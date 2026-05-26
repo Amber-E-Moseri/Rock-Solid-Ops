@@ -99,6 +99,8 @@
       <div id="tabContent"></div>
     </section>
   </div>
+  <script src="../js/config.js"></script>
+  <script src="../js/config-helper.js"></script>
   <script type="module">
     (() => {
       const THEME_KEY = "fs_help_guide_theme";
@@ -109,7 +111,7 @@
       const STATUS=[["PENDING","New registration waiting for review or assignment."],["REVIEW","Needs manual decision because automation could not finalize placement."],["ASSIGNED","Assigned to a class and ready for downstream workflows."],["WAITLISTED","No slot available yet; waiting for a class opening."],["DUPLICATE","Duplicate registration detected and flagged for review."]];
       const MILESTONES=["Born Again","Filled with Spirit","Partnership","Serving Team Interest","Foundation Completed"];
       const CONTACTS=[["Login and role access","Admin or superadmin"],["Class assignment issues","Admin or subgroup admin"],["Attendance issues","Teacher lead or admin"],["Email and notifications","Admin operations"],["Moodle sync issues","System admin"]];
-      const VISIBLE_ROLES={superadmin:["superadmin","admin"],admin:["admin"],regional_secretary:["regional_secretary","admin"],pastor:["pastor"],subgroup_admin:["subgroup_admin"],teacher:["teacher"]};
+      const VISIBLE_ROLES={superadmin:["superadmin","teacher"],admin:["admin","teacher"],regional_secretary:["regional_secretary","teacher"],pastor:["pastor","teacher"],subgroup_admin:["subgroup_admin","teacher"],teacher:["teacher"],principal:["principal","teacher"]};
       const allRoleKeys=Object.keys(ROLES); let visibleKeys=[...allRoleKeys], role="", tab="getting-started", searchIndex=[];
       const el={cards:document.getElementById("roleCards"),landing:document.getElementById("landingView"),guide:document.getElementById("guideView"),pill:document.getElementById("activeRolePill"),tabs:document.getElementById("tabButtons"),content:document.getElementById("tabContent"),crumb:document.getElementById("breadcrumb"),roleSwitcher:document.getElementById("roleSwitcher"),mobileRoleSwitcher:document.getElementById("mobileRoleSwitcher"),progress:document.getElementById("roleProgress"),searchInput:document.getElementById("searchInput"),headerSearchInput:document.getElementById("headerSearchInput"),mobileSearchInput:document.getElementById("mobileSearchInput"),searchResults:document.getElementById("searchResults"),clearSearch:document.getElementById("clearSearch"),homeBtn:document.getElementById("homeBtn"),themeToggle:document.getElementById("themeToggle"),mobileThemeToggle:document.getElementById("mobileThemeToggle"),printBtn:document.getElementById("printBtn"),mobilePrintBtn:document.getElementById("mobilePrintBtn"),viewingAs:document.getElementById("viewingAs"),landingNote:document.getElementById("landingNote"),backToRoles:document.getElementById("backToRoles"),mobileToolsToggle:document.getElementById("mobileToolsToggle"),mobileMenu:document.getElementById("mobileMenu")};
       const esc=(v)=>String(v??"").replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); const norm=(v)=>String(v||"").toLowerCase().trim(); const tId=(x)=>TABS.some((t)=>t[0]===x)?x:"getting-started"; const stepKey=(r,t,i)=>`${r}::${t}::${i}`;

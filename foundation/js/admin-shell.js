@@ -289,7 +289,12 @@
       visibleItems.forEach(function (item) {
         const isActive = item.key === active;
         const badge = bc[item.key] ? `<span class="sb-badge" style="background:var(--amber)">${bc[item.key]}</span>` : "";
-        nav += `<a class="sb-link${isActive ? " active" : ""}" href="${item.href}" data-key="${item.key}">${item.label}${badge}</a>`;
+        const iconText = String(item.icon || item.label || "?").slice(0, 2).toUpperCase();
+        nav += `<a class="sb-link${isActive ? " active" : ""}" href="${item.href}" data-key="${item.key}" title="${item.label}">
+          <span class="sb-icon">${iconText}</span>
+          <span>${item.label}</span>
+          ${badge}
+        </a>`;
       });
     });
     return nav;
@@ -341,6 +346,11 @@
     const effectiveRole = effectiveRoleFromMode(role, mode);
     if (!TEACHER_MODE_ELIGIBLE_ROLES.has(role) || mode !== "teacher") clearRegionalTeacherScope();
     if (isTeacherBlockedPage(active, effectiveRole)) {
+      if (TEACHER_MODE_ELIGIBLE_ROLES.has(role)) {
+        setRegionalMode("admin");
+        window.location.reload();
+        return;
+      }
       window.clearTimeout(mountFailSafeTimer);
       document.body.style.opacity = "1";
       renderDenied();
@@ -469,6 +479,19 @@
     collapseBtn && collapseBtn.addEventListener("click", function () {
       const next = !document.body.classList.contains("fs-shell-collapsed");
       applyCollapsedState(next);
+    });
+
+    // Fail-safe: allow expanding/collapsing from sidebar itself if topbar control is missed.
+    const sidebarLogo = sidebar.querySelector(".sb-logo");
+    const sidebarMark = sidebar.querySelector(".sb-mark");
+    function toggleCollapsedState() {
+      const next = !document.body.classList.contains("fs-shell-collapsed");
+      applyCollapsedState(next);
+    }
+    sidebarLogo && sidebarLogo.addEventListener("click", toggleCollapsedState);
+    sidebarMark && sidebarMark.addEventListener("click", toggleCollapsedState);
+    sidebar.addEventListener("dblclick", function () {
+      if (document.body.classList.contains("fs-shell-collapsed")) applyCollapsedState(false);
     });
 
     const modeAdminBtn = document.getElementById("fs-mode-admin");

@@ -136,6 +136,7 @@ const state = {
   selectedApplicantId: null,
   milestonesReady: true,
   isSuperadmin: false,
+  canManageDefinitions: false,
   editingDefCode: null
 };
 let rowEventsBound = false;
@@ -184,12 +185,12 @@ function renderDefinitionRows() {
       <td>${d.class_session_number ? `Class ${esc(d.class_session_number)}` : "General"}</td>
       <td><span class="fs-badge ${d.is_active ? "fs-badge-success" : "fs-badge-warning"}">${d.is_active ? "Active" : "Inactive"}</span></td>
       <td>
-        ${state.isSuperadmin ? `<button class="fs-btn fs-btn-secondary fs-btn-sm" data-edit-def="${esc(d.code)}">Edit</button> <button class="fs-btn fs-btn-danger fs-btn-sm" data-toggle-def="${esc(d.code)}">${d.is_active ? "Deactivate" : "Activate"}</button>` : "<span class=\"muted\">View only</span>"}
+        ${state.canManageDefinitions ? `<button class="fs-btn fs-btn-secondary fs-btn-sm" data-edit-def="${esc(d.code)}">Edit</button> <button class="fs-btn fs-btn-danger fs-btn-sm" data-toggle-def="${esc(d.code)}">${d.is_active ? "Deactivate" : "Activate"}</button>` : "<span class=\"muted\">View only</span>"}
       </td>
     </tr>
   `).join("") || `<tr><td colspan="5" class="muted">No milestone definitions found.</td></tr>`;
 
-  if (!state.isSuperadmin) return;
+  if (!state.canManageDefinitions) return;
   document.querySelectorAll("[data-edit-def]").forEach((btn) => btn.addEventListener("click", () => startEditDefinition(btn.dataset.editDef)));
   document.querySelectorAll("[data-toggle-def]").forEach((btn) => btn.addEventListener("click", () => toggleDefinitionActive(btn.dataset.toggleDef)));
 }
@@ -320,7 +321,7 @@ function startEditDefinition(code) {
 }
 
 async function saveDefinition() {
-  if (!state.isSuperadmin) return;
+  if (!state.canManageDefinitions) return;
   const code = String($("defCode").value || "").trim().toUpperCase().replace(/\s+/g, "_");
   const label = String($("defLabel").value || "").trim();
   const sessionRaw = String($("defSession").value || "").trim();
@@ -373,7 +374,7 @@ async function saveDefinition() {
 }
 
 async function toggleDefinitionActive(code) {
-  if (!state.isSuperadmin) return;
+  if (!state.canManageDefinitions) return;
   const d = getDefByCode(code);
   if (!d) return;
   const now = new Date().toISOString();
@@ -438,7 +439,7 @@ function wire() {
   $("milestoneFilter").addEventListener("change", (e) => { state.filters.milestone = e.target.value || ""; renderRows(); });
   $("statusFilter").addEventListener("change", (e) => { state.filters.status = e.target.value || ""; renderRows(); });
 
-  if (state.isSuperadmin) {
+  if (state.canManageDefinitions) {
     $("defSaveBtn").addEventListener("click", saveDefinition);
   }
 }
@@ -455,9 +456,10 @@ async function boot() {
   if (!(["admin", "superadmin"].includes(String(auth.profile?.role || "").toLowerCase()) || isRegionalSecretary(auth.profile?.role))) return;
   state.auth = auth;
   state.isSuperadmin = String(auth.profile?.role || "").toLowerCase() === "superadmin";
+  state.canManageDefinitions = ["superadmin", "admin", "regional_secretary"].includes(String(auth.profile?.role || "").toLowerCase());
 
-  $("defsRoleNote").textContent = state.isSuperadmin ? "Superadmin: full definition management" : "Admin: definition view only";
-  if (!state.isSuperadmin) {
+  $("defsRoleNote").textContent = state.canManageDefinitions ? "Definition management enabled" : "Definition view only";
+  if (!state.canManageDefinitions) {
     $("defsManage").classList.add("hidden");
   }
 
