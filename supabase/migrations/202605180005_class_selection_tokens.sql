@@ -1,4 +1,4 @@
-﻿create table if not exists public.class_selection_tokens (
+create table if not exists public.class_selection_tokens (
   id uuid primary key default gen_random_uuid(),
   token text not null unique default encode(gen_random_bytes(32), 'hex'),
   applicant_id uuid not null references public.applicants(id) on delete cascade,

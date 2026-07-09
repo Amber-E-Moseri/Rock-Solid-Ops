@@ -307,14 +307,25 @@
   };
 
   // Global production-safe runtime handlers so pages fail visibly instead of silently.
+  // Benign browser/extension noise that should never surface a toast.
+  const BENIGN_ERROR_RX = /ResizeObserver loop|ResizeObserver undelivered|^Script error\.?$|extension context invalidated/i;
   window.addEventListener("error", function (event) {
     const err = event?.error || event?.message || "Unknown runtime error";
+    if (BENIGN_ERROR_RX.test(String(event?.message || err))) return;
     console.error("[FSRuntime.global.error]", err);
-    RT.toast?.error?.("A runtime error occurred. Please refresh the page.");
+    // Defer so page-level handlers registered after this one can claim the
+    // event via preventDefault() and show their own UI instead.
+    setTimeout(function () {
+      if (event.defaultPrevented) return;
+      RT.toast?.error?.("A runtime error occurred. Please refresh the page.");
+    }, 0);
   });
   window.addEventListener("unhandledrejection", function (event) {
     const reason = event?.reason || "Unhandled promise rejection";
     console.error("[FSRuntime.global.unhandledrejection]", reason);
-    RT.toast?.error?.("A background request failed. Please retry.");
+    setTimeout(function () {
+      if (event.defaultPrevented) return;
+      RT.toast?.error?.("A background request failed. Please retry.");
+    }, 0);
   });
 })();

@@ -1,273 +1,118 @@
-<!DOCTYPE html>
+ï»¿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rock Solid — Admin Portal</title>
+  <title>Rock Solid â€” Admin Portal</title>
   <script src="../js/config.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --navy: var(--color-primary); --navy-d: var(--color-primary-hover); --navy-l: var(--color-primary-hover);
-      --gold: var(--color-warning); --cream: var(--color-bg);
-      --bg: var(--color-bg);
-      --border: var(--color-border);
-      --text: var(--color-text-primary); --muted: var(--color-text-muted);
-      --success: var(--color-success-fg); --success-bg: var(--color-success-bg); --success-bd: color-mix(in srgb, var(--color-success) 45%, #fff);
-      --danger:  var(--color-danger-fg); --danger-bg:  var(--color-danger-bg); --danger-bd:  color-mix(in srgb, var(--color-danger) 45%, #fff);
-      --warn:    var(--color-warning-fg); --warn-bg:    var(--color-warning-bg); --warn-bd:    color-mix(in srgb, var(--color-warning) 45%, #fff);
-      --info:    var(--color-info-fg); --info-bg:    var(--color-info-bg); --info-bd:    color-mix(in srgb, var(--color-info) 45%, #fff);
+      --r-lg: 14px;
+      --r-md: 10px;
+      --r-full: 9999px;
+      --soft-purple: color-mix(in srgb, var(--primary, #4C2A92) 12%, #ede9fe);
+      --warning: var(--warn, #c07400);
+      --shadow-soft: 0 2px 8px rgba(0,0,0,.08);
+      --primary-hover: #7d62c8;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+    body { font-family: "Manrope", system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
 
-    /* -- Loading / Access Denied -- */
+    /* Loading / Access Denied */
     #loading-screen {
-      position: fixed; inset: 0; background: var(--cream);
+      position: fixed; inset: 0; background: var(--bg);
       display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 100;
     }
-    .spinner {
-      width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--navy);
-      border-radius: 50%; animation: spin 0.75s linear infinite;
-    }
+    .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.75s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    #loading-screen p { color: var(--fs-text-muted); font-size: 15px; }
-
-    #access-denied {
-      display: none; position: fixed; inset: 0; background: var(--cream);
-      align-items: center; justify-content: center;
-    }
-    .denied-card {
-      background: #fff; border-radius: 16px; padding: 48px 40px; max-width: 420px; width: 100%;
-      text-align: center; box-shadow: 0 8px 32px rgba(76,42,146,0.12);
-    }
+    #access-denied { display: none; position: fixed; inset: 0; background: var(--bg); align-items: center; justify-content: center; }
+    .denied-card { background: #fff; border-radius: 16px; padding: 48px 40px; max-width: 420px; width: 100%; text-align: center; box-shadow: 0 8px 32px rgba(76,42,146,0.12); }
     .denied-card h2 { color: var(--danger); font-size: 20px; margin-bottom: 12px; }
-    .denied-card p  { color: var(--fs-text-muted); margin-bottom: 24px; line-height: 1.6; }
-
-    /* -- Portal shell -- */
+    .denied-card p  { color: var(--muted); margin-bottom: 24px; line-height: 1.6; }
     #portal { display: none; min-height: 100vh; }
 
-    /* -- Header -- */
-    header {
-      background: var(--navy); color: #fff;
-      position: sticky; top: 0; z-index: 50;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    }
-    .header-inner {
-      max-width: 1200px; margin: 0 auto; padding: 0 24px;
-      height: 62px; display: flex; align-items: center; justify-content: space-between;
-    }
-    .header-brand { display: flex; align-items: center; gap: 12px; }
-    .logo-mark {
-      width: 38px; height: 38px; background: var(--gold); border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 900; font-size: 14px; color: var(--navy); letter-spacing: -0.5px; flex-shrink: 0;
-    }
-    .brand-name { font-weight: 700; font-size: 16px; line-height: 1.2; }
-    .brand-sub  { font-size: 11px; opacity: 0.7; }
-    .header-right { display: flex; align-items: center; gap: 14px; }
-    .user-name  { font-weight: 600; font-size: 14px; }
-    .btn-logout {
-      padding: 7px 16px; background: rgba(255,255,255,0.15);
-      color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 7px;
-      font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.15s;
-    }
-    .btn-logout:hover { background: rgba(255,255,255,0.25); }
-
-    /* -- Toasts -- */
+    /* Toasts */
     #toasts { position: fixed; bottom: 24px; right: 24px; z-index: 200; display: flex; flex-direction: column; gap: 8px; }
-    .toast {
-      padding: 12px 18px; border-radius: 9px; font-size: 14px; font-weight: 500;
-      color: #fff; max-width: 340px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-      animation: fadeUp 0.25s ease;
-    }
+    .toast { padding: 12px 18px; border-radius: 9px; font-size: 14px; font-weight: 500; color: #fff; max-width: 340px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); animation: fadeUp 0.25s ease; }
     .toast-success { background: #16a34a; }
     .toast-error   { background: #dc2626; }
-    .toast-info    { background: var(--navy); }
+    .toast-info    { background: var(--primary); }
     @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
-    /* -- Main layout -- */
-    main { max-width: 1200px; margin: 0 auto; padding: 28px 24px 60px; display: flex; flex-direction: column; gap: 28px; }
-
-    /* -- Section cards -- */
-    .section { background: #fff; border-radius: 14px; border: 1px solid var(--border); overflow: hidden; }
-    .section-header {
-      padding: 18px 24px 16px; border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .section-header h2 { font-size: 16px; font-weight: 700; color: var(--navy); }
-    .section-body { padding: 20px 24px; }
-
-    /* -- Badges -- */
-    .badge {
-      display: inline-block; padding: 2px 10px; border-radius: 20px;
-      font-size: 12px; font-weight: 600; white-space: nowrap;
-    }
-    .badge-superadmin { background: #ede9fe; color: #5b21b6; }
-    .badge-subgroup_admin { background: var(--info-bg); color: var(--info); }
-    .badge-pastor { background: var(--warn-bg); color: var(--warn); }
-    .badge-active { background: var(--success-bg); color: var(--success); }
-    .badge-pending { background: var(--warn-bg); color: var(--warn); }
-    .badge-rejected { background: var(--danger-bg); color: var(--danger); }
-    .badge-suspended { background: #fff7ed; color: #c2410c; }
-    .badge-suspendedconfirmed { background: var(--danger-bg); color: var(--danger); }
-    .badge-ready { background: var(--success-bg); color: var(--success); }
-    .badge-close { background: var(--warn-bg); color: var(--warn); }
-    .badge-not-ready { background: #f1f5f9; color: #475569; }
-    .gate-ok  { color: #16a34a; font-size: 16px; }
-    .gate-no  { color: #d1d5db; font-size: 16px; }
-
-    /* -- Tables -- */
-    .table-wrap { overflow-x: auto; margin-top: 4px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-    thead tr { background: #f8f6ff; }
-    th { padding: 10px 14px; text-align: left; font-size: 12px; font-weight: 700; color: var(--fs-text-muted); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
-    td { padding: 11px 14px; border-top: 1px solid var(--border); vertical-align: middle; }
-    tr:hover td { background: #faf9ff; }
-    td.nowrap { white-space: nowrap; }
-    .table-mobile-cards { display: none; gap: 10px; margin-top: 10px; }
-    .table-mobile-card {
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: #fff;
-      padding: 12px;
-      box-shadow: 0 4px 14px rgba(76,42,146,0.08);
-    }
-    .table-mobile-title { font-size: 14px; font-weight: 800; color: var(--navy); margin-bottom: 6px; }
-    .table-mobile-meta { display: grid; gap: 4px; margin-bottom: 8px; }
-    .table-mobile-meta .meta-row { font-size: 12px; color: var(--fs-text-muted); }
-    .table-mobile-actions { margin-top: 8px; }
-
-    /* -- Buttons -- */
-    .btn-sm {
-      padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;
-      cursor: pointer; border: none; transition: opacity 0.15s; white-space: nowrap;
-    }
-    .btn-sm:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-approve  { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-bd); }
-    .btn-approve:hover:not(:disabled)  { background: #bbf7d0; }
-    .btn-reject   { background: var(--danger-bg);  color: var(--danger);  border: 1px solid var(--danger-bd); }
-    .btn-reject:hover:not(:disabled)   { background: #fecaca; }
-    .btn-reinstate{ background: var(--info-bg);    color: var(--info);    border: 1px solid var(--info-bd); }
-    .btn-reinstate:hover:not(:disabled){ background: #bfdbfe; }
-    .btn-suspend  { background: var(--warn-bg);    color: var(--warn);    border: 1px solid var(--warn-bd); }
-    .btn-suspend:hover:not(:disabled)  { background: #fde68a; }
-    .btn-confirm  { background: var(--danger-bg);  color: var(--danger);  border: 1px solid var(--danger-bd); }
-    .btn-confirm:hover:not(:disabled)  { background: #fecaca; }
-    .btn-primary {
-      padding: 11px 22px; background: var(--navy); color: #fff; border: none;
-      border-radius: 9px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s;
-    }
-    .btn-primary:hover:not(:disabled) { background: var(--navy-d); }
-    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-    .btn-outline {
-      padding: 10px 20px; background: #fff; color: var(--text); border: 1.5px solid var(--border);
-      border-radius: 9px; font-size: 14px; font-weight: 600; cursor: pointer;
-    }
-    .btn-outline:hover { background: #f8f6ff; }
-    .btn-danger {
-      padding: 10px 20px; background: var(--danger-bg); color: var(--danger);
-      border: 1.5px solid var(--danger-bd); border-radius: 9px; font-size: 14px; font-weight: 600; cursor: pointer;
-    }
-    .btn-danger:hover:not(:disabled) { background: #fecaca; }
-    .btn-danger:disabled { opacity: 0.6; cursor: not-allowed; }
-    .actions { display: flex; gap: 6px; flex-wrap: wrap; }
-
-    /* -- States -- */
-    .empty-state { color: var(--fs-text-muted); padding: 24px 0; text-align: center; font-size: 14px; }
-    .loading-state { color: var(--fs-text-muted); padding: 24px 0; text-align: center; }
-    .error-state {
-      background: var(--danger-bg); border: 1px solid var(--danger-bd); color: var(--danger);
-      border-radius: 8px; padding: 14px 18px; font-size: 13px; line-height: 1.6;
-    }
-    .error-state small { display: block; margin-top: 4px; opacity: 0.75; }
-
-    /* -- Dashboard grid -- */
-    .dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
-    .dash-card { background: #f8f6ff; border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
-    .dash-card-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
-    .dash-subgroup { font-weight: 700; color: var(--navy); font-size: 15px; }
-    .dash-group { font-size: 12px; color: var(--fs-text-muted); }
-    .dash-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .metric-val { display: block; font-size: 22px; font-weight: 800; color: var(--navy); line-height: 1; }
-    .metric-label { display: block; font-size: 11px; color: var(--fs-text-muted); margin-top: 3px; }
-
-    /* -- Attention flag -- */
-    .flag-on { color: #d97706; font-weight: 700; }
-    .flag-off { color: #d1d5db; }
-
-    /* -- Modal -- */
-    #modal-overlay {
-      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
-      align-items: center; justify-content: center; z-index: 150; padding: 20px;
-    }
+    /* Suspend modal */
+    #modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); align-items: center; justify-content: center; z-index: 150; padding: 20px; }
     #modal-overlay.open { display: flex; }
-    .modal {
-      background: #fff; border-radius: 16px; width: 100%; max-width: 480px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.25); overflow: hidden;
-    }
+    .modal { background: #fff; border-radius: 16px; width: 100%; max-width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); overflow: hidden; }
     .modal-head { padding: 22px 24px 18px; border-bottom: 1px solid var(--border); }
-    .modal-head h3 { font-size: 17px; font-weight: 700; color: var(--text); }
-    .modal-head p  { font-size: 13.5px; color: var(--fs-text-muted); margin-top: 4px; }
+    .modal-head h3 { font-size: 17px; font-weight: 700; }
+    .modal-head p  { font-size: 13.5px; color: var(--muted); margin-top: 4px; }
     .modal-body { padding: 22px 24px; }
     label.modal-label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 7px; }
     .required { color: var(--danger); }
-    textarea#modal-reason {
-      width: 100%; padding: 10px 14px; border: 1.5px solid #dde0e8; border-radius: 8px;
-      font-size: 14px; font-family: inherit; resize: vertical; min-height: 90px; line-height: 1.5;
-    }
-    textarea#modal-reason:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(76,42,146,0.1); }
+    textarea#modal-reason { width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical; min-height: 90px; }
+    textarea#modal-reason:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(76,42,146,0.1); }
     .modal-error { display: none; background: var(--danger-bg); border: 1px solid var(--danger-bd); color: var(--danger); border-radius: 7px; padding: 9px 13px; font-size: 13px; margin-top: 12px; }
     .modal-error.show { display: block; }
     .modal-foot { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
 
-    /* -- Section header actions -- */
-    .section-header-actions { display: flex; gap: 8px; align-items: center; }
-
-    /* -- Batch status badges -- */
-    .badge-draft     { background: #f1f5f9; color: #475569; }
-    .badge-open      { background: var(--info-bg); color: var(--info); }
-    .badge-completed { background: #f0fdf4; color: #15803d; }
-    .badge-archived  { background: #f3f4f6; color: #9ca3af; }
-
-    /* -- Form fields (batch + moodle modals) -- */
-    .modal-form   { display: flex; flex-direction: column; gap: 14px; }
-    .form-row     { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    .form-group   { display: flex; flex-direction: column; gap: 5px; }
-    .form-group label { font-size: 13px; font-weight: 600; color: #444; }
-    .form-group input,
-    .form-group select {
-      padding: 9px 12px; border: 1.5px solid #dde0e8; border-radius: 8px;
-      font-size: 14px; font-family: inherit; background: #fafafa; color: #222;
-      transition: border-color 0.15s, box-shadow 0.15s;
-    }
-    .form-group input:focus,
-    .form-group select:focus {
-      outline: none; border-color: var(--navy); background: #fff;
-      box-shadow: 0 0 0 3px rgba(76,42,146,0.1);
-    }
-    .form-group input:disabled { background: #f1f5f9; color: #9ca3af; cursor: not-allowed; }
-
-    /* -- Moodle group rows -- */
-    .moodle-group-row {
-      background: #f8f6ff; border: 1px solid var(--border); border-radius: 10px;
-      padding: 14px 16px; margin-bottom: 10px;
-    }
-    .moodle-group-row:last-of-type { margin-bottom: 0; }
-    .moodle-group-label {
-      font-size: 13px; font-weight: 700; color: var(--navy);
-      margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.04em;
-    }
-
-    @media (max-width: 640px) {
-      .header-inner { padding: 0 16px; }
-      main { padding: 16px 12px 48px; }
-      .section-body { padding: 16px; }
-      .form-row { grid-template-columns: 1fr; }
-      .table-wrap { display: none; }
-      .table-mobile-cards { display: grid; }
-    }
+    /* Hub page */
+    .ap-page { padding: 28px 24px 60px; display: flex; flex-direction: column; gap: 20px; }
+    .ap-head h1 { font-size: clamp(1.6rem, 3vw, 2.1rem); font-weight: 800; color: var(--text); margin: 0 0 4px; }
+    .ap-head p  { color: var(--muted); font-size: 14px; margin: 0; max-width: 600px; }
+    .ap-hero { background: linear-gradient(135deg, #44267F, #2A2440); border-radius: 20px; padding: 28px 32px; position: relative; overflow: hidden; color: #fff; }
+    .ap-hero::after  { content:''; position:absolute; right:-40px; top:-40px; width:180px; height:180px; border-radius:50%; background:rgba(255,255,255,.07); }
+    .ap-hero::before { content:''; position:absolute; right:60px; bottom:-70px; width:150px; height:150px; border-radius:50%; background:rgba(244,190,65,.12); }
+    .ap-hero-content { position: relative; z-index: 1; }
+    .ap-greeting  { font-size: clamp(1.15rem, 2.6vw, 1.5rem); font-weight: 800; margin: 0 0 6px; }
+    .ap-hero-sub  { font-size: 13.5px; opacity: .82; margin: 0 0 22px; line-height: 1.55; max-width: 520px; }
+    .ap-stats     { display: flex; gap: 36px; flex-wrap: wrap; }
+    .ap-stat-val  { display: block; font-size: 28px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+    .ap-stat-val.accent { color: #f4be41; }
+    .ap-stat-lbl  { display: block; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; opacity: .75; margin-top: 2px; }
+    .ap-sec-label { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 4px 0 0; }
+    .ap-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+    .ap-card { background: var(--surface,#fff); border: 1px solid var(--border); border-radius: var(--r-lg,14px); padding: 18px; box-shadow: var(--shadow-soft); cursor: pointer; transition: transform .14s, box-shadow .18s, border-color .14s; text-decoration: none; color: inherit; display: block; }
+    .ap-card:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(76,42,146,.12); border-color: color-mix(in srgb, var(--primary) 28%, var(--border)); }
+    .ap-card-icon  { width: 42px; height: 42px; border-radius: 12px; background: var(--soft-purple,#EDE9FE); color: var(--primary); display: flex; align-items: center; justify-content: center; margin-bottom: 13px; }
+    .ap-card-icon svg { width: 21px; height: 21px; stroke: currentColor; stroke-width: 1.8; fill: none; }
+    .ap-card-icon.gold  { background: #FBEFCF; color: #B8860B; }
+    .ap-card-icon.navy  { background: #E5E3EE; color: var(--navy,#3D2A8A); }
+    .ap-card-icon.green { background: var(--success-bg,#ECFDF3); color: var(--success,#22C55E); }
+    .ap-card-icon.red   { background: var(--danger-bg,#FCEBEB); color: var(--danger,#EF4444); }
+    .ap-card-hd    { display: flex; align-items: center; gap: 8px; }
+    .ap-card-title { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }
+    .ap-card-badge { font-size: 11px; font-weight: 800; background: var(--soft-purple,#EDE9FE); color: var(--primary); border-radius: 999px; padding: 1px 8px; }
+    .ap-card-badge.red { color: var(--danger); background: var(--danger-bg,#FCEBEB); }
+    .ap-card-desc  { font-size: 12.5px; color: var(--muted); font-weight: 500; margin-top: 4px; line-height: 1.4; }
+    .ap-card-open  { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 700; color: var(--primary); margin-top: 12px; }
+    .ap-two { display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; }
+    .ap-panel { background: var(--surface,#fff); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+    .ap-panel-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+    .ap-panel-head h3 { font-size: 14px; font-weight: 700; }
+    .ap-panel-head a  { font-size: 12.5px; font-weight: 700; color: var(--primary); text-decoration: none; }
+    .ap-panel-body { padding: 4px 0; }
+    .ap-feed-item { display: flex; gap: 12px; padding: 12px 16px; }
+    .ap-feed-item + .ap-feed-item { border-top: 1px solid var(--border); }
+    .ap-av { width: 32px; height: 32px; border-radius: 999px; background: var(--soft-purple,#EDE9FE); color: var(--primary); font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .ap-av.sys { background: var(--navy,#3D2A8A); color: #fff; }
+    .ap-feed-tx { font-size: 13.5px; line-height: 1.4; }
+    .ap-feed-tx b { font-weight: 800; }
+    .ap-feed-tx .t { font-size: 11px; color: var(--muted); font-weight: 600; margin-top: 2px; }
+    .ap-health-row { display: flex; align-items: center; gap: 11px; padding: 11px 16px; }
+    .ap-health-row + .ap-health-row { border-top: 1px solid var(--border); }
+    .ap-hdot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .ap-hdot.ok   { background: var(--success,#22C55E); }
+    .ap-hdot.warn { background: var(--warning,#F59E0B); }
+    .ap-hdot.bad  { background: var(--danger,#EF4444); }
+    .ap-hn { flex: 1; font-size: 13.5px; font-weight: 700; }
+    .ap-hv { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+    @media (max-width: 860px) { .ap-two { grid-template-columns: 1fr; } }
+    @media (max-width: 520px) { .ap-page { padding: 16px 12px 48px; } .ap-stats { gap: 20px; } }
   </style>
-  <link rel="stylesheet" href="../ui/tokens.css" />
+  
   <link rel="stylesheet" href="../ui/premium-theme.css" />
   <link rel="stylesheet" href="../ui/admin-shell.css" />
   <link rel="stylesheet" href="../ui/primitives.css" />
@@ -279,7 +124,7 @@
   <!-- Loading -->
   <div id="loading-screen">
     <div class="spinner"></div>
-    <p>Loading portal…</p>
+    <p>Loading portalâ€¦</p>
   </div>
 
   <!-- Access denied -->
@@ -305,143 +150,12 @@
       </div>
       <div class="modal-body">
         <label class="modal-label" for="modal-reason">Reason for Suspension <span class="required">*</span></label>
-        <textarea id="modal-reason" placeholder="Describe the reason…"></textarea>
+        <textarea id="modal-reason" placeholder="Describe the reasonâ€¦"></textarea>
         <div class="modal-error" id="modal-err"></div>
       </div>
       <div class="modal-foot">
         <button class="fs-btn fs-btn fs-btn-secondary-outline" onclick="closeModal()">Cancel</button>
         <button class="fs-btn fs-btn fs-btn-secondary-danger" id="modal-submit" onclick="confirmSuspend()">Confirm Suspension</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Batch create/edit modal -->
-  <div id="batch-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;z-index:150;padding:20px;">
-    <div class="modal" style="max-width:540px;">
-      <div class="modal-head">
-        <h3 id="bm-title">Create New Batch</h3>
-      </div>
-      <div class="modal-body">
-        <div class="modal-form">
-          <div class="form-row">
-            <div class="form-group">
-              <label for="bm-batch-id">Batch ID <span class="required">*</span></label>
-              <input id="bm-batch-id" type="text" placeholder="e.g. 2026A">
-            </div>
-            <div class="form-group">
-              <label for="bm-status">Status</label>
-              <select id="bm-status">
-                <option value="Draft">Draft</option>
-                <option value="Open">Open</option>
-                <option value="Active">Active</option>
-                <option value="Completed">Completed</option>
-                <option value="Archived">Archived</option>
-                <option value="Suspended">Suspended</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="bm-batch-name">Batch Name <span class="required">*</span></label>
-            <input id="bm-batch-name" type="text" placeholder="e.g. Rock Solid 2026 — Batch A">
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label for="bm-start-sunday">Start Sunday <span class="required">*</span></label>
-              <input id="bm-start-sunday" type="date">
-            </div>
-            <div class="form-group">
-              <label for="bm-start-date">Start Date <span class="required">*</span></label>
-              <input id="bm-start-date" type="date">
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="bm-end-date">End Date</label>
-            <input id="bm-end-date" type="date">
-          </div>
-        </div>
-        <div class="modal-error" id="bm-err"></div>
-      </div>
-      <div class="modal-foot">
-        <button class="fs-btn fs-btn fs-btn-secondary-outline" onclick="closeBatchModal()">Cancel</button>
-        <button class="fs-btn fs-btn fs-btn-secondary-primary" id="bm-submit" onclick="saveBatch()">Save Batch</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Moodle mapping modal -->
-  <div id="moodle-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;z-index:150;padding:20px;">
-    <div class="modal" style="max-width:560px;max-height:90vh;overflow-y:auto;">
-      <div class="modal-head">
-        <h3>Moodle Course Mapping</h3>
-        <p id="mm-batch-label" style="color:var(--fs-text-muted);font-size:13px;margin-top:4px;"></p>
-      </div>
-      <div class="modal-body">
-        <p style="color:var(--fs-text-muted);font-size:13px;margin-bottom:16px;line-height:1.5;">
-          Set the Moodle course each group uses for this batch.
-          Subgroups (e.g. CSGA, CSGB) inherit their parent group's course automatically.
-        </p>
-        <div class="moodle-group-row">
-          <div class="moodle-group-label">CE — Central East</div>
-          <div class="modal-form">
-            <div class="form-group">
-              <label for="mm-CE-id">Moodle Course ID <span class="required">*</span></label>
-              <input id="mm-CE-id" type="text" placeholder="Course ID in Moodle">
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="mm-CE-name">Course Name</label>
-                <input id="mm-CE-name" type="text" placeholder="Display name">
-              </div>
-              <div class="form-group">
-                <label for="mm-CE-url">Course URL</label>
-                <input id="mm-CE-url" type="text" placeholder="https://…">
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="moodle-group-row">
-          <div class="moodle-group-label">CS — Central South</div>
-          <div class="modal-form">
-            <div class="form-group">
-              <label for="mm-CS-id">Moodle Course ID <span class="required">*</span></label>
-              <input id="mm-CS-id" type="text" placeholder="Course ID in Moodle">
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="mm-CS-name">Course Name</label>
-                <input id="mm-CS-name" type="text">
-              </div>
-              <div class="form-group">
-                <label for="mm-CS-url">Course URL</label>
-                <input id="mm-CS-url" type="text">
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="moodle-group-row">
-          <div class="moodle-group-label">WS — West</div>
-          <div class="modal-form">
-            <div class="form-group">
-              <label for="mm-WS-id">Moodle Course ID <span class="required">*</span></label>
-              <input id="mm-WS-id" type="text" placeholder="Course ID in Moodle">
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="mm-WS-name">Course Name</label>
-                <input id="mm-WS-name" type="text">
-              </div>
-              <div class="form-group">
-                <label for="mm-WS-url">Course URL</label>
-                <input id="mm-WS-url" type="text">
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-error" id="mm-err"></div>
-      </div>
-      <div class="modal-foot">
-        <button class="fs-btn fs-btn fs-btn-secondary-outline" onclick="closeMoodleModal()">Cancel</button>
-        <button class="fs-btn fs-btn fs-btn-secondary-primary" id="mm-submit" onclick="saveMoodleMappings()">Save Mappings</button>
       </div>
     </div>
   </div>
@@ -456,6 +170,7 @@
   <script src="../ui/premium-shell.js"></script>
 </body>
 </html>
+
 
 
 

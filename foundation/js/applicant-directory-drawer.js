@@ -1,6 +1,23 @@
 ﻿(function (global) {
   const Drawer = (global.FSApplicantDirectoryDrawer = global.FSApplicantDirectoryDrawer || {});
 
+  function setKv(containerId, fields) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.replaceChildren(
+      ...fields.map(({ label, value }) => {
+        const div = document.createElement("div");
+        const l = document.createElement("label");
+        l.textContent = label;
+        const strong = document.createElement("strong");
+        strong.textContent = value;
+        div.appendChild(l);
+        div.appendChild(strong);
+        return div;
+      })
+    );
+  }
+
   function listRows(ctx, items, renderLabel) {
     const { esc, fmt } = ctx;
     if (!items.length) return `<div class="row muted">No records yet.</div>`;
@@ -8,7 +25,7 @@
   }
 
   Drawer.renderDrawerContent = function renderDrawerContent(ctx, applicantId) {
-    const { state, $, esc, milestoneKeys, milestoneLabels, getApplicantMilestones, getClassInfo, getAttendanceSummary, getNotificationRows, getAttendanceStatusCounts, attendanceStatusBadge, displayGroupValue, displaySubgroupValue } = ctx;
+    const { state, $, esc, milestoneKeys, milestoneLabels, getApplicantMilestones, getClassInfo, getAttendanceSummary, getNotificationRows, getAttendanceStatusCounts, attendanceStatusBadge, displayGroupValue, displaySubgroupValue, getDuplicateGroup, getGroupDuplicates, getDuplicateNotificationsForGroup, buildDuplicateApplicantDetails, getDuplicateGroupStatus } = ctx;
     const app = state.applicants.find((a) => String(a.id) === String(applicantId));
     if (!app) return null;
     state.selectedApplicantId = String(app.id);
@@ -19,12 +36,41 @@
     const moodleStatus = state.moodle.find((m) => String(m.applicant_id || m.student_id || "") === String(app.id))?.status || "Unknown";
     $("drawerName").textContent = app.full_name || "Student";
     $("drawerSub").textContent = `${app.email || "-"} · ${app.phone || app.phone_number || "-"}`;
-    $("overviewKv").innerHTML = `<div><label>Fellowship</label><strong>${esc(app.fellowship_code || app.fellowship || app.subgroup_id || "-")}</strong></div><div><label>Group / Subgroup</label><strong>${esc(displayGroupValue(app))} / ${esc(displaySubgroupValue(app))}</strong></div><div><label>Assigned Class</label><strong>${esc(app.class_option_id || "-")}</strong></div><div><label>Teacher</label><strong>${esc(cls?.teacher_name || cls?.teacher_id || "-")}</strong></div><div><label>Batch</label><strong>${esc(app.batch_id || cls?.batch_id || "-")}</strong></div><div><label>Moodle Sync</label><strong>${esc(moodleStatus)}</strong></div><div><label>ClickUp Task</label><strong>${esc(app.clickup_task_url || app.clickup_url || "Not linked")}</strong></div>`;
+    setKv("overviewKv", [
+      { label: "Fellowship", value: app.fellowship_code || app.fellowship || app.subgroup_id || "-" },
+      { label: "Group / Subgroup", value: `${displayGroupValue(app)} / ${displaySubgroupValue(app)}` },
+      { label: "Assigned Class", value: app.class_option_id || "-" },
+      { label: "Teacher", value: cls?.teacher_name || cls?.teacher_id || "-" },
+      { label: "Batch", value: app.batch_id || cls?.batch_id || "-" },
+      { label: "Moodle Sync", value: moodleStatus },
+      { label: "ClickUp Task", value: app.clickup_task_url || app.clickup_url || "Not linked" },
+    ]);
     const applicantMilestones = new Set(getApplicantMilestones(app));
     const labels = milestoneLabels();
     $("milestoneChips").innerHTML = milestoneKeys().map((k) => `<span class="chip" style="opacity:${applicantMilestones.has(k) ? 1 : .45}">${esc(labels[k] || k)}</span>`).join("");
-    $("attendanceKv").innerHTML = `<div><label>Attendance %</label><strong>${attendance.pct == null ? "-" : `${attendance.pct}%`}</strong></div><div><label>Sessions Attended</label><strong>${attendance.attended}/${attendance.total}</strong></div><div><label>Last Attendance</label><strong>${esc(ctx.fmt(attendance.last))}</strong></div><div><label>Missing Sessions</label><strong>${attendance.missing}</strong></div>`;
+    setKv("attendanceKv", [
+      { label: "Attendance %", value: attendance.pct == null ? "-" : `${attendance.pct}%` },
+      { label: "Sessions Attended", value: `${attendance.attended}/${attendance.total}` },
+      { label: "Last Attendance", value: ctx.fmt(attendance.last) },
+      { label: "Missing Sessions", value: String(attendance.missing) },
+    ]);
     $("attendanceKv").insertAdjacentHTML("beforeend", `<div style="grid-column:1/-1"><label>Attendance Session Status</label><div class="chips" style="margin-top:6px">${[attendanceStatusBadge("Submitted", "completed", statusCounts.SUBMITTED), attendanceStatusBadge("Late Start", "unassigned", statusCounts.LATE_START), attendanceStatusBadge("Missing", "duplicate", statusCounts.MISSING)].filter(Boolean).join("") || '<span class="muted">No attendance status rows yet.</span>'}</div></div>`);
+    const duplicateGroup = getDuplicateGroup ? getDuplicateGroup(app) : null;
+    const duplicateSection = $("duplicateSection");
+    if (duplicateGroup && duplicateSection) {
+      const details = buildDuplicateApplicantDetails ? buildDuplicateApplicantDetails(duplicateGroup) : [];
+      const groupMembers = getGroupDuplicates ? getGroupDuplicates(app) : [];
+      const groupNotifications = getDuplicateNotificationsForGroup ? getDuplicateNotificationsForGroup(duplicateGroup.id) : [];
+      duplicateSection.style.display = "";
+      $("duplicateKv").innerHTML = `<div><label>Applicant status</label><strong>${esc(String(app.duplicate_status || "UNIQUE").toUpperCase())}</strong></div><div><label>Group status</label><strong>${esc(getDuplicateGroupStatus ? getDuplicateGroupStatus(duplicateGroup) : duplicateGroup.status || "-")}</strong></div><div><label>Group count</label><strong>${esc(String(duplicateGroup.duplicate_count || groupMembers.length || 0))}</strong></div><div><label>Notification state</label><strong>${esc(groupNotifications[0]?.notification_status || "none")}</strong></div>`;
+      $("duplicateGroupMembers").innerHTML = details.length
+        ? details.map((member) => `<div class="row"><span>${esc(member.name || member.email || "Unknown")} · ${esc(member.subgroup || "—")}</span><span class="muted">${esc(ctx.fmt(member.created_at))}</span></div>`).join("")
+        : `<div class="row muted">No duplicate group members available.</div>`;
+    } else if (duplicateSection) {
+      duplicateSection.style.display = "none";
+      $("duplicateKv").innerHTML = "";
+      $("duplicateGroupMembers").innerHTML = "";
+    }
     const notifRows = getNotificationRows(app).slice(0, 40);
     $("notificationHistory").innerHTML = listRows(ctx, notifRows, (n) => `${esc(String(n.status || n.event_status || n.provider_status || "PENDING").toUpperCase())} · ${esc(n.event_type || "EVENT")}`);
     const emailRows = state.emails.filter((e) => {

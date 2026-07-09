@@ -19,6 +19,37 @@
   --shadow-soft: 0 4px 18px rgba(23, 19, 39, 0.05);
   --radius: 20px;
 
+  /* Status surface tokens */
+  --success-bg: #E7F7EC;
+  --success-bd: color-mix(in srgb, var(--success) 35%, var(--success-bg));
+  --warn: #D97706;
+  --warn-bg: #FFF3DD;
+  --warn-bd: color-mix(in srgb, var(--warn) 35%, var(--warn-bg));
+  --danger-bg: #FCEBEB;
+  --danger-bd: color-mix(in srgb, var(--danger) 35%, var(--danger-bg));
+  --info: #2563EB;
+  --info-bg: #E9EEFF;
+  --info-bd: color-mix(in srgb, var(--info) 35%, var(--info-bg));
+  --amber: #F4BE41;
+  --amber-d: #D4A520;
+
+  /* Component radius scale (matches design spec --r-*) */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-full: 999px;
+
+  /* Elevation micro */
+  --sh-xs: 0 2px 8px rgba(23, 19, 39, 0.06);
+
+  /* Surface aliases */
+  --surface-alt: var(--surface-2);
+  --navy-ghost: rgba(44, 29, 100, 0.08);
+
+  /* Text scale */
+  --text-2: #463D5E;
+  --soft-lav: #F5F1FF;
+
   /* Legacy teacher-portal tokens (backward-compatible aliases) */
   --navy: #3D2A8A;
   --ink: #1E1535;
@@ -46,6 +77,20 @@ html[data-theme="dark"] {
   --border: rgba(255,255,255,0.08);
   --shadow: 0 14px 34px rgba(0, 0, 0, 0.35);
   --shadow-soft: 0 6px 22px rgba(0, 0, 0, 0.22);
+
+  /* Status surface tokens (dark) */
+  --success-bg: #173625;
+  --success-bd: color-mix(in srgb, var(--success) 35%, var(--success-bg));
+  --warn-bg: #3A2800;
+  --warn-bd: color-mix(in srgb, var(--warn) 35%, var(--warn-bg));
+  --danger-bg: #3A1010;
+  --danger-bd: color-mix(in srgb, var(--danger) 35%, var(--danger-bg));
+  --info-bg: #0E1F44;
+  --info-bd: color-mix(in srgb, var(--info) 35%, var(--info-bg));
+  --surface-alt: var(--surface-2);
+  --navy-ghost: rgba(139, 107, 255, 0.12);
+  --text-2: #A39BB8;
+  --soft-lav: #241c38;
 
   /* Legacy dark-mode overrides */
   --navy: #8B6BFF;

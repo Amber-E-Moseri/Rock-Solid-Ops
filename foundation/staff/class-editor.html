@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Rock Solid - Class Editor</title>
+  <title>Rock Solid — Class Editor</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -13,227 +13,249 @@
   <link rel="stylesheet" href="../ui/layout.css" />
   <link rel="stylesheet" href="../ui/primitives.css" />
   <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: "Manrope", sans-serif; color: var(--color-text-primary); background: var(--color-bg); min-height: 100dvh; }
-    .btn { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-1) var(--space-3); font: 500 var(--fs-meta)/1.4 inherit; background: var(--color-surface); color: var(--color-text-primary); cursor: pointer; white-space: nowrap; }
-    .btn:hover { background: var(--color-surface-raised); }
+    :root {
+      --primary-hover: #5B34B3;
+      --soft-lav: #F5F1FF;
+      --bg-page: #F7F5FB;
+      --border-soft: #E9E4F5;
+      --text-strong: #171327;
+      --text-muted: #6E6885;
+    }
+    body { background: var(--bg-page); }
+    .fs-page.fs-wrap-xl { max-width: none; width: 100%; padding: 34px 38px 40px; }
+    .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 18px; flex-wrap: wrap; }
+    .page-head h1 { font-size: 32px; font-weight: 800; letter-spacing: -.03em; line-height: 1.06; margin: 0; color: var(--text-strong); }
+    .page-head p  { color: var(--text-muted); margin: 10px 0 0; font-size: 18px; line-height: 1.45; font-weight: 500; max-width: 760px; }
+    .page-head-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 12px 18px; border-radius: 18px; border: 1px solid var(--border-soft); background: #fff; color: var(--text-strong); font: 700 13.5px/1 "Manrope", sans-serif; cursor: pointer; white-space: nowrap; transition: box-shadow .14s, background .12s, border-color .12s; }
+    .btn:hover { background: #faf7ff; box-shadow: 0 6px 18px rgba(23,19,39,.06); }
     .btn:disabled { opacity: .5; cursor: not-allowed; }
-    .btn-primary { background: var(--color-primary); color: var(--color-primary-fg); border-color: var(--color-primary); }
-    .btn-danger  { background: var(--color-danger-bg); color: var(--color-danger-fg); border-color: color-mix(in srgb,var(--color-danger-fg) 30%,transparent); }
-    .btn-sm { padding: 2px 8px; font-size: 11px; }
-    .edit-panel { background: var(--color-surface-raised); border-top: 1px solid var(--color-border); padding: var(--space-4); }
-    .form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-3); margin-bottom: var(--space-3); }
-    @media (max-width: 900px) { .form-grid { grid-template-columns: 1fr 1fr; } }
-    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
-    .form-field label { display: block; font-size: 12px; font-weight: 700; color: var(--color-text-muted); margin-bottom: 4px; }
-    .toggle-row { display: flex; align-items: center; gap: 12px; }
-    .toggle { position: relative; display: inline-block; width: 40px; height: 22px; }
+    .btn-primary { background: linear-gradient(140deg, var(--primary-hover), var(--primary, #4C2A92)); color: #fff; border-color: var(--primary); box-shadow: 0 12px 26px rgba(76,42,146,.22); }
+    .btn-danger  { background: var(--danger-bg); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
+    .btn-sm { padding: 9px 12px; font-size: 12px; border-radius: 14px; }
+    .msg { padding: 12px 14px; border: 1px solid var(--border-soft); border-radius: 16px; background: #fff; font-size: 14px; }
+    .msg.error { border-color: color-mix(in srgb, var(--danger) 30%, transparent); background: var(--danger-bg); color: var(--danger); }
+    .msg.success { border-color: color-mix(in srgb, var(--success) 30%, transparent); background: var(--success-bg); color: var(--success); }
+    .new-panel, .mass-panel { background: #fff; border: 1px solid var(--border-soft); border-radius: 24px; padding: 20px 22px; margin-bottom: 18px; box-shadow: 0 8px 24px rgba(23,19,39,.04); }
+    .new-panel { border-color: var(--primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 10%, transparent); }
+    .new-panel h2, .mass-panel h2 { margin: 0 0 14px; font-size: 15px; font-weight: 800; color: var(--text-strong); }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 20px; margin-bottom: 14px; }
+    .form-field label, .editor-section-label { display: block; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); margin-bottom: 10px; }
+    .fs-input, .fs-select { width: 100%; min-height: 52px; font-family: inherit; font-size: 14px; font-weight: 700; padding: 13px 16px; border-radius: 18px; border: 1px solid var(--border-soft); background: #FCFBFF; color: var(--text-strong); transition: border-color .14s, box-shadow .14s; }
+    .fs-input:focus, .fs-select:focus { outline: none; border-color: var(--primary); background: #fff; box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 14%, transparent); }
+    .toggle-row, .toggle-stack { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .toggle-stack { gap: 32px; margin-top: 8px; }
+    .toggle-pill { display: inline-flex; align-items: center; gap: 10px; color: var(--text-muted); font-size: 13px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
+    .toggle { position: relative; display: inline-block; width: 54px; height: 30px; }
     .toggle input { opacity: 0; width: 0; height: 0; }
-    .slider { position: absolute; inset: 0; background: var(--color-border); border-radius: 22px; cursor: pointer; transition: .2s; }
-    .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .2s; }
-    input:checked + .slider { background: var(--color-primary); }
-    input:checked + .slider:before { transform: translateX(18px); }
-    .fc-chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 36px; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 6px; background: var(--color-surface); }
-    .fc-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--color-primary); color: var(--color-primary-fg); border-radius: var(--radius-full); padding: 2px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
-    .fc-chip-add { background: var(--color-surface-raised); color: var(--color-text-primary); border: 1px dashed var(--color-border); }
-    .msg { padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-raised); font-size: var(--fs-body); }
-    .msg.error   { border-color: color-mix(in srgb,var(--color-danger-fg) 30%,transparent); background: var(--color-danger-bg); color: var(--color-danger-fg); }
-    .msg.success { border-color: color-mix(in srgb,var(--color-success-fg) 30%,transparent); background: var(--color-success-bg); color: var(--color-success-fg); }
-    .new-panel { background: var(--color-surface); border: 1px solid var(--color-primary); border-radius: var(--radius-md); padding: var(--space-4); margin-bottom: var(--space-4); }
-    .new-panel h2 { margin: 0 0 var(--space-3); font-size: var(--fs-body); color: var(--color-primary); }
+    .slider { position: absolute; inset: 0; background: #DDD7EC; border-radius: 999px; cursor: pointer; transition: .18s; }
+    .slider::before { position: absolute; content: ""; height: 24px; width: 24px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .18s; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+    input:checked + .slider { background: var(--primary); }
+    input:checked + .slider::before { transform: translateX(24px); }
+    .fc-chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 52px; border: 1px solid var(--border-soft); border-radius: 18px; padding: 9px; background: #fff; }
+    .fc-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--primary); color: #fff; border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .fc-chip-add { background: #faf7ff; color: var(--text-strong); border: 1px dashed var(--border-soft); }
+    .filter-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+    .filter-bar .fs-select { width: auto; }
+    #activeOnlyLabel { font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-muted); }
+    .editor-workspace { display: grid; grid-template-columns: 404px minmax(0,1fr); gap: 20px; align-items: start; }
+    .class-rail-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 4px 10px; color: #5D5680; font-weight: 700; }
+    .class-rail-top button { background: none; border: none; color: var(--primary); font: inherit; cursor: pointer; padding: 0; }
+    .class-list { display: flex; flex-direction: column; gap: 12px; }
+    .class-card { background: #fff; border: 1px solid var(--border-soft); border-radius: 24px; padding: 18px 16px; display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; cursor: pointer; box-shadow: 0 4px 10px rgba(23,19,39,.04); transition: border-color .14s, box-shadow .14s, transform .14s; }
+    .class-card:hover { box-shadow: 0 10px 22px rgba(76,42,146,.08); transform: translateY(-1px); }
+    .class-card.active { border-color: #6D45C7; box-shadow: 0 0 0 3px rgba(76,42,146,.12); }
+    .class-card.is-inactive { background: #FCFBFF; border-style: dashed; }
+    .class-dot { width: 10px; height: 10px; border-radius: 999px; background: #4C2A92; }
+    .class-card.warn .class-dot { background: #D79D11; }
+    .class-card.inactive .class-dot { background: #595777; }
+    .class-card-title { font-size: 18px; font-weight: 800; letter-spacing: -.02em; color: var(--text-strong); }
+    .class-card-meta { margin-top: 6px; color: var(--text-muted); font-size: 13px; line-height: 1.45; }
+    .class-card-count { font-size: 14px; font-weight: 800; color: #3E3561; white-space: nowrap; }
+    .mass-check { width: 16px; height: 16px; }
+    .editor-panel { background: #fff; border: 1px solid var(--border-soft); border-radius: 28px; overflow: hidden; box-shadow: 0 8px 30px rgba(23,19,39,.04); }
+    .editor-panel-head { padding: 24px 28px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid #EEE8FF; flex-wrap: wrap; }
+    .editor-panel-title { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .editor-panel-title h2 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.03em; color: var(--text-strong); }
+    .editor-badges { display: flex; gap: 10px; flex-wrap: wrap; }
+    .status-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 800; letter-spacing: .02em; }
+    .status-badge.active { color: #0B9D4A; background: #E8F8EE; }
+    .status-badge.open { color: #5C33B5; background: #EFE8FF; }
+    .status-badge.closed { color: #D97706; background: #FFF1D8; }
+    .editor-body { padding: 24px 28px 28px; }
+    .editor-help { margin: 12px 0 0; color: var(--text-muted); font-size: 14px; line-height: 1.45; }
+    .capacity-preview { margin-top: 26px; }
+    .capacity-bar { position: relative; width: 100%; height: 12px; background: #F1ECFB; border-radius: 999px; overflow: hidden; }
+    .capacity-fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #5B34B3, #4C2A92); border-radius: 999px; }
+    .capacity-meta { display: flex; justify-content: space-between; gap: 16px; margin-top: 10px; font-size: 14px; align-items: center; flex-wrap: wrap; }
+    .capacity-meta strong { font-size: 16px; color: var(--text-strong); }
+    .editor-footer { border-top: 1px solid #EEE8FF; padding: 20px 28px; display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .editor-footer-right { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .editor-empty { padding: 40px 28px; color: var(--text-muted); }
+    @media (max-width: 1180px) { .editor-workspace { grid-template-columns: 340px minmax(0,1fr); } }
+    @media (max-width: 980px) {
+      .fs-page.fs-wrap-xl { padding: 24px 20px 28px; }
+      .editor-workspace, .form-grid { grid-template-columns: 1fr; }
+      .editor-panel-head, .editor-body, .editor-footer { padding-left: 20px; padding-right: 20px; }
+    }
   </style>
 </head>
 <body>
-  <main class="main">
-    <div class="fs-page-header">
-      <h1 class="fs-page-title">Class Editor</h1>
-      <div class="fs-page-actions">
-        <select class="fs-select" id="groupFilter"><option value="">All Groups</option></select>
-        <label style="display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-meta);font-weight:600">
-          <input type="checkbox" id="activeOnly" checked /> Active only
-        </label>
-        <button id="newClassBtn" class="fs-btn fs-btn-primary">+ New Class</button>
-        <button id="massManageBtn" class="fs-btn">Mass Manage</button>
-        <button id="refreshBtn" class="fs-btn fs-btn-secondary">Refresh</button>
+  <main class="fs-page fs-wrap-xl">
+    <div class="page-head">
+      <div>
+        <h1>Class editor</h1>
+        <p>Create and edit classes — set the day, time, location, teacher and capacity, then map them to a batch and Moodle group.</p>
+      </div>
+      <div class="page-head-actions">
+        <button id="refreshBtn" class="btn">Refresh</button>
+        <button id="massManageBtn" class="btn">Mass Manage</button>
+        <button id="newClassBtn" class="btn btn-primary">+ New class</button>
       </div>
     </div>
 
-    <div id="flashArea" style="margin-bottom:var(--space-2)"></div>
+    <div id="flashArea" style="margin-bottom:12px"></div>
 
-    <!-- New class panel -->
     <div id="newPanel" class="new-panel" style="display:none">
       <h2>Create New Class</h2>
-      <div class="form-grid" id="newFormGrid">
-        <div class="form-field">
-          <label>Class ID (auto-generated, editable)</label>
-          <input class="fs-input" id="nClassId" type="text" placeholder="CO-..." />
-        </div>
-        <div class="form-field">
-          <label>Teacher</label>
-          <select class="fs-select" id="nTeacher"></select>
-        </div>
-        <div class="form-field">
-          <label>Day</label>
-          <select class="fs-select" id="nDay">
-            <option value="">Select day</option>
-            <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
-            <option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
-          </select>
-        </div>
-        <div class="form-field">
-          <label>Time</label>
-          <input class="fs-input" id="nTime" type="time" />
-        </div>
-        <div class="form-field">
-          <label>Initial Capacity</label>
-          <input class="fs-input" id="nCapacity" type="number" min="1" placeholder="25" />
-        </div>
-        <div class="form-field">
-          <label>Batch (creates slot)</label>
-          <select class="fs-select" id="nBatch"></select>
-        </div>
-        <div class="form-field">
-          <label>Label Suffix</label>
-          <input class="fs-input" id="nSuffix" type="text" placeholder="Optional" />
-        </div>
-        <div class="form-field">
-          <label>Enrollment Closes (Expiry)</label>
-          <input class="fs-input" id="nExpiry" type="datetime-local" />
-        </div>
+      <div class="form-grid">
+        <div class="form-field"><label>Class ID</label><input class="fs-input" id="nClassId" type="text" placeholder="CO-..." /></div>
+        <div class="form-field"><label>Teacher</label><select class="fs-select" id="nTeacher"></select></div>
+        <div class="form-field"><label>Day</label><select class="fs-select" id="nDay"><option value="">Select day</option><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option></select></div>
+        <div class="form-field"><label>Time</label><input class="fs-input" id="nTime" type="time" step="1800" /></div>
+        <div class="form-field"><label>Initial Capacity</label><input class="fs-input" id="nCapacity" type="number" min="1" placeholder="25" /></div>
+        <div class="form-field"><label>Batch</label><select class="fs-select" id="nBatch"></select></div>
+        <div class="form-field"><label>Label Suffix</label><input class="fs-input" id="nSuffix" type="text" placeholder="Optional" /></div>
+        <div class="form-field"><label>Enrollment Closes</label><input class="fs-input" id="nExpiry" type="datetime-local" /></div>
       </div>
-      <div class="form-field" style="margin-bottom:var(--space-3)">
-        <label>Fellowship Codes</label>
-        <div class="fc-chips" id="nFcChips"></div>
-      </div>
-      <div id="multiFcPrompt" class="msg" style="display:none;margin-bottom:var(--space-3)">
+      <div class="form-field" style="margin-bottom:14px"><label>Fellowship Codes</label><div class="fc-chips" id="nFcChips"></div></div>
+      <div id="multiFcPrompt" class="msg" style="display:none;margin-bottom:14px">
         <div style="font-weight:700;margin-bottom:8px">Multiple fellowships selected. How should these be handled?</div>
-        <label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">
-          <input type="radio" name="multiFcMode" value="shared" checked />
-          <span><strong>Shared class (recommended for online)</strong> — one class ID, one roster, one attendance sheet. All fellowships join the same session.</span>
-        </label>
-        <label style="display:flex;align-items:flex-start;gap:8px">
-          <input type="radio" name="multiFcMode" value="separate" />
-          <span><strong>Separate classes</strong> — create one class option per fellowship with individual class IDs and rosters.</span>
-        </label>
+        <label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px"><input type="radio" name="multiFcMode" value="shared" checked /><span><strong>Shared class</strong> — one class ID, one roster, one attendance sheet.</span></label>
+        <label style="display:flex;align-items:flex-start;gap:8px"><input type="radio" name="multiFcMode" value="separate" /><span><strong>Separate classes</strong> — create one class option per fellowship.</span></label>
       </div>
-      <div class="toggle-row" style="margin-bottom:var(--space-3);gap:24px;flex-wrap:wrap">
-        <label class="toggle-row"><label class="toggle"><input type="checkbox" id="nIsOnline" /><span class="slider"></span></label><span style="font-size:13px;font-weight:600">Online class</span></label>
-        <label class="toggle-row"><label class="toggle"><input type="checkbox" id="nActive" checked /><span class="slider"></span></label><span style="font-size:13px;font-weight:600">Active</span></label>
-        <label class="toggle-row"><label class="toggle"><input type="checkbox" id="nEnrollOpen" checked /><span class="slider"></span></label><span style="font-size:13px;font-weight:600">Enrollment Open</span></label>
+      <div class="toggle-row" style="margin-bottom:14px">
+        <label class="toggle-pill"><span class="toggle"><input type="checkbox" id="nIsOnline" /><span class="slider"></span></span> Online class</label>
+        <label class="toggle-pill"><span class="toggle"><input type="checkbox" id="nActive" checked /><span class="slider"></span></span> Active</label>
+        <label class="toggle-pill"><span class="toggle"><input type="checkbox" id="nEnrollOpen" checked /><span class="slider"></span></span> Enrollment open</label>
       </div>
-      <div style="display:flex;gap:var(--space-2)">
-        <button id="saveNewBtn" class="fs-btn btn-primary">Create Class</button>
-        <button id="cancelNewBtn" class="fs-btn">Cancel</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="saveNewBtn" class="btn btn-primary">Create Class</button>
+        <button id="cancelNewBtn" class="btn">Cancel</button>
       </div>
-      <div id="newMsg" style="margin-top:var(--space-2)"></div>
+      <div id="newMsg" style="margin-top:10px"></div>
     </div>
 
-    <!-- Mass Manage panel -->
-    <div id="massManagePanel" class="new-panel" style="display:none;margin-bottom:var(--space-4)">
+    <div id="massManagePanel" class="mass-panel" style="display:none">
       <h2>Mass Manage Classes</h2>
-      <div style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3)">
-        <label style="display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-meta);font-weight:600;cursor:pointer">
-          <input type="checkbox" id="selectAllCheck" /> Select All
-        </label>
-        <span id="selectedCount" style="font-size:var(--fs-meta);font-weight:600;color:var(--color-text-muted)">0 classes selected</span>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px">
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer"><input type="checkbox" id="selectAllCheck" /> Select All</label>
+        <span id="selectedCount" style="font-size:13px;font-weight:600;color:var(--text-muted)">0 classes selected</span>
       </div>
-      <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;align-items:center">
-        <button id="massActivateBtn" class="fs-btn btn-primary btn-sm" disabled>Activate</button>
-        <button id="massDeactivateBtn" class="fs-btn btn-danger btn-sm" disabled>Deactivate</button>
-        <button id="massSetExpiryBtn" class="fs-btn btn-sm" disabled>Set Expiry</button>
-        <div id="massExpirySection" style="display:none;align-items:center;gap:var(--space-2)">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button id="massActivateBtn" class="btn btn-primary btn-sm" disabled>Activate</button>
+        <button id="massDeactivateBtn" class="btn btn-danger btn-sm" disabled>Deactivate</button>
+        <button id="massSetExpiryBtn" class="btn btn-sm" disabled>Set Expiry</button>
+        <div id="massExpirySection" style="display:none;align-items:center;gap:8px">
           <input type="datetime-local" id="massExpiryInput" class="fs-input" style="width:200px" />
-          <button id="massApplyExpiryBtn" class="fs-btn btn-primary btn-sm">Apply</button>
+          <button id="massApplyExpiryBtn" class="btn btn-primary btn-sm">Apply</button>
         </div>
       </div>
-      <div id="massMsg" style="margin-top:var(--space-2)"></div>
+      <div id="massMsg" style="margin-top:10px"></div>
     </div>
 
-    <!-- Class options table -->
-    <div class="fs-table-wrap">
-      <table class="fs-table" id="classTable">
-        <thead>
-          <tr>
-            <th id="massCheckboxTh" style="display:none;width:32px"></th>
-            <th>Class ID</th>
-            <th>Teacher</th>
-            <th>Group</th>
-            <th>Fellowship Codes</th>
-            <th>Day</th>
-            <th>Time</th>
-            <th>Active</th>
-            <th>Enroll Open</th>
-            <th>Expires</th>
-            <th>Enrolled</th>
-            <th>Slots</th>
-            <th id="actionsHeader">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="classTableBody"></tbody>
-      </table>
+    <div class="filter-bar">
+      <select class="fs-select" id="groupFilter" style="min-width:140px"><option value="">All Groups</option></select>
+      <label id="activeOnlyLabel"><input type="checkbox" id="activeOnly" checked /> Active only</label>
     </div>
+
+    <section class="editor-workspace">
+      <aside>
+        <div class="class-rail-top">
+          <strong id="classCountMeta">0 classes</strong>
+          <button id="railNewClassBtn" type="button">+ New</button>
+        </div>
+        <div id="classTableBody" class="class-list"></div>
+      </aside>
+      <section id="editorDetailPane" class="editor-panel"></section>
+    </section>
   </main>
 
   <script src="../js/config.js"></script>
   <script src="../js/admin-shell.js?v=20260518"></script>
   <script type="module">
-    import { supabase, requireAuth, getCurrentProfile } from "../auth/auth-client.js";
+    import { supabase, requireAuth } from "../auth/auth-client.js";
 
     const $ = (id) => document.getElementById(id);
-    const esc = (v) => String(v ?? "").replace(/[&<>'"]/g, (m) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[m]));
-
+    const esc = (v) => String(v ?? "").replace(/[&<>'"]/g, (m) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;" }[m]));
     const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 
     const state = {
-      classes:       [],
-      teachers:      [],
-      fellowships:   [],
-      batches:       [],
-      slots:         {},
-      enrolled:      {},
-      profile:       null,
-      canEdit:       false,
+      classes: [],
+      teachers: [],
+      fellowships: [],
+      batches: [],
+      slots: {},
+      slotBatches: {},
+      enrolled: {},
+      profile: null,
+      canEdit: false,
       canSuperadmin: false,
-      openEditId:    null,
-      newFcCodes:    [],
-      editFcCodes:   {},
-      newClassMode:  "shared",
+      openEditId: null,
+      newFcCodes: [],
+      editFcCodes: {},
+      newClassMode: "shared",
       massManageOpen: false,
-      selectedIds:   new Set(),
+      selectedIds: new Set(),
     };
 
     function showFlash(msg, type = "") {
       $("flashArea").innerHTML = msg ? `<div class="msg ${type}">${msg}</div>` : "";
       if (msg && type !== "error") setTimeout(() => { $("flashArea").innerHTML = ""; }, 5000);
     }
-
     function toDatetimeLocal(iso) {
       if (!iso) return "";
-      const d = new Date(iso);
-      const p = (n) => String(n).padStart(2, "0");
+      const d = new Date(iso); const p = (n) => String(n).padStart(2, "0");
       return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
     }
-
     function fmtShortDate(iso) {
       if (!iso) return "—";
       return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     }
-
-    function editColspan() {
-      return 11 + (state.canEdit ? 1 : 0) + (state.massManageOpen ? 1 : 0);
+    function fmtTime(v) {
+      if (!v) return "—";
+      const [hour, minute] = String(v).split(":").map(Number);
+      const suffix = hour >= 12 ? "PM" : "AM";
+      const normalized = hour % 12 || 12;
+      return `${normalized}:${String(minute || 0).padStart(2, "0")} ${suffix}`;
     }
-
-    function updateMassUI() {
-      const count = state.selectedIds.size;
-      const countEl = $("selectedCount");
-      if (countEl) countEl.textContent = `${count} ${count === 1 ? "class" : "classes"} selected`;
-      const off = count === 0;
-      [$("massActivateBtn"), $("massDeactivateBtn"), $("massSetExpiryBtn")].forEach((b) => { if (b) b.disabled = off; });
-      if (off && $("massExpirySection")) $("massExpirySection").style.display = "none";
+    function idPart(input, fallback = "X") {
+      const clean = String(input || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+      return clean || fallback;
     }
-
+    function generateSharedClassId(subgroupId, teacherId, day, time) {
+      const sgPart = idPart(subgroupId, "SG");
+      const dayPart = day ? idPart(day.slice(0, 3), "DAY") : "DAY";
+      const timePart = time ? time.replace(":", "") : "0000";
+      const tidPart = teacherId ? idPart(String(teacherId).slice(0, 8), "XXXX") : "XXXX";
+      return `CO-${sgPart}-${dayPart}-${timePart}-${tidPart}`;
+    }
+    function generateSeparateClassId(fellowshipCode, teacherId, day, time) {
+      const fcPart = idPart(fellowshipCode, "REGIONAL");
+      const dayPart = day ? idPart(day.slice(0, 3), "DAY") : "DAY";
+      const timePart = time ? time.replace(":", "") : "0000";
+      const tidPart = teacherId ? idPart(String(teacherId).slice(0, 8), "XXXX") : "XXXX";
+      return `CO-${fcPart}-${dayPart}-${timePart}-${tidPart}`;
+    }
+    function normalizedCodes(codes) {
+      return [...new Set((codes || []).map((v) => String(v || "").trim()).filter(Boolean))];
+    }
+    function enforceCodesForOnlineMode(codes, isOnline) {
+      const clean = normalizedCodes(codes);
+      return isOnline ? clean : (clean.length ? [clean[0]] : []);
+    }
     function filteredClasses() {
-      const group     = $("groupFilter")?.value || "";
+      const group = $("groupFilter")?.value || "";
       const activeOnly = $("activeOnly")?.checked;
       return state.classes.filter((c) => {
         if (activeOnly && c.deleted_at) return false;
@@ -242,197 +264,150 @@
         return true;
       });
     }
-
-    // ── New class ID generator ────────────────────────────────────────────────
-    function idPart(input, fallback = "X") {
-      const clean = String(input || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-      return clean || fallback;
+    function updateMassUI() {
+      const count = state.selectedIds.size;
+      $("selectedCount").textContent = `${count} ${count === 1 ? "class" : "classes"} selected`;
+      const off = count === 0;
+      [$("massActivateBtn"), $("massDeactivateBtn"), $("massSetExpiryBtn")].forEach((b) => b.disabled = off);
+      if (off) $("massExpirySection").style.display = "none";
     }
-
-    function generateSharedClassId(subgroupId, teacherId, day, time) {
-      const sgPart   = idPart(subgroupId, "SG");
-      const dayPart  = day ? idPart(day.slice(0, 3), "DAY") : "DAY";
-      const timePart = time ? time.replace(":", "") : "0000";
-      const tidPart  = teacherId ? idPart(String(teacherId).slice(0, 8), "XXXX") : "XXXX";
-      return `CO-${sgPart}-${dayPart}-${timePart}-${tidPart}`;
-    }
-
-    function generateSeparateClassId(fellowshipCode, teacherId, day, time) {
-      const fcPart   = idPart(fellowshipCode, "REGIONAL");
-      const dayPart  = day ? idPart(day.slice(0, 3), "DAY") : "DAY";
-      const timePart = time ? time.replace(":", "") : "0000";
-      const tidPart  = teacherId ? idPart(String(teacherId).slice(0, 8), "XXXX") : "XXXX";
-      return `CO-${fcPart}-${dayPart}-${timePart}-${tidPart}`;
-    }
-
-    // ── FC chips ──────────────────────────────────────────────────────────────
     function renderFcChips(containerId, selectedCodes, onChange) {
       const container = $(containerId);
       if (!container) return;
-      container.innerHTML = selectedCodes.map((fc) =>
-        `<span class="fc-chip" data-fc="${esc(fc)}">${esc(fc)} ✕</span>`
-      ).join("") +
+      container.innerHTML = selectedCodes.map((fc) => `<span class="fc-chip" data-fc="${esc(fc)}">${esc(fc)} ×</span>`).join("") +
       `<select class="fc-chip fc-chip-add" id="${containerId}_add" style="border:none;background:none;font:inherit;font-size:12px;cursor:pointer">
         <option value="">+ Add</option>
-        ${state.fellowships
-          .filter((f) => !selectedCodes.includes(f.fellowship_code))
-          .map((f) => `<option value="${esc(f.fellowship_code)}">${esc(f.fellowship_code)} – ${esc(f.campus_name || "")}</option>`)
-          .join("")}
+        ${state.fellowships.filter((f) => !selectedCodes.includes(f.fellowship_code)).map((f) => `<option value="${esc(f.fellowship_code)}">${esc(f.fellowship_code)} – ${esc(f.campus_name || "")}</option>`).join("")}
       </select>`;
-
-      container.querySelectorAll(".fc-chip[data-fc]").forEach((chip) => {
-        chip.addEventListener("click", () => {
-          const updated = selectedCodes.filter((c) => c !== chip.dataset.fc);
-          onChange(updated);
-        });
-      });
-      const addSel = document.getElementById(`${containerId}_add`);
-      addSel && addSel.addEventListener("change", (e) => {
+      container.querySelectorAll(".fc-chip[data-fc]").forEach((chip) => chip.addEventListener("click", () => onChange(selectedCodes.filter((c) => c !== chip.dataset.fc))));
+      document.getElementById(`${containerId}_add`)?.addEventListener("change", (e) => {
         if (!e.target.value) return;
-        const updated = [...selectedCodes, e.target.value];
-        onChange(updated);
+        onChange([...selectedCodes, e.target.value]);
       });
     }
-
-    function normalizedCodes(codes) {
-      return [...new Set((codes || []).map((v) => String(v || "").trim()).filter(Boolean))];
+    function getSelectedClass(rows = filteredClasses()) {
+      if (!rows.length) return null;
+      if (!state.openEditId || !rows.some((row) => row.class_option_id === state.openEditId)) {
+        state.openEditId = rows[0].class_option_id;
+      }
+      return rows.find((row) => row.class_option_id === state.openEditId) || rows[0];
     }
-
-    function enforceCodesForOnlineMode(codes, isOnline) {
-      const clean = normalizedCodes(codes);
-      return isOnline ? clean : (clean.length ? [clean[0]] : []);
+    function getPrimaryBatchId(classId) {
+      return state.slotBatches[classId]?.[0] || "";
     }
-
-    // ── Edit panel ────────────────────────────────────────────────────────────
-    function renderEditPanel(co) {
-      const panelId = `edit-${co.class_option_id}`;
-      const fcKey   = co.class_option_id;
-      if (!state.editFcCodes[fcKey]) state.editFcCodes[fcKey] = [...(co.fellowship_codes || [])];
-
-      const teacherOpts = state.teachers.map((t) =>
-        `<option value="${esc(t.teacher_id)}"${t.full_name === co.teacher_name ? " selected" : ""}>${esc(t.full_name)} (${esc(t.email || "")})</option>`
-      ).join("");
-      const dayOpts = DAYS.map((d) => `<option value="${d}"${d === co.day ? " selected" : ""}>${d}</option>`).join("");
-      const sharedNote = (co.fellowship_codes || []).length > 1
-        ? `<div class="msg" style="margin-bottom:var(--space-3)">Shared class — ${(co.fellowship_codes || []).length} fellowships on one roster</div>`
-        : "";
-      const splitBtn = (state.canSuperadmin && (co.fellowship_codes || []).length > 1)
-        ? `<button class="fs-btn btn-danger" data-split-class="${esc(co.class_option_id)}">Split into Separate Classes</button>`
-        : "";
-
-      return `<tr id="${panelId}">
-        <td colspan="${editColspan()}" class="edit-panel">
-          ${sharedNote}
-          <div class="form-grid">
-            <div class="form-field">
-              <label>Teacher</label>
-              <select class="fs-select" id="et-${esc(co.class_option_id)}">${teacherOpts}</select>
-            </div>
-            <div class="form-field">
-              <label>Day</label>
-              <select class="fs-select" id="ed-${esc(co.class_option_id)}">${dayOpts}</select>
-            </div>
-            <div class="form-field">
-              <label>Time</label>
-              <input class="fs-input" id="etime-${esc(co.class_option_id)}" type="time" value="${esc(co.class_time || "")}" />
-            </div>
-            <div class="form-field">
-              <label>Max Capacity</label>
-              <input class="fs-input" id="ecap-${esc(co.class_option_id)}" type="number" min="1" value="${esc(co.max_capacity ?? "")}" placeholder="Unlimited" />
-            </div>
-            <div class="form-field">
-              <label>Label Suffix</label>
-              <input class="fs-input" id="esuffix-${esc(co.class_option_id)}" type="text" value="${esc(co.label_suffix || "")}" />
-            </div>
-            <div class="form-field">
-              <label>Confirmed Start Date</label>
-              <input class="fs-input" id="estart-${esc(co.class_option_id)}" type="date" value="${esc(co.confirmed_start_date || "")}" />
-            </div>
-            <div class="form-field">
-              <label>Enrollment Closes (Expiry)</label>
-              <input class="fs-input" id="eexpiry-${esc(co.class_option_id)}" type="datetime-local" value="${esc(toDatetimeLocal(co.enrollment_closes_at))}" />
+    function getBatchLabel(batchId) {
+      return state.batches.find((b) => b.batch_id === batchId)?.batch_name || batchId || "—";
+    }
+    function getFellowshipLabel(co) {
+      const code = co?.fellowship_codes?.[0];
+      const fc = state.fellowships.find((row) => row.fellowship_code === code);
+      return fc?.campus_name || co?.group_id || code || "—";
+    }
+    function buildTeacherOptions(selectedName) {
+      return state.teachers.map((t) => `<option value="${esc(t.teacher_id)}"${t.full_name === selectedName ? " selected" : ""}>${esc(t.full_name)} (${esc(t.email || "")})</option>`).join("");
+    }
+    function buildDayOptions(selectedDay) {
+      return DAYS.map((d) => `<option value="${d}"${d === selectedDay ? " selected" : ""}>${d}</option>`).join("");
+    }
+    function buildBatchOptions(selectedBatchId) {
+      return '<option value="">No batch</option>' + state.batches.map((b) => `<option value="${esc(b.batch_id)}"${b.batch_id === selectedBatchId ? " selected" : ""}>${esc(b.batch_name || b.batch_id)}</option>`).join("");
+    }
+    function renderClassList(rows) {
+      $("classCountMeta").textContent = `${rows.length} ${rows.length === 1 ? "class" : "classes"}`;
+      $("classTableBody").innerHTML = rows.map((co) => {
+        const enrolledCount = state.enrolled[co.class_option_id] || 0;
+        const capacity = co.max_capacity ?? 25;
+        const inactive = co.active === false || co.deleted_at;
+        const warn = co.enrollment_open === false;
+        return `<button type="button" class="class-card ${state.openEditId === co.class_option_id ? "active" : ""} ${inactive ? "inactive is-inactive" : ""} ${warn ? "warn" : ""}" data-select-class="${esc(co.class_option_id)}">
+          ${state.massManageOpen ? `<input type="checkbox" class="mass-check" data-id="${esc(co.class_option_id)}" ${state.selectedIds.has(co.class_option_id) ? "checked" : ""} />` : `<span class="class-dot"></span>`}
+          <span style="text-align:left">
+            <span class="class-card-title">${esc(co.class_option_id)}</span>
+            <span class="class-card-meta">${esc(co.day || "—")} · ${esc(fmtTime(co.class_time))} · ${esc(co.teacher_name || "No teacher")}${warn ? " · Reg closed" : inactive ? " · Inactive" : ""}</span>
+          </span>
+          <span class="class-card-count">${enrolledCount}/${capacity}</span>
+        </button>`;
+      }).join("");
+    }
+    function renderDetailPanel(co) {
+      const pane = $("editorDetailPane");
+      if (!co) {
+        pane.innerHTML = `<div class="editor-empty">No class options found for the current filters.</div>`;
+        return;
+      }
+      if (!state.editFcCodes[co.class_option_id]) state.editFcCodes[co.class_option_id] = [...(co.fellowship_codes || [])];
+      const enrolledCount = state.enrolled[co.class_option_id] || 0;
+      const capacity = Math.max(Number(co.max_capacity || 0), enrolledCount, 1);
+      const fill = Math.min(100, Math.round((enrolledCount / capacity) * 100));
+      const primaryBatchId = getPrimaryBatchId(co.class_option_id);
+      const teacherOptions = buildTeacherOptions(co.teacher_name);
+      const batchOptions = buildBatchOptions(primaryBatchId);
+      const moodleOptions = state.fellowships.map((f) => `<option value="${esc(f.fellowship_code)}"${f.fellowship_code === (co.fellowship_codes?.[0] || "") ? " selected" : ""}>${esc(f.campus_name || f.fellowship_code)}</option>`).join("");
+      pane.innerHTML = `
+        <div class="editor-panel-head">
+          <div class="editor-panel-title">
+            <h2>${esc(co.class_option_id)}</h2>
+            <div class="editor-badges">
+              <span class="status-badge active">${co.active === false ? "INACTIVE" : "ACTIVE"}</span>
+              <span class="status-badge ${co.enrollment_open === false ? "closed" : "open"}">${co.enrollment_open === false ? "REG CLOSED" : "REG OPEN"}</span>
             </div>
           </div>
-          <div class="form-field" style="margin-bottom:var(--space-3)">
+          ${state.canEdit ? `<div class="editor-footer-right"><button class="btn btn-sm" data-dup="${esc(co.class_option_id)}">Duplicate</button></div>` : ""}
+        </div>
+        <div class="editor-body">
+          <div class="form-grid">
+            <div class="form-field"><label>Fellowship</label><select class="fs-select" id="efellowship-${esc(co.class_option_id)}" disabled><option>${esc(getFellowshipLabel(co))}</option></select></div>
+            <div class="form-field"><label>Location / Name</label><input class="fs-input" id="ename-${esc(co.class_option_id)}" type="text" value="${esc(co.class_option_id)}" disabled /></div>
+            <div class="form-field"><label>Day</label><select class="fs-select" id="ed-${esc(co.class_option_id)}">${buildDayOptions(co.day)}</select></div>
+            <div class="form-field"><label>Time</label><input class="fs-input" id="etime-${esc(co.class_option_id)}" type="time" step="1800" value="${esc(co.class_time || "")}" /></div>
+            <div class="form-field"><label>Teacher</label><select class="fs-select" id="et-${esc(co.class_option_id)}">${teacherOptions}</select></div>
+            <div class="form-field"><label>Capacity</label><input class="fs-input" id="ecap-${esc(co.class_option_id)}" type="number" min="1" value="${esc(co.max_capacity ?? "")}" placeholder="25" /></div>
+            <div class="form-field"><label>Batch</label><select class="fs-select" id="ebatch-${esc(co.class_option_id)}">${batchOptions}</select></div>
+            <div class="form-field"><label>Moodle Group</label><select class="fs-select" id="emoodle-${esc(co.class_option_id)}" disabled><option value="">No mapping</option>${moodleOptions}</select></div>
+          </div>
+          <div class="form-field" style="margin-bottom:16px">
             <label>Fellowship Codes</label>
             <div class="fc-chips" id="efc-${esc(co.class_option_id)}"></div>
           </div>
-          <div class="toggle-row" style="margin-bottom:var(--space-3);gap:24px;flex-wrap:wrap">
-            <label class="toggle-row"><label class="toggle"><input type="checkbox" id="eonline-${esc(co.class_option_id)}"${co.is_online === true ? " checked" : ""}/><span class="slider"></span></label><span style="font-size:13px;font-weight:600">Online class</span></label>
-            <label class="toggle-row"><label class="toggle"><input type="checkbox" id="eactive-${esc(co.class_option_id)}"${co.active !== false ? " checked" : ""}/><span class="slider"></span></label><span style="font-size:13px;font-weight:600">Active</span></label>
-            <label class="toggle-row"><label class="toggle"><input type="checkbox" id="eenroll-${esc(co.class_option_id)}"${co.enrollment_open !== false ? " checked" : ""}/><span class="slider"></span></label><span style="font-size:13px;font-weight:600">Enrollment Open</span></label>
+          <div class="form-grid">
+            <div class="form-field"><label>Label Suffix</label><input class="fs-input" id="esuffix-${esc(co.class_option_id)}" type="text" value="${esc(co.label_suffix || "")}" /></div>
+            <div class="form-field"><label>Enrollment Closes</label><input class="fs-input" id="eexpiry-${esc(co.class_option_id)}" type="datetime-local" value="${esc(toDatetimeLocal(co.enrollment_closes_at))}" /></div>
           </div>
-          <div style="display:flex;gap:var(--space-2)">
-            <button class="fs-btn btn-primary" data-save-edit="${esc(co.class_option_id)}" data-old-day="${esc(co.day || "")}" data-old-time="${esc(co.class_time || "")}">Save Changes</button>
-            ${splitBtn}
-            <button class="fs-btn" data-cancel-edit="${esc(co.class_option_id)}">Cancel</button>
+          <span class="editor-section-label">Status & Registration</span>
+          <div class="toggle-stack">
+            <label class="toggle-pill"><span class="toggle"><input type="checkbox" id="eactive-${esc(co.class_option_id)}"${co.active !== false ? " checked" : ""} /><span class="slider"></span></span> Class Active</label>
+            <label class="toggle-pill"><span class="toggle"><input type="checkbox" id="eenroll-${esc(co.class_option_id)}"${co.enrollment_open !== false ? " checked" : ""} /><span class="slider"></span></span> Registration Open</label>
+            <label class="toggle-pill"><span class="toggle"><input type="checkbox" id="eonline-${esc(co.class_option_id)}"${co.is_online === true ? " checked" : ""} /><span class="slider"></span></span> Online Class</label>
           </div>
-          <div id="emsg-${esc(co.class_option_id)}" style="margin-top:var(--space-2)"></div>
-        </td>
-      </tr>`;
+          <p class="editor-help">Inactive classes are hidden from teachers and reporting. Closing registration stops new student assignment.</p>
+          <div class="capacity-preview">
+            <span class="editor-section-label">Capacity Preview</span>
+            <div class="capacity-bar"><span class="capacity-fill" style="width:${fill}%"></span></div>
+            <div class="capacity-meta"><span>${Math.max(capacity - enrolledCount, 0)} seats available</span><strong>${enrolledCount} / ${capacity} enrolled</strong></div>
+          </div>
+          <div id="emsg-${esc(co.class_option_id)}" style="margin-top:16px"></div>
+        </div>
+        <div class="editor-footer">
+          <button class="btn btn-danger" data-delete="${esc(co.class_option_id)}">${co.deleted_at ? "Deleted" : "Delete"}</button>
+          <div class="editor-footer-right">
+            ${state.canSuperadmin && (co.fellowship_codes || []).length > 1 ? `<button class="btn" data-split-class="${esc(co.class_option_id)}">Split class</button>` : ""}
+            <button class="btn" data-reset-detail="${esc(co.class_option_id)}">Reset</button>
+            ${state.canEdit ? `<button class="btn btn-primary" data-save-edit="${esc(co.class_option_id)}" data-old-day="${esc(co.day || "")}" data-old-time="${esc(co.class_time || "")}">✓ Save changes</button>` : "" }
+          </div>
+        </div>`;
+      renderFcChips(`efc-${co.class_option_id}`, state.editFcCodes[co.class_option_id] || [], (updated) => {
+        const isOnline = document.getElementById(`eonline-${co.class_option_id}`)?.checked === true;
+        state.editFcCodes[co.class_option_id] = enforceCodesForOnlineMode(updated, isOnline);
+        renderDetailPanel(co);
+      });
     }
-
-    // ── Main table render ─────────────────────────────────────────────────────
     function renderTable() {
-      const rows   = filteredClasses();
-      const tbody  = $("classTableBody");
-      const canAct = state.canEdit;
-
-      $("actionsHeader").style.display = canAct ? "" : "none";
-
-      if (!rows.length) {
-        tbody.innerHTML = `<tr><td colspan="${editColspan()}"><div class="msg">No class options found.</div></td></tr>`;
-        return;
-      }
-
-      let html = "";
-      rows.forEach((co) => {
-        const enrolledCount = state.enrolled[co.class_option_id] || 0;
-        const slotCount = state.slots[co.class_option_id] || 0;
-        const fc        = (co.fellowship_codes || []).join(", ") || "-";
-        const onlineTag = co.is_online === true ? ' <span class="fc-chip" style="font-size:10px;padding:1px 8px">ONLINE</span>' : "";
-        html += `<tr id="row-${esc(co.class_option_id)}" style="${co.deleted_at ? "opacity:.5" : ""}">
-          ${state.massManageOpen ? `<td><input type="checkbox" class="mass-check" data-id="${esc(co.class_option_id)}" ${state.selectedIds.has(co.class_option_id) ? "checked" : ""} /></td>` : ""}
-          <td style="font-size:12px;font-weight:600">${esc(co.class_option_id)}</td>
-          <td style="font-size:12px">${esc(co.teacher_name || "-")}</td>
-          <td style="font-size:12px">${esc(co.group_id || "-")}</td>
-          <td style="font-size:12px">${esc(fc)}${onlineTag}</td>
-          <td style="font-size:12px">${esc(co.day || "-")}</td>
-          <td style="font-size:12px">${esc(co.class_time || "-")}</td>
-          <td style="font-size:12px">${co.active === false ? "No" : "Yes"}</td>
-          <td style="font-size:12px">${co.enrollment_open === false ? "No" : "Yes"}</td>
-          <td style="font-size:12px">${esc(fmtShortDate(co.enrollment_closes_at))}</td>
-          <td style="font-size:12px">${enrolledCount}</td>
-          <td style="font-size:12px">${slotCount}</td>
-          ${canAct ? `<td>
-            <div style="display:flex;gap:4px;flex-wrap:wrap">
-              <button class="fs-btn btn-sm" data-edit="${esc(co.class_option_id)}">Edit</button>
-              <button class="fs-btn btn-sm" data-dup="${esc(co.class_option_id)}">Duplicate</button>
-              <button class="fs-btn btn-sm btn-danger" data-delete="${esc(co.class_option_id)}">${co.deleted_at ? "Deleted" : "Delete"}</button>
-            </div>
-          </td>` : ""}
-        </tr>`;
-
-        if (state.openEditId === co.class_option_id) {
-          html += renderEditPanel(co);
-        }
-      });
-
-      tbody.innerHTML = html;
-
-      // Wire fc chips for open edit panels
-      rows.forEach((co) => {
-        if (state.openEditId === co.class_option_id) {
-          renderFcChips(`efc-${co.class_option_id}`, state.editFcCodes[co.class_option_id] || [], (updated) => {
-            const isOnline = document.getElementById(`eonline-${co.class_option_id}`)?.checked === true;
-            state.editFcCodes[co.class_option_id] = enforceCodesForOnlineMode(updated, isOnline);
-            renderTable();
-          });
-        }
-      });
+      const rows = filteredClasses();
+      renderClassList(rows);
+      renderDetailPanel(getSelectedClass(rows));
+      updateMassUI();
     }
 
-    // ── Load data ─────────────────────────────────────────────────────────────
     async function loadData() {
       showFlash("Loading...");
       const [classRes, teacherRes, fcRes, batchRes, slotRes, applicantsRes] = await Promise.all([
@@ -443,261 +418,171 @@
         supabase.from("class_slots").select("class_option_id,batch_id").limit(2000),
         supabase.from("applicants").select("class_option_id").eq("registration_status", "ASSIGNED").limit(20000),
       ]);
-
-      state.classes     = classRes.data || [];
-      state.teachers    = teacherRes.data || [];
+      state.classes = classRes.data || [];
+      state.teachers = teacherRes.data || [];
       state.fellowships = fcRes.data || [];
-      state.batches     = batchRes.data || [];
-
-      // Count slots per class
+      state.batches = batchRes.data || [];
       state.slots = {};
+      state.slotBatches = {};
       (slotRes.data || []).forEach((s) => {
         state.slots[s.class_option_id] = (state.slots[s.class_option_id] || 0) + 1;
+        state.slotBatches[s.class_option_id] = state.slotBatches[s.class_option_id] || [];
+        if (!state.slotBatches[s.class_option_id].includes(s.batch_id)) state.slotBatches[s.class_option_id].push(s.batch_id);
       });
-
-      // Count enrolled students per class (ASSIGNED applicants)
       state.enrolled = {};
       (applicantsRes.data || []).forEach((a) => {
         const classOptionId = String(a.class_option_id || "").trim();
         if (!classOptionId) return;
         state.enrolled[classOptionId] = (state.enrolled[classOptionId] || 0) + 1;
       });
-
-      // Populate group filter
       const groups = [...new Set(state.classes.map((c) => c.group_id).filter(Boolean))];
       const curGroup = $("groupFilter").value;
-      $("groupFilter").innerHTML = '<option value="">All Groups</option>' +
-        groups.map((g) => `<option value="${esc(g)}">${esc(g)}</option>`).join("");
+      $("groupFilter").innerHTML = '<option value="">All Groups</option>' + groups.map((g) => `<option value="${esc(g)}">${esc(g)}</option>`).join("");
       if (curGroup) $("groupFilter").value = curGroup;
-
-      // Teacher dropdown for new class
-      $("nTeacher").innerHTML = '<option value="">Select teacher</option>' +
-        state.teachers.map((t) => `<option value="${esc(t.teacher_id)}">${esc(t.full_name)} (${esc(t.email || "")})</option>`).join("");
-      $("nBatch").innerHTML = '<option value="">No batch (create slot later)</option>' +
-        state.batches.map((b) => `<option value="${esc(b.batch_id)}">${esc(b.batch_name || b.batch_id)}</option>`).join("");
-
-      renderFcChips("nFcChips", state.newFcCodes, (updated) => {
+      $("nTeacher").innerHTML = '<option value="">Select teacher</option>' + state.teachers.map((t) => `<option value="${esc(t.teacher_id)}">${esc(t.full_name)} (${esc(t.email || "")})</option>`).join("");
+      $("nBatch").innerHTML = '<option value="">No batch (create slot later)</option>' + state.batches.map((b) => `<option value="${esc(b.batch_id)}">${esc(b.batch_name || b.batch_id)}</option>`).join("");
+      renderFcChips("nFcChips", state.newFcCodes, function updateNewCodes(updated) {
         const isOnline = $("nIsOnline")?.checked === true;
         state.newFcCodes = enforceCodesForOnlineMode(updated, isOnline);
-        const prompt = $("multiFcPrompt");
-        if (prompt) prompt.style.display = (isOnline && state.newFcCodes.length > 1) ? "" : "none";
-        renderFcChips("nFcChips", state.newFcCodes, arguments.callee);
+        $("multiFcPrompt").style.display = (isOnline && state.newFcCodes.length > 1) ? "" : "none";
+        renderFcChips("nFcChips", state.newFcCodes, updateNewCodes);
       });
-
       showFlash("");
       renderTable();
     }
 
-    // ── Save edit ─────────────────────────────────────────────────────────────
     async function saveEdit(coId, oldDay, oldTime) {
       const teacherSel = document.getElementById(`et-${coId}`);
-      const teacher    = state.teachers.find((t) => t.teacher_id === teacherSel?.value);
-      const newDay     = document.getElementById(`ed-${coId}`)?.value;
-      const newTime    = document.getElementById(`etime-${coId}`)?.value;
-      const newCap     = document.getElementById(`ecap-${coId}`)?.value || null;
-      const newSuffix  = document.getElementById(`esuffix-${coId}`)?.value || null;
-      const newStart   = document.getElementById(`estart-${coId}`)?.value || null;
-      const isActive   = document.getElementById(`eactive-${coId}`)?.checked;
+      const teacher = state.teachers.find((t) => t.teacher_id === teacherSel?.value);
+      const newDay = document.getElementById(`ed-${coId}`)?.value;
+      const newTime = document.getElementById(`etime-${coId}`)?.value;
+      const newCap = document.getElementById(`ecap-${coId}`)?.value || null;
+      const newSuffix = document.getElementById(`esuffix-${coId}`)?.value || null;
+      const isActive = document.getElementById(`eactive-${coId}`)?.checked;
       const enrollOpen = document.getElementById(`eenroll-${coId}`)?.checked;
-      const isOnline   = document.getElementById(`eonline-${coId}`)?.checked === true;
-      const newFc      = enforceCodesForOnlineMode(state.editFcCodes[coId] || [], isOnline);
-      const expiryEl   = document.getElementById(`eexpiry-${coId}`);
-      const now        = new Date().toISOString();
-      const actor      = state.profile?.email || null;
-      const msgEl      = document.getElementById(`emsg-${coId}`);
-
+      const isOnline = document.getElementById(`eonline-${coId}`)?.checked === true;
+      const newFc = enforceCodesForOnlineMode(state.editFcCodes[coId] || [], isOnline);
+      const expiryEl = document.getElementById(`eexpiry-${coId}`);
+      const batchEl = document.getElementById(`ebatch-${coId}`);
+      const now = new Date().toISOString();
+      const actor = state.profile?.email || null;
+      const msgEl = document.getElementById(`emsg-${coId}`);
       const updates = {
-        teacher_name:          teacher?.full_name || null,
-        teacher_id:            teacher?.teacher_id || null,
-        day:                   newDay,
-        class_time:            newTime,
-        max_capacity:          newCap ? parseInt(newCap) : null,
-        label_suffix:          newSuffix,
-        confirmed_start_date:  newStart || null,
-        enrollment_closes_at:  expiryEl?.value ? new Date(expiryEl.value).toISOString() : null,
-        active:                isActive,
-        enrollment_open:       enrollOpen,
-        is_online:             isOnline,
-        fellowship_codes:      newFc,
-        updated_by:            actor,
-        updated_at:            now,
+        teacher_name: teacher?.full_name || null,
+        teacher_id: teacher?.teacher_id || null,
+        day: newDay,
+        class_time: newTime,
+        max_capacity: newCap ? parseInt(newCap, 10) : null,
+        label_suffix: newSuffix,
+        enrollment_closes_at: expiryEl?.value ? new Date(expiryEl.value).toISOString() : null,
+        active: isActive,
+        enrollment_open: enrollOpen,
+        is_online: isOnline,
+        fellowship_codes: newFc,
+        updated_by: actor,
+        updated_at: now,
       };
-
       const { error } = await supabase.from("class_options").update(updates).eq("class_option_id", coId);
-      if (error) { if (msgEl) msgEl.innerHTML = `<div class="msg error">${esc(error.message)}</div>`; return; }
-
-      // Sync teacher_name to class_slots
-      if (teacher?.full_name) {
-        await supabase.from("class_slots").update({ teacher_name: teacher.full_name }).eq("class_option_id", coId);
-      }
-
-      const timeChanged = newDay !== oldDay || newTime !== oldTime;
-      let notifSent = false;
-
-      if (timeChanged) {
-        const { count: enrolledCount } = await supabase.from("applicants")
-          .select("id", { count: "exact", head: true })
-          .eq("class_option_id", coId).eq("registration_status", "ASSIGNED");
-
-        if ((enrolledCount || 0) > 0) {
-          const doNotify = confirm(`${enrolledCount} student(s) are enrolled in this class. Send them a class time change notification?`);
-          if (doNotify) {
-            const { data: enrolled } = await supabase.from("applicants")
-              .select("id,full_name,email").eq("class_option_id", coId).eq("registration_status", "ASSIGNED");
-            const emailRows = (enrolled || []).map((ap) => ({
-              recipient_email: ap.email,
-              recipient_name:  ap.full_name || "",
-              template_key:    "class_time_changed",
-              subject:         "Update: Your Rock Solid class time has changed",
-              status:          "Pending",
-              payload: {
-                first_name:   String(ap.full_name || "Student").split(/\s+/)[0],
-                full_name:    ap.full_name,
-                teacher_name: teacher?.full_name || updates.teacher_name || "",
-                old_day:      oldDay,
-                old_time:     oldTime,
-                new_day:      newDay,
-                new_time:     newTime,
-              },
-            }));
-            if (emailRows.length) await supabase.from("email_queue").insert(emailRows);
-            notifSent = true;
-          }
-        }
-      }
-
-      await supabase.from("audit_logs").insert({
-        actor_email: actor, action: "CLASS_OPTION_UPDATED", entity_type: "class_option",
-        entity_id: coId, status: "SUCCESS",
-        details: { changed_fields: Object.keys(updates), time_changed: timeChanged, notification_sent: notifSent },
-        created_at: now,
-      });
-
-      if (msgEl) msgEl.innerHTML = `<div class="msg success">Saved.</div>`;
-      state.openEditId = null;
-      await loadData();
-    }
-
-    // ── Create new class ──────────────────────────────────────────────────────
-    async function createClass() {
-      const teacherId = $("nTeacher")?.value;
-      const day       = $("nDay")?.value;
-      const time      = $("nTime")?.value;
-      const capacity  = $("nCapacity")?.value ? parseInt($("nCapacity").value) : null;
-      const batchId   = $("nBatch")?.value || null;
-      const suffix    = $("nSuffix")?.value.trim() || null;
-      const expiryVal = $("nExpiry")?.value;
-      const isOnline  = $("nIsOnline")?.checked === true;
-      const active    = $("nActive")?.checked;
-      const enrollO   = $("nEnrollOpen")?.checked;
-      const fc        = enforceCodesForOnlineMode(state.newFcCodes, isOnline);
-      const msgEl     = $("newMsg");
-      const classMode = state.newClassMode || "shared";
-
-      if (!teacherId || !day || !time) {
-        msgEl.innerHTML = '<div class="msg error">Teacher, day, and time are required.</div>';
-        return;
-      }
-
-      const teacher = state.teachers.find((t) => t.teacher_id === teacherId);
-      const now     = new Date().toISOString();
-      const actor   = state.profile?.email || null;
-
-      if (isOnline && fc.length > 1 && classMode === "separate") {
-        const rows = fc.map((code) => ({
-          class_option_id:       generateSeparateClassId(code, teacherId, day, time),
-          teacher_id:            teacherId,
-          teacher_name:          teacher?.full_name || null,
-          day,
-          class_time:            time,
-          max_capacity:          capacity,
-          label_suffix:          suffix,
-          enrollment_closes_at:  expiryVal ? new Date(expiryVal).toISOString() : null,
-          active,
-          enrollment_open:       enrollO,
-          is_online:             isOnline,
-          fellowship_codes:      [code],
-          group_id:              teacher?.group_id || null,
-          subgroup_id:           teacher?.subgroup_id || null,
-          created_by:            actor,
-          updated_by:            actor,
-          created_at:            now,
-          updated_at:            now,
-        }));
-        const { error } = await supabase.from("class_options").insert(rows);
-        if (error) { msgEl.innerHTML = `<div class="msg error">${esc(error.message)}</div>`; return; }
-        if (batchId) {
-          const slotRows = rows.map((r) => ({
-            class_slot_id: `${r.class_option_id}-${batchId}`,
-            class_option_id: r.class_option_id,
-            batch_id: batchId,
+      if (error) { msgEl.innerHTML = `<div class="msg error">${esc(error.message)}</div>`; return; }
+      if (teacher?.full_name) await supabase.from("class_slots").update({ teacher_name: teacher.full_name }).eq("class_option_id", coId);
+      if (batchEl) {
+        const nextBatch = batchEl.value || null;
+        const currentBatches = state.slotBatches[coId] || [];
+        if (nextBatch && (currentBatches.length !== 1 || currentBatches[0] !== nextBatch)) {
+          await supabase.from("class_slots").delete().eq("class_option_id", coId);
+          await supabase.from("class_slots").insert({
+            class_slot_id: `${coId}-${nextBatch}`,
+            class_option_id: coId,
+            batch_id: nextBatch,
             teacher_name: teacher?.full_name || null,
             group_id: teacher?.group_id || null,
             subgroup_id: teacher?.subgroup_id || null,
             status: "Active",
-            current_enrolment: 0,
-            max_capacity: capacity,
+            current_enrolment: state.enrolled[coId] || 0,
+            max_capacity: updates.max_capacity,
             created_by: actor,
             updated_by: actor,
+          });
+        }
+      }
+      const timeChanged = newDay !== oldDay || newTime !== oldTime;
+      let notifSent = false;
+      if (timeChanged) {
+        const { count: enrolledCount } = await supabase.from("applicants").select("id", { count: "exact", head: true }).eq("class_option_id", coId).eq("registration_status", "ASSIGNED");
+        if ((enrolledCount || 0) > 0 && confirm(`${enrolledCount} student(s) are enrolled in this class. Send them a class time change notification?`)) {
+          const { data: enrolled } = await supabase.from("applicants").select("id,full_name,email").eq("class_option_id", coId).eq("registration_status", "ASSIGNED");
+          const emailRows = (enrolled || []).map((ap) => ({
+            recipient_email: ap.email,
+            recipient_name: ap.full_name || "",
+            template_key: "class_time_changed",
+            subject: "Update: Your Rock Solid class time has changed",
+            status: "Pending",
+            payload: { first_name: String(ap.full_name || "Student").split(/\s+/)[0], full_name: ap.full_name, teacher_name: teacher?.full_name || updates.teacher_name || "", old_day: oldDay, old_time: oldTime, new_day: newDay, new_time: newTime },
           }));
+          if (emailRows.length) await supabase.from("email_queue").insert(emailRows);
+          notifSent = true;
+        }
+      }
+      await supabase.from("audit_logs").insert({ actor_email: actor, action: "CLASS_OPTION_UPDATED", entity_type: "class_option", entity_id: coId, status: "SUCCESS", details: { changed_fields: Object.keys(updates), time_changed: timeChanged, notification_sent: notifSent }, created_at: now });
+      msgEl.innerHTML = `<div class="msg success">Saved.</div>`;
+      await loadData();
+    }
+
+    async function createClass() {
+      const teacherId = $("nTeacher")?.value;
+      const day = $("nDay")?.value;
+      const time = $("nTime")?.value;
+      const capacity = $("nCapacity")?.value ? parseInt($("nCapacity").value, 10) : null;
+      const batchId = $("nBatch")?.value || null;
+      const suffix = $("nSuffix")?.value.trim() || null;
+      const expiryVal = $("nExpiry")?.value;
+      const isOnline = $("nIsOnline")?.checked === true;
+      const active = $("nActive")?.checked;
+      const enrollO = $("nEnrollOpen")?.checked;
+      const fc = enforceCodesForOnlineMode(state.newFcCodes, isOnline);
+      const msgEl = $("newMsg");
+      const classMode = state.newClassMode || "shared";
+      if (!teacherId || !day || !time) {
+        msgEl.innerHTML = '<div class="msg error">Teacher, day, and time are required.</div>';
+        return;
+      }
+      const teacher = state.teachers.find((t) => t.teacher_id === teacherId);
+      const now = new Date().toISOString();
+      const actor = state.profile?.email || null;
+      if (isOnline && fc.length > 1 && classMode === "separate") {
+        const rows = fc.map((code) => ({
+          class_option_id: generateSeparateClassId(code, teacherId, day, time),
+          teacher_id: teacherId,
+          teacher_name: teacher?.full_name || null,
+          day, class_time: time, max_capacity: capacity, label_suffix: suffix,
+          enrollment_closes_at: expiryVal ? new Date(expiryVal).toISOString() : null,
+          active, enrollment_open: enrollO, is_online: isOnline, fellowship_codes: [code],
+          group_id: teacher?.group_id || null, subgroup_id: teacher?.subgroup_id || null,
+          created_by: actor, updated_by: actor, created_at: now, updated_at: now,
+        }));
+        const { error } = await supabase.from("class_options").insert(rows);
+        if (error) { msgEl.innerHTML = `<div class="msg error">${esc(error.message)}</div>`; return; }
+        if (batchId) {
+          const slotRows = rows.map((r) => ({ class_slot_id: `${r.class_option_id}-${batchId}`, class_option_id: r.class_option_id, batch_id: batchId, teacher_name: teacher?.full_name || null, group_id: teacher?.group_id || null, subgroup_id: teacher?.subgroup_id || null, status: "Active", current_enrolment: 0, max_capacity: capacity, created_by: actor, updated_by: actor }));
           const { error: slotErr } = await supabase.from("class_slots").insert(slotRows);
           if (slotErr) { msgEl.innerHTML = `<div class="msg error">${esc(slotErr.message)}</div>`; return; }
         }
-        await supabase.from("audit_logs").insert(rows.map((r) => ({
-          actor_email: actor, action: "CLASS_OPTION_CREATED", entity_type: "class_option",
-          entity_id: r.class_option_id, status: "SUCCESS",
-          details: { teacher_name: teacher?.full_name, day, class_time: time, batch_id: batchId, fellowship_code: r.fellowship_codes[0], mode: "separate" },
-          created_at: now,
-        })));
+        await supabase.from("audit_logs").insert(rows.map((r) => ({ actor_email: actor, action: "CLASS_OPTION_CREATED", entity_type: "class_option", entity_id: r.class_option_id, status: "SUCCESS", details: { teacher_name: teacher?.full_name, day, class_time: time, batch_id: batchId, fellowship_code: r.fellowship_codes[0], mode: "separate" }, created_at: now })));
         msgEl.innerHTML = `<div class="msg success">${fc.length} separate classes created</div>`;
       } else {
         const classId = $("nClassId")?.value.trim() || generateSharedClassId(teacher?.subgroup_id || "SG", teacherId, day, time);
         const { error } = await supabase.from("class_options").insert({
-          class_option_id:       classId,
-          teacher_id:            teacherId,
-          teacher_name:          teacher?.full_name || null,
-          day,
-          class_time:            time,
-          max_capacity:          capacity,
-          label_suffix:          suffix,
-          enrollment_closes_at:  expiryVal ? new Date(expiryVal).toISOString() : null,
-          active,
-          enrollment_open:       enrollO,
-          is_online:             isOnline,
-          fellowship_codes:      fc,
-          group_id:              teacher?.group_id || null,
-          subgroup_id:           teacher?.subgroup_id || null,
-          created_by:            actor,
-          updated_by:            actor,
-          created_at:            now,
-          updated_at:            now,
+          class_option_id: classId, teacher_id: teacherId, teacher_name: teacher?.full_name || null, day, class_time: time, max_capacity: capacity, label_suffix: suffix,
+          enrollment_closes_at: expiryVal ? new Date(expiryVal).toISOString() : null, active, enrollment_open: enrollO, is_online: isOnline, fellowship_codes: fc,
+          group_id: teacher?.group_id || null, subgroup_id: teacher?.subgroup_id || null, created_by: actor, updated_by: actor, created_at: now, updated_at: now,
         });
         if (error) { msgEl.innerHTML = `<div class="msg error">${esc(error.message)}</div>`; return; }
         if (batchId) {
-          const { error: slotErr } = await supabase.from("class_slots").insert({
-            class_slot_id:    `${classId}-${batchId}`,
-            class_option_id:  classId,
-            batch_id:         batchId,
-            teacher_name:     teacher?.full_name || null,
-            group_id:         teacher?.group_id || null,
-            subgroup_id:      teacher?.subgroup_id || null,
-            status:           "Active",
-            current_enrolment: 0,
-            max_capacity:     capacity,
-            created_by:       actor,
-            updated_by:       actor,
-          });
+          const { error: slotErr } = await supabase.from("class_slots").insert({ class_slot_id: `${classId}-${batchId}`, class_option_id: classId, batch_id: batchId, teacher_name: teacher?.full_name || null, group_id: teacher?.group_id || null, subgroup_id: teacher?.subgroup_id || null, status: "Active", current_enrolment: 0, max_capacity: capacity, created_by: actor, updated_by: actor });
           if (slotErr) { msgEl.innerHTML = `<div class="msg error">${esc(slotErr.message)}</div>`; return; }
         }
-        await supabase.from("audit_logs").insert({
-          actor_email: actor, action: "CLASS_OPTION_CREATED", entity_type: "class_option",
-          entity_id: classId, status: "SUCCESS",
-          details: { teacher_name: teacher?.full_name, day, class_time: time, batch_id: batchId, fellowship_codes: fc, mode: "shared" },
-          created_at: now,
-        });
-        msgEl.innerHTML = fc.length > 1
-          ? `<div class="msg success">1 shared class created for ${fc.length} fellowships</div>`
-          : '<div class="msg success">Class created!</div>';
+        await supabase.from("audit_logs").insert({ actor_email: actor, action: "CLASS_OPTION_CREATED", entity_type: "class_option", entity_id: classId, status: "SUCCESS", details: { teacher_name: teacher?.full_name, day, class_time: time, batch_id: batchId, fellowship_codes: fc, mode: "shared" }, created_at: now });
+        msgEl.innerHTML = fc.length > 1 ? `<div class="msg success">1 shared class created for ${fc.length} fellowships</div>` : '<div class="msg success">Class created!</div>';
       }
       state.newFcCodes = [];
       $("newPanel").style.display = "none";
@@ -710,273 +595,130 @@
       const codes = source.fellowship_codes || [];
       if (codes.length < 2) return;
       if (!confirm("This will create separate class IDs per fellowship. Enrolled students will need to be manually reassigned.")) return;
-
       const actor = state.profile?.email || null;
       const now = new Date().toISOString();
       const teacherId = source.teacher_id || "";
       const day = source.day || "";
       const time = source.class_time || "";
-
-      const rows = codes.map((code) => ({
-        class_option_id: generateSeparateClassId(code, teacherId, day, time),
-        teacher_id: source.teacher_id,
-        teacher_name: source.teacher_name,
-        day: source.day,
-        class_time: source.class_time,
-        max_capacity: source.max_capacity,
-        label_suffix: source.label_suffix,
-        active: true,
-        enrollment_open: source.enrollment_open !== false,
-        fellowship_codes: [code],
-        group_id: source.group_id,
-        subgroup_id: source.subgroup_id,
-        created_by: actor,
-        updated_by: actor,
-        created_at: now,
-        updated_at: now,
-      }));
-
+      const rows = codes.map((code) => ({ class_option_id: generateSeparateClassId(code, teacherId, day, time), teacher_id: source.teacher_id, teacher_name: source.teacher_name, day: source.day, class_time: source.class_time, max_capacity: source.max_capacity, label_suffix: source.label_suffix, active: true, enrollment_open: source.enrollment_open !== false, fellowship_codes: [code], group_id: source.group_id, subgroup_id: source.subgroup_id, created_by: actor, updated_by: actor, created_at: now, updated_at: now }));
       const { error } = await supabase.from("class_options").insert(rows);
       if (error) { showFlash(`Split failed: ${error.message}`, "error"); return; }
-
       const { data: sourceSlots } = await supabase.from("class_slots").select("*").eq("class_option_id", coId);
       if (sourceSlots?.length) {
         const slotRows = [];
-        for (const row of rows) {
-          for (const s of sourceSlots) {
-            slotRows.push({
-              class_slot_id: `${row.class_option_id}-${s.batch_id}`,
-              class_option_id: row.class_option_id,
-              batch_id: s.batch_id,
-              teacher_name: row.teacher_name,
-              group_id: row.group_id,
-              subgroup_id: row.subgroup_id,
-              status: s.status || "Active",
-              current_enrolment: 0,
-              max_capacity: row.max_capacity,
-              created_by: actor,
-              updated_by: actor,
-            });
-          }
-        }
+        for (const row of rows) for (const s of sourceSlots) slotRows.push({ class_slot_id: `${row.class_option_id}-${s.batch_id}`, class_option_id: row.class_option_id, batch_id: s.batch_id, teacher_name: row.teacher_name, group_id: row.group_id, subgroup_id: row.subgroup_id, status: s.status || "Active", current_enrolment: 0, max_capacity: row.max_capacity, created_by: actor, updated_by: actor });
         const { error: slotErr } = await supabase.from("class_slots").insert(slotRows);
         if (slotErr) { showFlash(`Split slot creation failed: ${slotErr.message}`, "error"); return; }
       }
-
-      await supabase.from("class_options")
-        .update({ active: false, enrollment_open: false, updated_by: actor, updated_at: now })
-        .eq("class_option_id", coId);
-
-      await supabase.from("audit_logs").insert({
-        actor_email: actor,
-        action: "CLASS_OPTION_SPLIT",
-        entity_type: "class_option",
-        entity_id: coId,
-        status: "SUCCESS",
-        details: { source_class_option_id: coId, fellowship_codes: codes, new_class_option_ids: rows.map((r) => r.class_option_id) },
-        created_at: now,
-      });
-
+      await supabase.from("class_options").update({ active: false, enrollment_open: false, updated_by: actor, updated_at: now }).eq("class_option_id", coId);
+      await supabase.from("audit_logs").insert({ actor_email: actor, action: "CLASS_OPTION_SPLIT", entity_type: "class_option", entity_id: coId, status: "SUCCESS", details: { source_class_option_id: coId, fellowship_codes: codes, new_class_option_ids: rows.map((r) => r.class_option_id) }, created_at: now });
       showFlash(`${codes.length} separate classes created`, "success");
-      state.openEditId = null;
       await loadData();
     }
 
-    // ── Event binding ─────────────────────────────────────────────────────────
     function bindEvents() {
       $("refreshBtn").addEventListener("click", loadData);
       $("groupFilter").addEventListener("change", renderTable);
       $("activeOnly").addEventListener("change", renderTable);
-
-      $("newClassBtn").addEventListener("click", () => {
-        $("newPanel").style.display = $("newPanel").style.display === "none" ? "" : "none";
-      });
+      const toggleNew = () => { $("newPanel").style.display = $("newPanel").style.display === "none" ? "" : "none"; };
+      $("newClassBtn").addEventListener("click", toggleNew);
+      $("railNewClassBtn").addEventListener("click", toggleNew);
       $("cancelNewBtn").addEventListener("click", () => { $("newPanel").style.display = "none"; });
       $("saveNewBtn").addEventListener("click", createClass);
-
-      // Auto-generate Class ID
-      [$("nTeacher"), $("nDay"), $("nTime")].forEach((el) => {
-        el && el.addEventListener("change", () => {
-          const t = $("nTeacher")?.value;
-          const d = $("nDay")?.value;
-          const ti = $("nTime")?.value;
-          const teacher = state.teachers.find((x) => x.teacher_id === t);
-          $("nClassId").value = generateSharedClassId(teacher?.subgroup_id || "SG", t, d, ti);
-        });
-      });
-
-      document.querySelectorAll('input[name="multiFcMode"]').forEach((el) => {
-        el.addEventListener("change", () => {
-          state.newClassMode = el.value === "separate" ? "separate" : "shared";
-        });
-      });
-
+      [$("nTeacher"), $("nDay"), $("nTime")].forEach((el) => el?.addEventListener("change", () => {
+        const t = $("nTeacher")?.value; const d = $("nDay")?.value; const ti = $("nTime")?.value;
+        const teacher = state.teachers.find((x) => x.teacher_id === t);
+        $("nClassId").value = generateSharedClassId(teacher?.subgroup_id || "SG", t, d, ti);
+      }));
+      document.querySelectorAll('input[name="multiFcMode"]').forEach((el) => el.addEventListener("change", () => { state.newClassMode = el.value === "separate" ? "separate" : "shared"; }));
       $("nIsOnline")?.addEventListener("change", () => {
         const isOnline = $("nIsOnline")?.checked === true;
         state.newFcCodes = enforceCodesForOnlineMode(state.newFcCodes, isOnline);
-        const prompt = $("multiFcPrompt");
-        if (prompt) prompt.style.display = (isOnline && state.newFcCodes.length > 1) ? "" : "none";
-        renderFcChips("nFcChips", state.newFcCodes, (updated) => {
+        $("multiFcPrompt").style.display = (isOnline && state.newFcCodes.length > 1) ? "" : "none";
+        renderFcChips("nFcChips", state.newFcCodes, function updateNewCodes(updated) {
           const online = $("nIsOnline")?.checked === true;
           state.newFcCodes = enforceCodesForOnlineMode(updated, online);
-          const p = $("multiFcPrompt");
-          if (p) p.style.display = (online && state.newFcCodes.length > 1) ? "" : "none";
-          renderFcChips("nFcChips", state.newFcCodes, arguments.callee);
+          $("multiFcPrompt").style.display = (online && state.newFcCodes.length > 1) ? "" : "none";
+          renderFcChips("nFcChips", state.newFcCodes, updateNewCodes);
         });
       });
-
-      // Table button delegation
-      $("classTableBody").addEventListener("click", async (e) => {
-        const editBtn = e.target.closest("[data-edit]");
-        if (editBtn) {
-          const id = editBtn.dataset.edit;
-          state.openEditId = state.openEditId === id ? null : id;
-          renderTable();
-          return;
-        }
-
-        const cancelBtn = e.target.closest("[data-cancel-edit]");
-        if (cancelBtn) { state.openEditId = null; renderTable(); return; }
-
+      $("classTableBody").addEventListener("click", (e) => {
+        const card = e.target.closest("[data-select-class]");
+        if (!card) return;
+        if (e.target.classList.contains("mass-check")) return;
+        state.openEditId = card.dataset.selectClass;
+        renderTable();
+      });
+      $("classTableBody").addEventListener("change", (e) => {
+        const el = e.target;
+        if (!(el instanceof HTMLInputElement) || !el.classList.contains("mass-check")) return;
+        if (el.checked) state.selectedIds.add(el.dataset.id); else state.selectedIds.delete(el.dataset.id);
+        updateMassUI();
+      });
+      $("editorDetailPane").addEventListener("click", async (e) => {
         const saveBtn = e.target.closest("[data-save-edit]");
-        if (saveBtn) {
-          await saveEdit(saveBtn.dataset.saveEdit, saveBtn.dataset.oldDay, saveBtn.dataset.oldTime);
-          return;
-        }
-
+        if (saveBtn) return saveEdit(saveBtn.dataset.saveEdit, saveBtn.dataset.oldDay, saveBtn.dataset.oldTime);
         const splitBtn = e.target.closest("[data-split-class]");
-        if (splitBtn) {
-          await splitSharedClass(splitBtn.dataset.splitClass);
-          return;
-        }
-
+        if (splitBtn) return splitSharedClass(splitBtn.dataset.splitClass);
+        const resetBtn = e.target.closest("[data-reset-detail]");
+        if (resetBtn) return renderTable();
         const dupBtn = e.target.closest("[data-dup]");
         if (dupBtn) {
           const src = state.classes.find((c) => c.class_option_id === dupBtn.dataset.dup);
           if (!src) return;
           const newId = `${src.class_option_id}-COPY`;
-          const { error } = await supabase.from("class_options").insert({
-            ...src, class_option_id: newId, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-            deleted_at: null, created_by: state.profile?.email || null,
-          });
-          showFlash(error ? `Duplicate failed: ${error.message}` : `Duplicated as ${newId}. Click Edit to update details.`, error ? "error" : "success");
+          const { error } = await supabase.from("class_options").insert({ ...src, class_option_id: newId, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, created_by: state.profile?.email || null });
+          showFlash(error ? `Duplicate failed: ${error.message}` : `Duplicated as ${newId}.`, error ? "error" : "success");
           if (!error) await loadData();
           return;
         }
-
         const delBtn = e.target.closest("[data-delete]");
         if (delBtn) {
           const id = delBtn.dataset.delete;
-          const { count } = await supabase.from("applicants").select("id", { count: "exact", head: true })
-            .eq("class_option_id", id).eq("registration_status", "ASSIGNED");
-          if ((count || 0) > 0) {
-            if (!confirm(`${count} student(s) are enrolled in this class. Soft-delete anyway?`)) return;
-          } else {
-            if (!confirm(`Soft-delete class ${id}?`)) return;
-          }
-          const { error } = await supabase.from("class_options")
-            .update({ deleted_at: new Date().toISOString(), active: false }).eq("class_option_id", id);
+          const { count } = await supabase.from("applicants").select("id", { count: "exact", head: true }).eq("class_option_id", id).eq("registration_status", "ASSIGNED");
+          if (!confirm((count || 0) > 0 ? `${count} student(s) are enrolled in this class. Soft-delete anyway?` : `Soft-delete class ${id}?`)) return;
+          const { error } = await supabase.from("class_options").update({ deleted_at: new Date().toISOString(), active: false }).eq("class_option_id", id);
           showFlash(error ? `Delete failed: ${error.message}` : `Class ${id} deleted.`, error ? "error" : "success");
           if (!error) await loadData();
-          return;
         }
       });
-
-      $("classTableBody").addEventListener("change", (e) => {
+      $("editorDetailPane").addEventListener("change", (e) => {
         const el = e.target;
-        if (!(el instanceof HTMLInputElement)) return;
-        if (el.classList.contains("mass-check")) {
-          const id = el.dataset.id;
-          if (el.checked) state.selectedIds.add(id);
-          else state.selectedIds.delete(id);
-          updateMassUI();
-          return;
-        }
-        if (!el.id.startsWith("eonline-")) return;
+        if (!(el instanceof HTMLInputElement) || !el.id.startsWith("eonline-")) return;
         const coId = el.id.replace("eonline-", "");
         state.editFcCodes[coId] = enforceCodesForOnlineMode(state.editFcCodes[coId] || [], el.checked);
         renderTable();
       });
-
-      // Mass manage
       $("massManageBtn").addEventListener("click", () => {
         state.massManageOpen = !state.massManageOpen;
         state.selectedIds = new Set();
         $("massManagePanel").style.display = state.massManageOpen ? "" : "none";
-        const th = $("massCheckboxTh");
-        if (th) th.style.display = state.massManageOpen ? "" : "none";
         renderTable();
-        updateMassUI();
       });
-
       $("selectAllCheck").addEventListener("change", (e) => {
         const rows = filteredClasses();
-        if (e.target.checked) rows.forEach((c) => state.selectedIds.add(c.class_option_id));
-        else state.selectedIds.clear();
-        updateMassUI();
+        if (e.target.checked) rows.forEach((c) => state.selectedIds.add(c.class_option_id)); else state.selectedIds.clear();
         renderTable();
       });
-
       $("massActivateBtn").addEventListener("click", async () => {
-        if (!state.selectedIds.size) return;
-        const ids = [...state.selectedIds];
-        const { error } = await supabase.from("class_options")
-          .update({ active: true, enrollment_open: true })
-          .in("class_option_id", ids);
-        if (error) { $("massMsg").innerHTML = `<div class="msg error">${esc(error.message)}</div>`; return; }
-        await supabase.from("audit_logs").insert({
-          actor_email: state.profile?.email || null, action: "CLASS_MASS_ACTIVATE",
-          entity_type: "class_option", status: "SUCCESS",
-          details: { class_option_ids: ids, count: ids.length }, created_at: new Date().toISOString(),
-        });
-        showFlash(`${ids.length} class(es) activated.`, "success");
-        state.selectedIds = new Set();
-        await loadData();
-        updateMassUI();
+        const ids = [...state.selectedIds]; if (!ids.length) return;
+        const { error } = await supabase.from("class_options").update({ active: true, enrollment_open: true }).in("class_option_id", ids);
+        if (error) return $("massMsg").innerHTML = `<div class="msg error">${esc(error.message)}</div>`;
+        showFlash(`${ids.length} class(es) activated.`, "success"); state.selectedIds = new Set(); await loadData();
       });
-
       $("massDeactivateBtn").addEventListener("click", async () => {
-        if (!state.selectedIds.size) return;
-        const ids = [...state.selectedIds];
-        const { error } = await supabase.from("class_options")
-          .update({ active: false, enrollment_open: false })
-          .in("class_option_id", ids);
-        if (error) { $("massMsg").innerHTML = `<div class="msg error">${esc(error.message)}</div>`; return; }
-        await supabase.from("audit_logs").insert({
-          actor_email: state.profile?.email || null, action: "CLASS_MASS_DEACTIVATE",
-          entity_type: "class_option", status: "SUCCESS",
-          details: { class_option_ids: ids, count: ids.length }, created_at: new Date().toISOString(),
-        });
-        showFlash(`${ids.length} class(es) deactivated.`, "success");
-        state.selectedIds = new Set();
-        await loadData();
-        updateMassUI();
+        const ids = [...state.selectedIds]; if (!ids.length) return;
+        const { error } = await supabase.from("class_options").update({ active: false, enrollment_open: false }).in("class_option_id", ids);
+        if (error) return $("massMsg").innerHTML = `<div class="msg error">${esc(error.message)}</div>`;
+        showFlash(`${ids.length} class(es) deactivated.`, "success"); state.selectedIds = new Set(); await loadData();
       });
-
-      $("massSetExpiryBtn").addEventListener("click", () => {
-        const s = $("massExpirySection");
-        s.style.display = s.style.display === "none" ? "inline-flex" : "none";
-      });
-
+      $("massSetExpiryBtn").addEventListener("click", () => { $("massExpirySection").style.display = $("massExpirySection").style.display === "none" ? "inline-flex" : "none"; });
       $("massApplyExpiryBtn").addEventListener("click", async () => {
-        if (!state.selectedIds.size) return;
+        const ids = [...state.selectedIds]; if (!ids.length) return;
         const expiryVal = $("massExpiryInput")?.value;
-        const ids = [...state.selectedIds];
-        const { error } = await supabase.from("class_options")
-          .update({ enrollment_closes_at: expiryVal ? new Date(expiryVal).toISOString() : null })
-          .in("class_option_id", ids);
-        if (error) { $("massMsg").innerHTML = `<div class="msg error">${esc(error.message)}</div>`; return; }
-        await supabase.from("audit_logs").insert({
-          actor_email: state.profile?.email || null, action: "CLASS_MASS_SET_EXPIRY",
-          entity_type: "class_option", status: "SUCCESS",
-          details: { class_option_ids: ids, enrollment_closes_at: expiryVal ? new Date(expiryVal).toISOString() : null, count: ids.length },
-          created_at: new Date().toISOString(),
-        });
-        showFlash(`Expiry set for ${ids.length} class(es).`, "success");
-        state.selectedIds = new Set();
-        $("massExpirySection").style.display = "none";
-        await loadData();
-        updateMassUI();
+        const { error } = await supabase.from("class_options").update({ enrollment_closes_at: expiryVal ? new Date(expiryVal).toISOString() : null }).in("class_option_id", ids);
+        if (error) return $("massMsg").innerHTML = `<div class="msg error">${esc(error.message)}</div>`;
+        showFlash(`Expiry set for ${ids.length} class(es).`, "success"); state.selectedIds = new Set(); $("massExpirySection").style.display = "none"; await loadData();
       });
     }
 
@@ -991,15 +733,12 @@
       state.profile = auth.profile;
       state.canEdit = ["admin","superadmin","regional_secretary"].includes((auth.profile?.role || "").toLowerCase());
       state.canSuperadmin = (auth.profile?.role || "").toLowerCase() === "superadmin";
-
       window.FSAdminShell?.mount({ active: "classeditor", pageTitle: "Class Editor", role: auth.profile?.role });
-
       if (!state.canEdit) {
         $("newClassBtn").style.display = "none";
+        $("railNewClassBtn").style.display = "none";
         $("massManageBtn").style.display = "none";
-        $("actionsHeader").style.display = "none";
       }
-
       bindEvents();
       await loadData();
     }
@@ -1008,4 +747,3 @@
   </script>
 </body>
 </html>
-

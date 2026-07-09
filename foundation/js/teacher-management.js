@@ -117,9 +117,15 @@
 
   // ── Tabs ───────────────────────────────────────────────────────────────────
   function renderTabs() {
-    $("statusTabs").innerHTML = statusTabs
-      .map((s) => `<button class="tab ${state.activeTab === s ? "active" : ""}" data-status="${s}">${s}</button>`)
-      .join("");
+    $("statusTabs").replaceChildren(
+      ...statusTabs.map((s) => {
+        const btn = document.createElement("button");
+        btn.className = `tab${state.activeTab === s ? " active" : ""}`;
+        btn.dataset.status = s;
+        btn.textContent = s;
+        return btn;
+      })
+    );
   }
 
   // ── Action buttons (role-aware) ────────────────────────────────────────────
@@ -256,6 +262,65 @@
     }
   }
 
+  // ── Safe DOM row builders ──────────────────────────────────────────────────
+  function buildTeacherRow(row) {
+    const normalized = FSAdminApi.normalizeTeacherStatus(row.status, row.active);
+    const classId = state.classMap.get(String(row.teacher_id)) || "—";
+    const tr = document.createElement("tr");
+
+    const nameTd = document.createElement("td");
+    const strong = document.createElement("strong");
+    strong.textContent = row.full_name || "—";
+    nameTd.appendChild(strong);
+    tr.appendChild(nameTd);
+
+    const addText = (text, style) => {
+      const td = document.createElement("td");
+      td.textContent = text;
+      if (style) Object.assign(td.style, style);
+      tr.appendChild(td);
+    };
+    const addHtml = (html) => {
+      const td = document.createElement("td");
+      td.innerHTML = html;
+      tr.appendChild(td);
+    };
+
+    addText(row.email || "—");
+    addText(row.fellowship_code || row.group_id || "—");
+    addText(row.subgroup_id || "—");
+    addHtml(statusChip(normalized));
+    addText(classId, { fontSize: "12px", color: "var(--muted)" });
+    addText(fmtDate(row.created_at));
+    addHtml(actionButtons(row));
+    return tr;
+  }
+
+  function buildTeacherCard(row) {
+    const normalized = FSAdminApi.normalizeTeacherStatus(row.status, row.active);
+    const article = document.createElement("article");
+    article.className = "teacher-card";
+
+    const h3 = document.createElement("h3");
+    h3.textContent = row.full_name || "—";
+
+    const p1 = document.createElement("p");
+    p1.textContent = row.email || "—";
+
+    const p2 = document.createElement("p");
+    p2.textContent = `Fellowship: ${row.fellowship_code || row.group_id || "—"} | Subgroup: ${row.subgroup_id || "—"}`;
+
+    const p3 = document.createElement("p");
+    p3.innerHTML = statusChip(normalized);
+
+    const actionsDiv = document.createElement("div");
+    actionsDiv.className = "actions";
+    actionsDiv.innerHTML = actionButtons(row);
+
+    article.append(h3, p1, p2, p3, actionsDiv);
+    return article;
+  }
+
   // ── Filters + render ───────────────────────────────────────────────────────
   function applyFilters() {
     const q        = String($("searchInput").value || "").trim().toLowerCase();
@@ -282,34 +347,8 @@
       return;
     }
 
-    const rowsHtml = state.filtered.map((row) => {
-      const normalized = FSAdminApi.normalizeTeacherStatus(row.status, row.active);
-      const classId    = state.classMap.get(String(row.teacher_id)) || "—";
-      return `<tr>
-        <td><strong>${esc(row.full_name || "—")}</strong></td>
-        <td>${esc(row.email || "—")}</td>
-        <td>${esc(row.fellowship_code || row.group_id || "—")}</td>
-        <td>${esc(row.subgroup_id || "—")}</td>
-        <td>${statusChip(normalized)}</td>
-        <td style="font-size:12px;color:var(--muted);">${esc(classId)}</td>
-        <td>${fmtDate(row.created_at)}</td>
-        <td>${actionButtons(row)}</td>
-      </tr>`;
-    }).join("");
-
-    const cardsHtml = state.filtered.map((row) => {
-      const normalized = FSAdminApi.normalizeTeacherStatus(row.status, row.active);
-      return `<article class="teacher-card">
-        <h3>${esc(row.full_name || "—")}</h3>
-        <p>${esc(row.email || "—")}</p>
-        <p>Fellowship: ${esc(row.fellowship_code || row.group_id || "—")} | Subgroup: ${esc(row.subgroup_id || "—")}</p>
-        <p>${statusChip(normalized)}</p>
-        <div class="actions">${actionButtons(row)}</div>
-      </article>`;
-    }).join("");
-
-    $("rows").innerHTML = rowsHtml;
-    $("mobileCards").innerHTML = cardsHtml;
+    $("rows").replaceChildren(...state.filtered.map(buildTeacherRow));
+    $("mobileCards").replaceChildren(...state.filtered.map(buildTeacherCard));
     $("countLabel").textContent = `${state.filtered.length} teacher${state.filtered.length === 1 ? "" : "s"}`;
     showData();
   }

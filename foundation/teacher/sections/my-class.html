@@ -7,30 +7,30 @@
   <link rel="stylesheet" href="../../ui/tokens.css" />
   <link rel="stylesheet" href="../../ui/primitives.css" />
   <style>
-    html, body { margin: 0; min-height: 100%; background: var(--color-bg); color: var(--color-text-primary); font-family: "Manrope", system-ui, -apple-system, sans-serif; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: "Manrope", system-ui, -apple-system, sans-serif; }
     .page { padding: var(--space-4); }
     .hidden { display: none !important; }
     .row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-    .mode-pill { border: 1px solid var(--color-border); background: var(--color-surface); border-radius: var(--radius-full); padding: 2px; display: inline-flex; }
-    .mode-pill button { border: none; background: transparent; padding: 6px 12px; border-radius: var(--radius-full); cursor: pointer; color: var(--color-text-secondary); }
-    .mode-pill button.active { background: var(--color-primary); color: var(--color-primary-fg); }
+    .mode-pill { border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-full); padding: 2px; display: inline-flex; }
+    .mode-pill button { border: none; background: transparent; padding: 6px 12px; border-radius: var(--radius-full); cursor: pointer; color: var(--text-2); }
+    .mode-pill button.active { background: var(--primary); color: #fff; }
     .search-wrap { position: relative; max-width: 420px; }
-    .search-wrap .clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); border: none; background: transparent; cursor: pointer; color: var(--color-text-muted); }
-    .danger { color: var(--color-danger); font-weight: 700; }
+    .search-wrap .clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); border: none; background: transparent; cursor: pointer; color: var(--muted); }
+    .danger { color: var(--danger); font-weight: 700; }
     .click-row { cursor: pointer; }
-    .drawer-backdrop { position: fixed; inset: 0; background: color-mix(in srgb, var(--color-text-primary) 25%, transparent); opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 40; }
+    .drawer-backdrop { position: fixed; inset: 0; background: color-mix(in srgb, var(--text) 25%, transparent); opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 40; }
     .drawer-backdrop.show { opacity: 1; pointer-events: auto; }
-    .drawer { position: fixed; top: 56px; right: 0; width: min(440px, 100%); height: calc(100vh - 56px); background: var(--color-surface); box-shadow: var(--shadow-raised); transform: translateX(100%); transition: transform 0.2s; z-index: 50; overflow: auto; }
+    .drawer { position: fixed; top: 56px; right: 0; width: min(440px, 100%); height: calc(100vh - 56px); background: var(--surface); box-shadow: var(--shadow-raised); transform: translateX(100%); transition: transform 0.2s; z-index: 50; overflow: auto; }
     .drawer.show { transform: translateX(0); }
-    .drawer-sec { padding: var(--space-4); border-bottom: 1px solid var(--color-border); }
+    .drawer-sec { padding: var(--space-4); border-bottom: 1px solid var(--border); }
     .drawer-h { margin: 0 0 var(--space-2); font-size: var(--fs-section-title); }
-    .grid { overflow: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+    .grid { overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
     .grid table { width: 100%; min-width: 900px; border-collapse: collapse; }
-    .grid th, .grid td { border-bottom: 1px solid var(--color-border); padding: var(--space-2); text-align: left; font-size: var(--fs-body); }
-    .sticky-name { position: sticky; left: 32px; background: var(--color-surface); min-width: 160px; z-index: 2; }
-    .sticky-check { position: sticky; left: 0; background: var(--color-surface); z-index: 3; width: 32px; }
-    .toolbar { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); padding: var(--space-2); margin-bottom: var(--space-2); }
-    .toast { position: fixed; bottom: 16px; right: 16px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); box-shadow: var(--shadow-raised); z-index: 100; }
+    .grid th, .grid td { border-bottom: 1px solid var(--border); padding: var(--space-2); text-align: left; font-size: var(--fs-body); }
+    .sticky-name { position: sticky; left: 32px; background: var(--surface); min-width: 160px; z-index: 2; }
+    .sticky-check { position: sticky; left: 0; background: var(--surface); z-index: 3; width: 32px; }
+    .toolbar { border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); padding: var(--space-2); margin-bottom: var(--space-2); }
+    .toast { position: fixed; bottom: 16px; right: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); box-shadow: var(--shadow-raised); z-index: 100; }
     @media (max-width: 640px) {
       .drawer { top: auto; bottom: 0; width: 100%; height: 85vh; border-top-left-radius: var(--radius-lg); border-top-right-radius: var(--radius-lg); transform: translateY(100%); }
       .drawer.show { transform: translateY(0); }

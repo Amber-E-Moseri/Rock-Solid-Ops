@@ -21,5 +21,15 @@ supabase.exe
 *.bak
 *.log
 
+# Dependencies
+node_modules/
+
+# Archives / build artifacts (not source)
+*.zip
+
+# Local scratch & debug artifacts
+tmp_teacher_ref/
+validation-screenshots/
+
 # Local config overrides
 foundation/js/config.local.js

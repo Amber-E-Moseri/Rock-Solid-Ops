@@ -15,7 +15,6 @@ let currentBatches   = []     // cached batch list for batch management
 let batchModalMode   = 'create' // 'create' | 'edit'
 let batchModalId     = null   // batch_id being edited
 let moodleModalBatchId = null // batch_id open in Moodle config modal
-const QUERY_ROW_CAP = 5000
 
 // ── Init ──────────────────────────────────────────────────────
 async function init() {
@@ -35,20 +34,27 @@ async function init() {
     currentUser = user
 
     const { data: profile, error: pErr } = await db
-      .from('admin_users')
-      .select('*')
-      .eq('auth_user_id', user.id)
-      .single()
+      .from('profiles')
+      .select('user_id,email,full_name,role,is_active')
+      .eq('user_id', user.id)
+      .maybeSingle()
 
     if (pErr || !profile) {
       const msg = pErr?.code === '42P01'
-        ? 'The admin_users table does not exist yet. Please run the SQL migration first.'
-        : 'No admin profile found for this account.'
+        ? 'The profiles table does not exist yet. Please run the SQL migration first.'
+        : 'No profile found for this account.'
       showAccessDenied(msg)
       return
     }
 
-    adminProfile = profile
+    const adminRoles = new Set(['superadmin','admin','subgroup_admin','pastor','principal','regional_secretary'])
+    if (!adminRoles.has(String(profile.role || '').toLowerCase())) {
+      showAccessDenied('Your account does not have admin access.')
+      return
+    }
+
+    // Normalize to match what the rest of the file expects
+    adminProfile = { ...profile, auth_user_id: user.id }
     renderPortal()
   } catch (e) {
     console.error('Init error:', e)
@@ -83,6 +89,14 @@ function safeInvokeLoader(fnName, moduleName, targetSectionId) {
   }
 }
 
+// ── Global error fallback ─────────────────────────────────────
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('[UnhandledRejection]', event.reason)
+  const message = event.reason?.message || String(event.reason) || 'An unexpected error occurred.'
+  toast(`Error: ${message}`, 'error')
+  event.preventDefault()
+})
+
 // ── Role helpers ──────────────────────────────────────────────
 function isSuperadmin()    { return adminProfile?.role === 'superadmin' }
 function isSubgroupAdmin() { return adminProfile?.role === 'subgroup_admin' }
@@ -98,6 +112,34 @@ function scopeQuery(query, col) {
   return sg.length ? query.in(col, sg) : query.in(col, ['__NONE__'])
 }
 
+// ── Hub icons (Lucide-style inline SVG) ───────────────────────
+const _ico = {
+  list:     `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3" cy="6" r=".8" fill="currentColor" stroke="none"/><circle cx="3" cy="12" r=".8" fill="currentColor" stroke="none"/><circle cx="3" cy="18" r=".8" fill="currentColor" stroke="none"/></svg>`,
+  calendar: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+  clock:    `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  grid:     `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`,
+  check:    `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  userPlus: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>`,
+  msg:      `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+  refresh:  `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>`,
+  pulse:    `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+  mail:     `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`,
+  log:      `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
+}
+
+function apCard(iconName, iconColorClass, _unused, title, desc, href, access, badgeId) {
+  const badge = badgeId
+    ? `<span class="ap-card-badge" id="${badgeId}" style="display:none"></span>`
+    : ''
+  const isRestricted = access && access !== 'all'
+  return `<a class="ap-card" href="${isRestricted ? '#' : href}"${isRestricted ? ` onclick="openPortalPage('${href}','${access}');return false"` : ''}>
+    <div class="ap-card-icon ${iconColorClass}">${_ico[iconName] || ''}</div>
+    <div class="ap-card-hd"><span class="ap-card-title">${title}</span>${badge}</div>
+    <p class="ap-card-desc">${desc}</p>
+    <span class="ap-card-open">Open <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+  </a>`
+}
+
 // ── Render portal ─────────────────────────────────────────────
 function renderPortal() {
   document.getElementById('loading-screen').style.display = 'none'
@@ -106,92 +148,194 @@ function renderPortal() {
     window.FSAdminShell.mount({
       active: 'portal',
       pageTitle: 'Admin Portal',
-      role: adminProfile.role,
-      profileName: adminProfile.full_name,
+      role: adminProfile.role || '',
+      profileName: adminProfile.full_name || adminProfile.email || '',
       onLogout: logout
     })
   } else if (window.FSAdminShell) {
     window.FSAdminShell.setPageTitle('Admin Portal')
-    window.FSAdminShell.setProfile(adminProfile.full_name, null)
+    window.FSAdminShell.setProfile({ profileName: adminProfile.full_name, role: adminProfile.role }, null)
   }
 
-  const main = document.getElementById('main')
-  main.innerHTML = ''
+  const firstName = (adminProfile.full_name || '').split(' ')[0] || 'there'
+  const h = new Date().getHours()
+  const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'
+  const sa = isSuperadmin()
 
-  if (isSuperadmin()) {
-    main.append(
-      mkSection('batch-mgmt',         'Batch Management',
-        '<button class="btn-sm btn-approve" onclick="openPortalPage(\'batch-management.html\',\'superadmin\')">+ Create Batch</button>'),
-      mkSection('admin-tools',        'Admin Tools'),
-      mkSection('pending-teachers',   'Pending Teacher Approvals'),
-      mkSection('suspended-teachers', 'Suspended Teachers Review'),
-      mkSection('pending-avail',      'Pending Availability Approvals'),
-      mkSection('dashboards',         'Subgroup Dashboards'),
-      mkSection('admin-users',        'Admin Users')
-    )
-    safeInvokeLoader('loadBatchManagement', 'Batch Management', 'batch-mgmt')
-    safeInvokeLoader('loadAdminTools', 'Admin Tools', 'admin-tools')
-    safeInvokeLoader('loadPendingTeachers', 'Pending Teacher Approvals', 'pending-teachers')
-    safeInvokeLoader('loadSuspendedTeachers', 'Suspended Teachers Review', 'suspended-teachers')
-    safeInvokeLoader('loadPendingAvail', 'Pending Availability Approvals', 'pending-avail')
-    safeInvokeLoader('loadDashboards', 'Subgroup Dashboards', 'dashboards')
-    safeInvokeLoader('loadAdminUsers', 'Admin Users', 'admin-users')
-  } else {
-    main.append(
-      mkSection('students',    'Students'),
-      mkSection('attendance',  'Attendance Overview'),
-      mkSection('graduation',  'Graduation Progress')
-    )
-    loadStudents()
-    loadAttendance()
-    loadGraduation()
+  document.getElementById('main').innerHTML = `
+    <div class="ap-page">
 
-    if (isSubgroupAdmin()) {
-      main.append(mkSection('notes', 'Student Notes & Flags'))
-      loadNotes()
+      <div class="ap-head">
+        <h1>Admin Portal</h1>
+        <p>Your control center for Foundation School operations — everything an administrator manages, in one place.</p>
+      </div>
+
+      <div class="ap-hero">
+        <div class="ap-hero-deco" aria-hidden="true"><div class="ap-deco-1"></div><div class="ap-deco-2"></div></div>
+        <div class="ap-hero-content">
+          <h2 class="ap-greeting">${greet}, ${esc(firstName)} 👋</h2>
+          <p class="ap-hero-sub" id="ap-hero-sub">Loading your workspace…</p>
+          <div class="ap-stats">
+            <div class="ap-stat"><span class="ap-stat-val" id="stat-enrolled">—</span><span class="ap-stat-lbl">Enrolled</span></div>
+            <div class="ap-stat"><span class="ap-stat-val" id="stat-batches">—</span><span class="ap-stat-lbl">Active Batches</span></div>
+            <div class="ap-stat"><span class="ap-stat-val accent" id="stat-pending">—</span><span class="ap-stat-lbl">Pending Review</span></div>
+            <div class="ap-stat"><span class="ap-stat-val" id="stat-teachers">—</span><span class="ap-stat-lbl">Teachers</span></div>
+          </div>
+        </div>
+      </div>
+
+      <p class="ap-sec-label">Registration &amp; Students</p>
+      <div class="ap-card-grid">
+        ${apCard('list',     '',      '','Review queue',     'Approve, assign or flag pending registrations.',        'applicant-directory.html','all',       'apb-pending')}
+        ${apCard('calendar', 'navy',  '','Batch management', 'Cohorts, class rosters, capacity and Moodle mapping.',  'batch-management.html',  'superadmin', null)}
+        ${apCard('clock',    'gold',  '','Waiting students', 'Promote waitlisted applicants into opened seats.',      'waitlist.html',          'all',        'apb-waitlist')}
+        ${apCard('grid',     'navy',  '','Class editor',     'Build and edit classes, times, teachers and seats.',    'class-editor.html',      'all',        null)}
+      </div>
+
+      <p class="ap-sec-label">Teaching &amp; Engagement</p>
+      <div class="ap-card-grid">
+        ${apCard('check',    'green', '','Attendance',       'Track submission and mark class rosters.',              'dashboards.html',        'all',        null)}
+        ${apCard('calendar', '',      '','Schedule',         'Weekly timetable and availability approvals.',          'teacher-schedule.html',  'all',        null)}
+        ${apCard('userPlus', 'green', '','Teacher portal',   "The teacher's own view — classes, availability, students.",'teacher-management.html','all',     null)}
+        ${apCard('msg',      '',      '','Messages',         'Conversations with teachers and applicants.',           'messages.html',          'all',        'apb-msgs')}
+      </div>
+
+      ${sa ? `
+      <p class="ap-sec-label">System &amp; Ops</p>
+      <div class="ap-card-grid">
+        ${apCard('refresh',  'red',   '','Failed syncs',     'Retry center for failed Moodle sync operations.',       'failed-sync-retry-center.html','all',  'apb-failedsyncs')}
+        ${apCard('pulse',    'green', '','System health',    'Monitor sync pipeline and integration status.',         'system-health.html',     'all',        null)}
+        ${apCard('mail',     'gold',  '','Email campaigns',  'Manage and send bulk email communications.',            'email-campaigns.html',   'all',        null)}
+        ${apCard('log',      '',      '','Audit log',        'Full history of admin actions and system events.',      'audit-log.html',         'superadmin', null)}
+      </div>` : ''}
+
+      <div class="ap-two">
+        <div class="ap-panel">
+          <div class="ap-panel-head">
+            <h3>Recent activity</h3>
+            <a href="admin-activity.html">Audit log →</a>
+          </div>
+          <div class="ap-panel-body" id="ap-activity">
+            <div class="ap-feed-item"><div class="ap-feed-tx" style="color:var(--muted)">Loading…</div></div>
+          </div>
+        </div>
+        <div class="ap-panel">
+          <div class="ap-panel-head">
+            <h3>System health</h3>
+            <a href="system-health.html">Details →</a>
+          </div>
+          <div class="ap-panel-body" id="ap-health">
+            <div class="ap-health-row"><span class="ap-hdot"></span><span class="ap-hn">Loading…</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>`
+
+  loadPortalStats()
+  loadPortalActivity()
+}
+
+async function loadPortalStats() {
+  try {
+    const [stuRes, batchRes, pendRes, tchRes] = await Promise.all([
+      db.from('applicants').select('id', { count: 'exact', head: true }).not('status', 'in', '(Withdrawn,Rejected)'),
+      db.from('batches').select('batch_id', { count: 'exact', head: true }).in('status', ['Active', 'Open']),
+      db.from('applicants').select('id', { count: 'exact', head: true }).eq('status', 'Pending'),
+      db.from('teachers').select('teacher_id', { count: 'exact', head: true }).eq('status', 'Active'),
+    ])
+    if (stuRes.error)   console.error('[portal] applicants count error:', stuRes.error)
+    if (batchRes.error) console.error('[portal] batches count error:', batchRes.error)
+    if (pendRes.error)  console.error('[portal] pending count error:', pendRes.error)
+    if (tchRes.error)   console.error('[portal] teachers count error:', tchRes.error)
+    const [enrolled, batches, pending, teachers] = [stuRes.count ?? 0, batchRes.count ?? 0, pendRes.count ?? 0, tchRes.count ?? 0]
+    setStatEl('stat-enrolled', enrolled)
+    setStatEl('stat-batches',  batches)
+    setStatEl('stat-pending',  pending)
+    setStatEl('stat-teachers', teachers)
+
+    const sub = document.getElementById('ap-hero-sub')
+    if (sub) {
+      sub.textContent = pending > 0
+        ? `You have ${pending} registration${pending !== 1 ? 's' : ''} to review.`
+        : 'Everything is up to date — no pending actions.'
     }
-
-    if (isPastor()) {
-      main.append(
-        mkSection('teachers',     'Teachers'),
-        mkSection('avail-pastor', 'Teacher Availability')
-      )
-      loadTeachers()
-      loadAvailPastor()
-    }
+    const pb = document.getElementById('apb-pending')
+    if (pb && pending > 0) { pb.textContent = pending; pb.style.display = '' }
+  } catch (e) {
+    console.error('Portal stats error:', e)
+    ;['stat-enrolled','stat-batches','stat-pending','stat-teachers'].forEach(id => setStatEl(id, '—'))
+    const sub = document.getElementById('ap-hero-sub')
+    if (sub) sub.textContent = 'Could not load stats — check your connection.'
   }
 }
 
-// ── Section helpers ───────────────────────────────────────────
-function mkSection(id, title, headerActionsHtml) {
-  const s = document.createElement('section')
-  s.className = 'section'
-  s.id = 'sec-' + id
-  s.innerHTML = `
-    <div class="section-header">
-      <h2>${title}</h2>
-      ${headerActionsHtml ? `<div class="section-header-actions">${headerActionsHtml}</div>` : ''}
-    </div>
-    <div class="section-body" id="sb-${id}"><div class="loading-state">Loading…</div></div>`
-  return s
+function setStatEl(id, val) { const el = document.getElementById(id); if (el) el.textContent = val }
+
+async function loadPortalActivity() {
+  try {
+    const [logsRes, moodleRes, emailRes] = await Promise.all([
+      db.from('audit_logs').select('actor_name, action, entity_type, created_at').order('created_at', { ascending: false }).limit(5),
+      db.from('moodle_sync').select('id', { count: 'exact', head: true }).eq('status', 'failed'),
+      db.from('email_queue').select('id', { count: 'exact', head: true }).eq('status', 'Pending'),
+    ])
+
+    const actEl = document.getElementById('ap-activity')
+    if (actEl) {
+      const logs = logsRes.data ?? []
+      if (!logs.length) {
+        actEl.innerHTML = '<div class="ap-feed-item"><div class="ap-feed-tx" style="color:var(--muted)">No recent activity.</div></div>'
+      } else {
+        actEl.innerHTML = logs.map(l => {
+          const initials = (l.actor_name || 'SY').trim().split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+          const isSys = !l.actor_name || l.actor_name.toLowerCase().includes('system')
+          const ago = relativeTime(l.created_at)
+          const label = esc(l.action || 'action').replace(/_/g, ' ')
+          return `<div class="ap-feed-item">
+            <div class="ap-av${isSys ? ' sys' : ''}">${initials}</div>
+            <div class="ap-feed-tx">
+              <span><b>${esc(l.actor_name || 'System')}</b> ${label} · ${esc(l.entity_type || '')}</span>
+              <div class="t">${ago}</div>
+            </div>
+          </div>`
+        }).join('')
+      }
+    }
+
+    const healthEl = document.getElementById('ap-health')
+    if (healthEl) {
+      const failedMoodle = moodleRes.count ?? 0
+      const pendingEmail = emailRes.count ?? 0
+      const pb = document.getElementById('apb-failedsyncs')
+      if (pb && failedMoodle > 0) { pb.textContent = failedMoodle; pb.style.display = '' }
+      healthEl.innerHTML = `
+        <div class="ap-health-row"><span class="ap-hdot ok"></span><span class="ap-hn">Email sender</span><span class="ap-hv">${pendingEmail} pending</span></div>
+        <div class="ap-health-row"><span class="ap-hdot ${failedMoodle > 0 ? 'warn' : 'ok'}"></span><span class="ap-hn">Moodle sync</span><span class="ap-hv">${failedMoodle > 0 ? failedMoodle + ' failed' : 'OK'}</span></div>
+        <div class="ap-health-row"><span class="ap-hdot ok"></span><span class="ap-hn">Registration processor</span><span class="ap-hv">active</span></div>
+      `
+    }
+  } catch (e) {
+    console.error('Activity load error:', e)
+  }
 }
 
-function sb(id)  { return document.getElementById('sb-' + id) }
-
-function setHtml(id, html) {
-  const el = sb(id)
-  if (el) el.innerHTML = html
+function relativeTime(iso) {
+  if (!iso) return ''
+  const diff = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 2) return 'just now'
+  if (m < 60) return m + 'm ago'
+  const h = Math.floor(m / 60)
+  if (h < 24) return h + 'h ago'
+  return Math.floor(h / 24) + 'd ago'
 }
 
-function setError(id, msg, raw) {
-  setHtml(id, `<div class="error-state">${msg}${raw ? `<small>${esc(raw)}</small>` : ''}</div>`)
-}
-
+// ── Navigation ────────────────────────────────────────────────
 function openPortalPage(path, accessLabel) {
   if (accessLabel && accessLabel !== 'all') {
     const role = adminProfile?.role || ''
     if (accessLabel === 'superadmin' && role !== 'superadmin') {
-      toast('You are logged in but your role does not have access to Batch Management', 'error')
+      toast('Your role does not have access to this section.', 'error')
       return
     }
   }
@@ -199,615 +343,13 @@ function openPortalPage(path, accessLabel) {
 }
 
 async function openNotificationCenter() {
-  try {
-    const res = await fetch('notification-center.html', { method: 'GET', cache: 'no-store' })
-    if (!res.ok) {
-      toast('Notification Center is unavailable.', 'error')
-      return
-    }
-    window.location.href = 'notification-center.html'
-  } catch (_) {
-    toast('Notification Center is unavailable.', 'error')
-  }
-}
-
-function loadBatchManagement() {
-  setHtml('batch-mgmt', `
-    <p style="margin-bottom:12px;color:var(--muted);">Open the dedicated Batch Management workspace.</p>
-    <button class="btn-primary" onclick="openPortalPage('batch-management.html','superadmin')">Open Batch Management</button>
-  `)
-}
-window.loadBatchManagement = loadBatchManagement
-
-function loadAdminTools() {
-  setHtml('admin-tools', `
-    <div class="actions">
-      <button class="btn-sm btn-approve" onclick="openPortalPage('batch-management.html','superadmin')">Batch Management</button>
-      <button class="btn-sm btn-reinstate" onclick="openPortalPage('audit-log.html','superadmin')">Audit Log</button>
-      <button class="btn-sm btn-reinstate" onclick="openPortalPage('failed-sync-retry-center.html','all')">Retry Center</button>
-      <button class="btn-sm btn-reinstate" onclick="openPortalPage('system-health.html','all')">System Health</button>
-      <button class="btn-sm btn-reinstate" onclick="openPortalPage('email-campaigns.html','all')">Email Campaigns</button>
-      <button class="btn-sm btn-reinstate" onclick="openPortalPage('dashboards.html','all')">Dashboards</button>
-      <button class="btn-sm btn-reinstate" onclick="openNotificationCenter()">Notification Center</button>
-    </div>
-  `)
-}
-window.loadAdminTools = loadAdminTools
-window.loadPendingTeachers = loadPendingTeachers
-window.loadSuspendedTeachers = loadSuspendedTeachers
-window.loadPendingAvail = loadPendingAvail
-window.loadDashboards = loadDashboards
-window.loadAdminUsers = loadAdminUsers
-window.approveTeacher = approveTeacher
-window.rejectTeacher = rejectTeacher
-window.confirmSuspension = confirmSuspension
-window.reinstateTeacher = reinstateTeacher
-window.approveAvail = approveAvail
-window.rejectAvail = rejectAvail
-window.openPortalPage = openPortalPage
-window.openNotificationCenter = openNotificationCenter
-window.openModal = openModal
-window.closeModal = closeModal
-window.confirmSuspend = confirmSuspend
-
-function mkTable(heads, rows) {
-  if (!rows.length) return '<p class="empty-state">No records found.</p>'
-  const cards = rows.map((r) => {
-    const primary = r[0] || 'Record'
-    const meta = r.slice(1, Math.max(1, r.length - 1)).map((c, i) => `<div class="meta-row"><strong>${heads[i + 1] || ''}:</strong> ${c}</div>`).join('')
-    const action = r[r.length - 1] || ''
-    return `<article class="table-mobile-card">
-      <div class="table-mobile-title">${primary}</div>
-      <div class="table-mobile-meta">${meta}</div>
-      <div class="table-mobile-actions">${action}</div>
-    </article>`
-  }).join('')
-  return `<div class="table-wrap"><table>
-    <thead><tr>${heads.map(h => `<th>${h}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody>
-  </table></div><div class="table-mobile-cards">${cards}</div>`
+  window.location.href = 'notification-center.html'
 }
 
 const esc = (s) => AdminUi.esc(s)
-const fmtDate = (v) => AdminUi.fmtDate(v)
-const fmtTime = (v) => AdminUi.fmtTime(v)
 
-function roleBadgeHtml(r) {
-  const map = { superadmin: 'Superadmin', subgroup_admin: 'Subgroup Admin', pastor: 'Pastor' }
-  return `<span class="badge badge-${esc(r)}">${esc(map[r] || r)}</span>`
-}
-
-function statusBadge(s) {
-  const cls = {
-    Active:'active', Pending:'pending', Rejected:'rejected',
-    Suspended:'suspended', SuspendedConfirmed:'suspendedconfirmed',
-    Ready:'ready', Close:'close', 'Not Ready':'not-ready',
-    Available:'active', Tentative:'pending', Unavailable:'rejected'
-  }[s] || 'not-ready'
-  return `<span class="badge badge-${cls}">${esc(s)}</span>`
-}
-
-async function btnAction(btn, label, fn) {
-  const orig = btn.textContent
-  btn.disabled = true
-  btn.textContent = label || 'Loading…'
-  try { await fn() }
-  finally { btn.disabled = false; btn.textContent = orig }
-}
-
-// ── Superadmin: Pending Teacher Approvals ─────────────────────
-async function loadPendingTeachers() {
-  try {
-    const { data, error } = await db.from('teachers')
-      .select('teacher_id, full_name, email, subgroup_id, group_id, created_at')
-      .eq('status', 'Pending')
-      .is('deleted_at', null)
-      .order('created_at')
-
-    if (error) throw error
-
-    const rows = (data || []).map(t => [
-      esc(t.full_name), esc(t.email || '—'), esc(t.subgroup_id || '—'),
-      esc(t.group_id || '—'), fmtDate(t.created_at),
-      `<div class="actions">
-        <button class="btn-sm btn-approve" onclick="approveTeacher('${esc(t.teacher_id)}', this)">Approve</button>
-        <button class="btn-sm btn-reject"  onclick="rejectTeacher('${esc(t.teacher_id)}', this)">Reject</button>
-      </div>`
-    ])
-    setHtml('pending-teachers', mkTable(['Name','Email','Subgroup','Group','Applied','Actions'], rows))
-  } catch (e) {
-    console.error(e)
-    setError('pending-teachers', 'Could not load pending teachers.', e.message)
-  }
-}
-
-async function approveTeacher(id, btn) {
-  await btnAction(btn, 'Approving...', async () => {
-    const actorEmail = String(adminProfile?.email || currentUser?.email || '').trim() || null
-    const updated = await FSAdminApi.updateTeacherStatus(db, id, 'ACTIVE', actorEmail)
-    await FSAdminApi.logTeacherAudit(db, 'TEACHER_APPROVED', id, {
-      to_status: 'ACTIVE',
-      teacher_name: updated?.full_name || null,
-      teacher_email: updated?.email || null,
-    }, actorEmail)
-    toast('Teacher approved.')
-    loadPendingTeachers()
-  })
-}
-
-async function rejectTeacher(id, btn) {
-  if (!confirm('Reject this teacher application? This cannot be undone.')) return
-  const reason = String(prompt('Optional rejection reason:', '') || '').trim() || null
-  await btnAction(btn, 'Rejecting...', async () => {
-    const actorEmail = String(adminProfile?.email || currentUser?.email || '').trim() || null
-    const updated = await FSAdminApi.updateTeacherStatus(db, id, 'INACTIVE', actorEmail, reason)
-    await FSAdminApi.logTeacherAudit(db, 'TEACHER_REJECTED', id, {
-      to_status: 'INACTIVE',
-      reason,
-      teacher_name: updated?.full_name || null,
-      teacher_email: updated?.email || null,
-    }, actorEmail)
-    toast('Teacher rejected.', 'error')
-    loadPendingTeachers()
-  })
-}
-
-// ── Superadmin: Suspended Teachers ───────────────────────────
-async function loadSuspendedTeachers() {
-  try {
-    const { data, error } = await db.from('teachers')
-      .select('teacher_id, full_name, email, subgroup_id, suspended_reason, suspended_by, suspended_at')
-      .eq('status', 'Suspended')
-      .is('deleted_at', null)
-      .order('suspended_at')
-
-    if (error) throw error
-
-    const rows = (data || []).map(t => [
-      esc(t.full_name), esc(t.email || '—'), esc(t.subgroup_id || '—'),
-      esc(t.suspended_reason || '—'), esc(t.suspended_by || '—'), fmtDate(t.suspended_at),
-      `<div class="actions">
-        <button class="btn-sm btn-confirm"   onclick="confirmSuspension('${esc(t.teacher_id)}', this)">Confirm Suspension</button>
-        <button class="btn-sm btn-reinstate" onclick="reinstateTeacher('${esc(t.teacher_id)}', this)">Override & Reinstate</button>
-      </div>`
-    ])
-    setHtml('suspended-teachers', mkTable(['Name','Email','Subgroup','Reason','Suspended By','Suspended At','Actions'], rows))
-  } catch (e) {
-    console.error(e)
-    setError('suspended-teachers', 'Could not load suspended teachers.', e.message)
-  }
-}
-
-async function confirmSuspension(id, btn) {
-  if (!confirm('Confirm this suspension? The teacher will remain inactive.')) return
-  await btnAction(btn, 'Confirming…', async () => {
-    const { error } = await db.from('teachers')
-      .update({ active: false, status: 'SuspendedConfirmed', reviewed_at: new Date().toISOString(), reviewed_by: currentUser.id })
-      .eq('teacher_id', id)
-    if (error) throw error
-    toast('Suspension confirmed.')
-    loadSuspendedTeachers()
-  })
-}
-
-async function reinstateTeacher(id, btn) {
-  if (!confirm('Override suspension and reinstate this teacher?')) return
-  await btnAction(btn, 'Reinstating…', async () => {
-    const { error } = await db.from('teachers')
-      .update({ active: true, status: 'Active', suspended_reason: null, suspended_by: null, suspended_at: null, reviewed_at: new Date().toISOString(), reviewed_by: currentUser.id })
-      .eq('teacher_id', id)
-    if (error) throw error
-    toast('Teacher reinstated.')
-    loadSuspendedTeachers()
-  })
-}
-
-// ── Superadmin: Pending Availability ─────────────────────────
-async function loadPendingAvail() {
-  try {
-    const { data, error } = await db.from('teacher_availability')
-      .select('id, teacher_id, subgroup_id, day, time_slot, batch_id, teachers(full_name)')
-      .eq('status', 'Tentative')
-      .order('created_at')
-
-    if (error) throw error
-
-    const rows = (data || []).map(r => [
-      esc(r.teachers?.full_name || r.teacher_id), esc(r.subgroup_id || '—'),
-      esc(r.day || '—'), fmtTime(r.time_slot), esc(r.batch_id || '2025A'),
-      `<div class="actions">
-        <button class="btn-sm btn-approve" onclick="approveAvail('${esc(r.id)}', this)">Approve</button>
-        <button class="btn-sm btn-reject"  onclick="rejectAvail('${esc(r.id)}', this)">Reject</button>
-      </div>`
-    ])
-    setHtml('pending-avail', mkTable(['Teacher','Subgroup','Day','Time','Batch','Actions'], rows))
-  } catch (e) {
-    console.error(e)
-    setError('pending-avail', 'Could not load pending availability.', e.message)
-  }
-}
-
-async function approveAvail(id, btn) {
-  await btnAction(btn, 'Approving…', async () => {
-    const actorEmail = String(adminProfile?.email || currentUser?.email || '').trim() || null
-    const actorId = String(currentUser?.id || '').trim() || null
-    const { data, error } = await db.rpc('approve_teacher_availability_atomic', {
-      p_availability_id: id,
-      p_actor_email: actorEmail,
-      p_actor_id: actorId
-    })
-
-    if (error) {
-      const message = error.message || 'RPC approval failed.'
-      try {
-        await db.from('audit_logs').insert({
-          actor_email: actorEmail,
-          actor_id: actorId,
-          action: 'TEACHER_AVAIL_APPROVAL_FAILED',
-          entity_type: 'teacher_availability',
-          entity_id: id,
-          status: 'FAILED',
-          details: { reason: message }
-        })
-      } catch (_) {
-        // best-effort audit
-      }
-      throw new Error(message)
-    }
-
-    const result = Array.isArray(data) ? data[0] : data
-    if (!result?.ok) {
-      const message = String(result?.error || 'Approval failed.').trim()
-      try {
-        await db.from('audit_logs').insert({
-          actor_email: actorEmail,
-          actor_id: actorId,
-          action: 'TEACHER_AVAIL_APPROVAL_FAILED',
-          entity_type: 'teacher_availability',
-          entity_id: id,
-          status: 'FAILED',
-          details: {
-            reason: message,
-            class_option_id: result?.class_option_id || null,
-            class_slot_id: result?.class_slot_id || null
-          }
-        })
-      } catch (_) {
-        // best-effort audit
-      }
-      throw new Error(message)
-    }
-
-    toast('Availability approved. Class created.')
-    loadPendingAvail()
-  })
-}
-
-async function rejectAvail(id, btn) {
-  if (!confirm('Reject this availability slot?')) return
-  await btnAction(btn, 'Rejecting…', async () => {
-    const { error } = await db.from('teacher_availability')
-      .update({ status: 'Unavailable' })
-      .eq('id', id)
-    if (error) throw error
-    toast('Availability rejected.', 'error')
-    loadPendingAvail()
-  })
-}
-
-// ── Superadmin: Dashboards ────────────────────────────────────
-async function loadDashboards() {
-  try {
-    const [fmRes, stuRes, attRes, gradRes] = await Promise.all([
-      db.from('fellowship_map').select('group_id, subgroup_id').eq('active', true),
-      db.from('students').select('subgroup_id, status').is('deleted_at', null),
-      db.from('attendance_log').select('subgroup_id, present'),
-      db.from('graduation_review').select('subgroup_id, all_gates_met')
-    ])
-    if (fmRes.error)  throw fmRes.error
-    if (stuRes.error) throw stuRes.error
-
-    const map = new Map()
-    for (const r of fmRes.data || []) {
-      if (!map.has(r.subgroup_id))
-        map.set(r.subgroup_id, { g: r.group_id, total: 0, active: 0, present: 0, graduated: 0 })
-    }
-    for (const r of stuRes.data  || []) { if (map.has(r.subgroup_id)) { map.get(r.subgroup_id).total++; if (r.status === 'Active') map.get(r.subgroup_id).active++ } }
-    for (const r of attRes.data  || []) { if (r.present && map.has(r.subgroup_id)) map.get(r.subgroup_id).present++ }
-    for (const r of gradRes.data || []) { if (r.all_gates_met && map.has(r.subgroup_id)) map.get(r.subgroup_id).graduated++ }
-
-    if (!map.size) { setHtml('dashboards', '<p class="empty-state">No subgroup data found in fellowship_map.</p>'); return }
-
-    const cards = [...map.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([sg, d]) => `
-      <div class="dash-card">
-        <div class="dash-card-header"><span class="dash-subgroup">${esc(sg)}</span><span class="dash-group">${esc(d.g)}</span></div>
-        <div class="dash-metrics">
-          <div><span class="metric-val">${d.total}</span><span class="metric-label">Total Students</span></div>
-          <div><span class="metric-val">${d.active}</span><span class="metric-label">Active</span></div>
-          <div><span class="metric-val">${d.present}</span><span class="metric-label">Present (all-time)</span></div>
-          <div><span class="metric-val">${d.graduated}</span><span class="metric-label">Graduated</span></div>
-        </div>
-      </div>`).join('')
-    setHtml('dashboards', `<div class="dash-grid">${cards}</div>`)
-  } catch (e) {
-    console.error(e)
-    setError('dashboards', 'Dashboard data unavailable. Check table/column names.', e.message)
-  }
-}
-
-// ── Superadmin: Admin Users ───────────────────────────────────
-async function loadAdminUsers() {
-  try {
-    const { data, error } = await db.from('admin_users')
-      .select('full_name, email, role, subgroups, group_ids')
-      .order('full_name')
-    if (error) throw error
-
-    const rows = (data || []).map(u => [
-      esc(u.full_name), esc(u.email), roleBadgeHtml(u.role),
-      esc((u.subgroups || []).join(', ') || '—'),
-      esc((u.group_ids || []).join(', ') || '—')
-    ])
-    setHtml('admin-users', mkTable(['Name','Email','Role','Subgroups','Groups'], rows))
-  } catch (e) {
-    console.error(e)
-    setError('admin-users', 'Could not load admin users.', e.message)
-  }
-}
-
-// ── Shared: Students ──────────────────────────────────────────
-async function loadStudents() {
-  try {
-    let q = db.from('students')
-      .select('student_id, full_name, email, fellowship_code, subgroup_id, status, needs_attention_flag, needs_attention_reason')
-      .is('deleted_at', null)
-      .order('full_name')
-      .limit(150)
-    q = scopeQuery(q)
-    const { data, error } = await q
-    if (error) throw error
-
-    const rows = (data || []).map(s => [
-      esc(s.student_id), esc(s.full_name), esc(s.email || '—'),
-      esc(s.fellowship_code || '—'), statusBadge(s.status || 'Active'),
-      s.needs_attention_flag
-        ? `<span class="flag-on" title="${esc(s.needs_attention_reason || '')}">⚑ Flagged</span>`
-        : `<span class="flag-off">—</span>`
-    ])
-    const note = (data || []).length === 150 ? '<p style="color:var(--muted);font-size:12px;margin-top:10px">Showing first 150 records.</p>' : ''
-    setHtml('students', mkTable(['ID','Name','Email','Fellowship','Status','Attention'], rows) + note)
-  } catch (e) {
-    console.error(e)
-    setError('students', 'Could not load students.', e.message)
-  }
-}
-
-// ── Shared: Attendance ────────────────────────────────────────
-async function loadAttendance() {
-  try {
-    let q = db.from('attendance_log').select('subgroup_id, present')
-    q = scopeQuery(q)
-    const { data, error } = await q
-    if (error) throw error
-
-    // Group by subgroup
-    const map = new Map()
-    for (const r of data || []) {
-      const sg = r.subgroup_id || '(unknown)'
-      if (!map.has(sg)) map.set(sg, { total: 0, present: 0 })
-      map.get(sg).total++
-      if (r.present) map.get(sg).present++
-    }
-
-    if (!map.size) { setHtml('attendance', '<p class="empty-state">No attendance records found.</p>'); return }
-
-    const rows = [...map.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([sg, d]) => {
-      const rate = d.total ? Math.round(d.present / d.total * 100) : 0
-      return [esc(sg), d.total, d.present, d.total - d.present, `${rate}%`]
-    })
-    setHtml('attendance', mkTable(['Subgroup','Total Records','Present','Absent','Attendance Rate'], rows))
-  } catch (e) {
-    console.error(e)
-    setError('attendance', 'Could not load attendance data.', e.message)
-  }
-}
-
-// ── Shared: Graduation ────────────────────────────────────────
-async function loadGraduation() {
-  try {
-    let q = db.from('graduation_review')
-      .select('student_id, subgroup_id, gate1_attendance, gate2_assignments, gate3_exam_passed, gate4_cell_integrated, all_gates_met, graduation_status, students(full_name)')
-      .order('graduation_status')
-      .limit(200)
-    q = scopeQuery(q)
-    const { data, error } = await q
-    if (error) throw error
-
-    function gIcon(v) { return v ? '<span class="gate-ok">✓</span>' : '<span class="gate-no">✗</span>' }
-    const rows = (data || []).map(r => [
-      esc(r.students?.full_name || r.student_id),
-      esc(r.subgroup_id || '—'),
-      gIcon(r.gate1_attendance), gIcon(r.gate2_assignments),
-      gIcon(r.gate3_exam_passed), gIcon(r.gate4_cell_integrated),
-      statusBadge(r.graduation_status || 'Not Ready')
-    ])
-    setHtml('graduation', mkTable(['Student','Subgroup','G1 Attend','G2 Assign','G3 Exam','G4 Cell','Status'], rows))
-  } catch (e) {
-    console.error(e)
-    setError('graduation', 'Could not load graduation data.', e.message)
-  }
-}
-
-// ── Subgroup Admin: Notes ─────────────────────────────────────
-async function loadNotes() {
-  try {
-    let q = db.from('students')
-      .select('student_id, full_name, subgroup_id, needs_attention_reason')
-      .eq('needs_attention_flag', true)
-      .is('deleted_at', null)
-      .order('full_name')
-    q = scopeQuery(q)
-    const { data, error } = await q
-    if (error) throw error
-
-    const rows = (data || []).map(s => [
-      esc(s.full_name), esc(s.subgroup_id || '—'), esc(s.needs_attention_reason || '—')
-    ])
-    setHtml('notes', mkTable(['Student','Subgroup','Reason / Note'], rows))
-  } catch (e) {
-    console.error(e)
-    setError('notes', 'Could not load student notes.', e.message)
-  }
-}
-
-// ── Pastor: Teachers ──────────────────────────────────────────
-async function loadTeachers() {
-  try {
-    let q = db.from('teachers')
-      .select('teacher_id, full_name, email, subgroup_id, status, active')
-      .is('deleted_at', null)
-      .order('full_name')
-      .range(0, QUERY_ROW_CAP - 1)
-    q = scopeQuery(q)
-    const { data, error } = await q
-    if (error) throw error
-
-    const rows = (data || []).map(t => {
-      const canSusp = t.status !== 'Suspended' && t.status !== 'SuspendedConfirmed'
-      return [
-        esc(t.full_name), esc(t.email || '—'), esc(t.subgroup_id || '—'),
-        statusBadge(t.status || (t.active ? 'Active' : 'Inactive')),
-        canSusp
-          ? `<button class="btn-sm btn-suspend" onclick="openModal('teacher','${esc(t.teacher_id)}','${esc(t.full_name)}')">Suspend</button>`
-          : `<span style="color:var(--muted);font-size:12px">Already suspended</span>`
-      ]
-    })
-    setHtml('teachers', mkTable(['Name','Email','Subgroup','Status','Action'], rows))
-  } catch (e) {
-    console.error(e)
-    setError('teachers', 'Could not load teachers.', e.message)
-  }
-}
-
-// ── Pastor: Availability ──────────────────────────────────────
-async function loadAvailPastor() {
-  try {
-    // Get teacher IDs in this pastor's subgroups
-    let tq = db.from('teachers')
-      .select('teacher_id')
-      .is('deleted_at', null)
-      .range(0, QUERY_ROW_CAP - 1)
-    tq = scopeQuery(tq)
-    const { data: tData, error: tErr } = await tq
-    if (tErr) throw tErr
-
-    const ids = (tData || []).map(t => t.teacher_id)
-    if (!ids.length) { setHtml('avail-pastor', '<p class="empty-state">No teachers in your subgroups.</p>'); return }
-
-    const { data, error } = await db.from('teacher_availability')
-      .select('id, teacher_id, subgroup_id, day, time_slot, status, batch_id, teachers(full_name)')
-      .in('teacher_id', ids)
-      .order('day')
-      .range(0, QUERY_ROW_CAP - 1)
-
-    if (error) throw error
-
-    const rows = (data || []).map(r => {
-      const canSusp = r.status !== 'Suspended'
-      return [
-        esc(r.teachers?.full_name || r.teacher_id), esc(r.day || '—'), fmtTime(r.time_slot),
-        statusBadge(r.status), esc(r.batch_id || '—'),
-        canSusp
-          ? `<button class="btn-sm btn-suspend" onclick="openModal('availability','${esc(r.id)}','${esc(r.teachers?.full_name || r.teacher_id)} — ${esc(r.day)} ${fmtTime(r.time_slot)}')">Suspend</button>`
-          : `<span style="color:var(--muted);font-size:12px">Suspended</span>`
-      ]
-    })
-    setHtml('avail-pastor', mkTable(['Teacher','Day','Time','Status','Batch','Action'], rows))
-  } catch (e) {
-    console.error(e)
-    setError('avail-pastor', 'Could not load availability.', e.message)
-  }
-}
-
-// ── Modal: Suspend ────────────────────────────────────────────
-function openModal(type, id, label) {
-  suspendTarget = { type, id, label }
-  document.getElementById('modal-title').textContent  = type === 'teacher' ? 'Suspend Teacher' : 'Suspend Availability'
-  document.getElementById('modal-entity').textContent = label
-  document.getElementById('modal-reason').value       = ''
-  document.getElementById('modal-err').classList.remove('show')
-  document.getElementById('modal-err').textContent    = ''
-  document.getElementById('modal-overlay').classList.add('open')
-  document.getElementById('modal-reason').focus()
-}
-
-function closeModal() {
-  document.getElementById('modal-overlay').classList.remove('open')
-  suspendTarget = null
-}
-
-async function confirmSuspend() {
-  const reason = document.getElementById('modal-reason').value.trim()
-  const errEl  = document.getElementById('modal-err')
-  errEl.classList.remove('show')
-
-  if (!reason) {
-    errEl.textContent = 'A reason is required before submitting.'
-    errEl.classList.add('show')
-    return
-  }
-
-  const btn = document.getElementById('modal-submit')
-  btn.disabled = true
-  btn.textContent = 'Suspending…'
-
-  try {
-    const now = new Date().toISOString()
-    if (suspendTarget.type === 'teacher') {
-      const { error } = await db.from('teachers').update({
-        active: false, status: 'Suspended',
-        suspended_reason: reason, suspended_by: currentUser.id, suspended_at: now
-      }).eq('teacher_id', suspendTarget.id)
-      if (error) throw error
-
-      await db.from('sync_log').insert({
-        phase: 'PASTOR_SUSPENSION', message: reason,
-        details: { entity_type: 'teacher', entity_id: suspendTarget.id, label: suspendTarget.label },
-        run_by: currentUser.id
-      })
-      closeModal()
-      toast('Teacher suspended.')
-      loadTeachers()
-    } else {
-      const { error } = await db.from('teacher_availability').update({
-        status: 'Suspended',
-        suspended_reason: reason, suspended_by: currentUser.id, suspended_at: now
-      }).eq('id', suspendTarget.id)
-      if (error) throw error
-
-      await db.from('sync_log').insert({
-        phase: 'PASTOR_SUSPENSION', message: reason,
-        details: { entity_type: 'teacher_availability', entity_id: suspendTarget.id, label: suspendTarget.label },
-        run_by: currentUser.id
-      })
-      closeModal()
-      toast('Availability suspended.')
-      loadAvailPastor()
-    }
-  } catch (e) {
-    console.error(e)
-    errEl.textContent = e.message || 'Suspension failed. Please try again.'
-    errEl.classList.add('show')
-  } finally {
-    btn.disabled = false
-    btn.textContent = 'Confirm Suspension'
-  }
-}
-
-// Close modal on overlay click
-document.getElementById('modal-overlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('modal-overlay')) closeModal()
-})
+window.openPortalPage = openPortalPage
+window.openNotificationCenter = openNotificationCenter
 
 // ── Toast ─────────────────────────────────────────────────────
 function toast(msg, type) {

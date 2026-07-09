@@ -5,6 +5,14 @@
     const { state, $, esc, milestoneLabels, classIdOf } = ctx;
     const fellowships = [...new Set(state.applicants.map((a) => a.fellowship_code || a.fellowship || a.subgroup_id).filter(Boolean))].sort();
     $("fellowshipFilter").innerHTML = `<option value="">All Fellowships</option>${fellowships.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("")}`;
+    
+    // NEW: Add subgroup filter
+    const subgroups = [...new Set(state.applicants.map((a) => a.subgroup_id).filter(Boolean))].sort();
+    const subgroupSelect = $("subgroupFilter");
+    if (subgroupSelect) {
+      subgroupSelect.innerHTML = `<option value="">All Subgroups</option>${subgroups.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("")}`;
+    }
+    
     const classes = state.classOptions.map((c) => classIdOf(c)).filter(Boolean).sort((a, b) => a.localeCompare(b));
     $("classFilter").innerHTML = `<option value="">All Classes</option>${classes.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("")}`;
     const batches = [...new Set(state.applicants.map((a) => a.batch_id).concat(state.classOptions.map((c) => c.batch_id)).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
@@ -45,10 +53,19 @@
         if (!pool.includes(q)) return false;
       }
       if (f.fellowship && fellowship !== f.fellowship) return false;
+      // NEW: Add subgroup filter support
+      if (f.subgroup && String(app.subgroup_id || "") !== String(f.subgroup)) return false;
       if (f.classOption && String(app.class_option_id || "") !== String(f.classOption)) return false;
       if (f.batch && batch !== String(f.batch)) return false;
       if (f.assignment === "assigned" && !app.class_option_id) return false;
       if (f.assignment === "unassigned" && app.class_option_id) return false;
+      // NEW: Handle duplicate filter
+      const duplicateStatus = String(app.duplicate_status || "UNIQUE").toUpperCase();
+      const duplicateGroup = ctx.getDuplicateGroup ? ctx.getDuplicateGroup(app) : null;
+      const duplicateGroupStatus = ctx.getDuplicateGroupStatus ? ctx.getDuplicateGroupStatus(duplicateGroup) : "";
+      if (f.duplicate === "duplicate_only" && duplicateStatus === "UNIQUE" && !app.duplicate_group_id) return false;
+      if (f.duplicate === "unresolved_only" && !(duplicateStatus === "CONFIRMED" && duplicateGroupStatus !== "resolved")) return false;
+      if (f.duplicate === "unassigned_only" && app.class_option_id) return false;
       if (f.notif && summary.notificationState !== f.notif) return false;
       if (f.milestone) {
         const ms = getApplicantMilestones(app);
@@ -95,10 +112,13 @@
     const { state, $ } = ctx;
     const map = [
       ["globalSearch", "search", "input"], ["quickAssignment", "assignment", "change"], ["quickNotif", "notif", "change"],
-      ["fellowshipFilter", "fellowship", "change"], ["classFilter", "classOption", "change"], ["batchFilter", "batch", "change"],
-      ["milestoneFilter", "milestone", "change"], ["attendanceFilter", "attendance", "change"], ["statusFilter", "status", "change"], ["dateFilter", "date", "change"],
+      ["fellowshipFilter", "fellowship", "change"], ["subgroupFilter", "subgroup", "change"], ["classFilter", "classOption", "change"], ["batchFilter", "batch", "change"],
+      ["milestoneFilter", "milestone", "change"], ["attendanceFilter", "attendance", "change"], ["statusFilter", "status", "change"], ["duplicateFilter", "duplicate", "change"], ["dateFilter", "date", "change"],
     ];
-    map.forEach(([id, key, ev]) => $(id).addEventListener(ev, (e) => { state.filters[key] = e.target.value; renderAll(); }));
+    // Debounce text input so a full re-render doesn't run on every keystroke.
+    let searchTimer = null;
+    const debouncedRenderAll = () => { clearTimeout(searchTimer); searchTimer = setTimeout(renderAll, 150); };
+    map.forEach(([id, key, ev]) => $(id)?.addEventListener(ev, (e) => { state.filters[key] = e.target.value; (ev === "input" ? debouncedRenderAll : renderAll)(); }));
     $("clearFilters").addEventListener("click", () => {
       Object.keys(state.filters).forEach((k) => { state.filters[k] = ""; });
       map.forEach(([id]) => { $(id).value = ""; });

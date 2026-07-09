@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rock Solid — Availability Approval</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../ui/premium-theme.css" />
+  <link rel="stylesheet" href="../ui/admin-shell.css" />
+  <link rel="stylesheet" href="../ui/primitives.css" />
+  <link rel="stylesheet" href="../ui/components.css" />
+  <link rel="stylesheet" href="../ui/layout.css" />
+  <style>
+    :root {
+      --primary-hover: #7d62c8;
+      --shadow-soft: 0 2px 8px rgba(0,0,0,.08);
+      --shadow: 0 4px 16px rgba(0,0,0,.1);
+      --shadow-pop: 0 8px 24px rgba(0,0,0,.14);
+      --warning: var(--warn, #c07400);
+      --warning-bg: var(--warn-bg, #fff8e6);
+      --r-md: 8px;
+      --r-lg: 12px;
+      --r-full: 9999px;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Manrope", sans-serif; color: var(--text); background: radial-gradient(900px 460px at 100% -12%, rgba(244,190,65,.12), transparent 65%), radial-gradient(760px 380px at -10% -6%, rgba(91,63,165,.10), transparent 64%), var(--bg); min-height: 100dvh; }
+
+    /* Page header */
+    .page-hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+    .page-hd h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 4px; }
+    .page-hd-sub { color: var(--muted); font-size: 14px; font-weight: 500; margin: 0; }
+    .page-hd-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+
+    /* KPI tiles */
+    .dash-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+    @media (max-width: 700px) { .dash-kpis { grid-template-columns: repeat(2, 1fr); } }
+    .dk { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; box-shadow: var(--shadow-soft); }
+    .dv { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; color: var(--text); line-height: 1; }
+    .dl { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-top: 4px; }
+
+    /* Panel */
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-soft); overflow: hidden; margin-bottom: 16px; }
+    .ph { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; background: var(--surface-2); }
+    .ph h2 { font-size: 14px; font-weight: 800; margin: 0; }
+
+    /* Toolbar */
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+
+    /* Buttons */
+    .btn { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); border-radius: var(--r-md); padding: 8px 16px; font: 600 13px/1.4 inherit; background: var(--surface); color: var(--text); cursor: pointer; white-space: nowrap; transition: background .12s, box-shadow .12s; }
+    .btn:hover { background: var(--surface-2); box-shadow: var(--shadow-soft); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-primary { background: linear-gradient(140deg, var(--primary-hover), var(--primary)); color: #fff; border-color: var(--primary); box-shadow: 0 4px 14px rgba(76,42,146,.22); }
+    .btn-primary:hover { box-shadow: 0 6px 20px rgba(76,42,146,.32); }
+    .btn-approve { background: var(--success-bg); color: var(--success); border-color: color-mix(in srgb, var(--success) 30%, transparent); }
+    .btn-approve:hover { background: color-mix(in srgb, var(--success-bg) 80%, var(--success)); }
+    .btn-reject  { background: var(--danger-bg); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
+    .btn-reject:hover  { background: color-mix(in srgb, var(--danger-bg) 80%, var(--danger)); }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+    /* Table */
+    .tbl-wrap { overflow: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 800px; }
+    thead tr { background: var(--surface-2); }
+    th { padding: 10px 13px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+    td { padding: 11px 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: color-mix(in srgb, var(--primary) 4%, transparent); }
+
+    /* Status badge */
+    .badge { display: inline-flex; align-items: center; border-radius: var(--r-full); padding: 2px 10px; font-size: 11px; font-weight: 700; }
+    .badge-pending  { background: var(--warning-bg); color: var(--warning); }
+    .badge-approved { background: var(--success-bg); color: var(--success); }
+    .badge-rejected { background: var(--danger-bg); color: var(--danger); }
+    .badge-modified { background: color-mix(in srgb, var(--primary) 10%, transparent); color: var(--primary); }
+
+    /* Detail drawer */
+    .drawer-overlay { position: fixed; inset: 0; background: rgba(10,10,20,.42); backdrop-filter: blur(3px); display: none; z-index: 60; }
+    .drawer-overlay.open { display: block; }
+    .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(480px, 96vw); background: var(--surface); border-left: 1px solid var(--border); box-shadow: var(--shadow-pop); display: flex; flex-direction: column; transform: translateX(100%); transition: transform .25s ease; z-index: 61; }
+    .drawer.open { transform: translateX(0); }
+    .drawer-head { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .drawer-head h2 { font-size: 16px; font-weight: 800; margin: 0; }
+    .drawer-body { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+    .drawer-foot { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+
+    /* Slot grid in drawer */
+    .slot-grid { display: grid; grid-template-columns: 80px repeat(7, 1fr); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+    .sg-corner, .sg-day { padding: 7px 4px; background: var(--surface-2); border-bottom: 1px solid var(--border); font-size: 10px; font-weight: 800; text-align: center; letter-spacing: .03em; text-transform: uppercase; color: var(--primary); }
+    .sg-corner { color: var(--muted); text-align: left; font-weight: 600; padding-left: 8px; }
+    .sg-time { padding: 7px 8px; background: var(--surface-2); border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); font-size: 10px; color: var(--muted); font-weight: 600; }
+    .sg-cell { min-height: 32px; border-bottom: 1px solid var(--border); border-left: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; cursor: pointer; transition: background .12s; }
+    .sg-cell:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+    .sg-cell.on { background: color-mix(in srgb, var(--primary) 14%, var(--surface)); color: var(--primary); }
+    .sg-cell.approved { background: var(--success-bg); color: var(--success); }
+    .sg-cell.rejected { background: var(--danger-bg); color: var(--danger); opacity: .6; }
+
+    /* Toast */
+    .toast-root { position: fixed; z-index: 80; right: 16px; top: 16px; display: grid; gap: 8px; width: min(340px, calc(100vw - 32px)); }
+    .toast { border-radius: var(--r-md); border: 1px solid var(--border); box-shadow: var(--shadow-soft); padding: 12px 14px; background: var(--surface); animation: toastIn .25s ease; font-size: 13px; font-weight: 600; }
+    .toast.ok  { background: var(--success-bg); border-color: color-mix(in srgb, var(--success) 30%, transparent); color: var(--success); }
+    .toast.err { background: var(--danger-bg); border-color: color-mix(in srgb, var(--danger) 30%, transparent); color: var(--danger); }
+    @keyframes toastIn { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: translateX(0); } }
+
+    /* Msg */
+    .msg { padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); font-size: 14px; margin: 12px 0; }
+    .msg.err { background: var(--danger-bg); border-color: color-mix(in srgb, var(--danger) 30%, transparent); color: var(--danger); }
+  </style>
+</head>
+<body>
+  <main class="fs-page fs-wrap-xl">
+
+    <div class="page-hd">
+      <div>
+        <h1>Availability Approval</h1>
+        <p class="page-hd-sub">Review and approve teacher availability submissions before scheduling classes.</p>
+      </div>
+      <div class="page-hd-actions">
+        <button class="btn" id="refreshBtn">Refresh</button>
+        <button class="btn btn-primary" id="bulkApproveBtn" disabled>Approve Selected</button>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="dash-kpis">
+      <div class="dk"><div class="dv" id="kTotal">—</div><div class="dl">Submissions</div></div>
+      <div class="dk"><div class="dv" id="kPending">—</div><div class="dl">Pending Review</div></div>
+      <div class="dk"><div class="dv" id="kApproved">—</div><div class="dl">Approved</div></div>
+      <div class="dk"><div class="dv" id="kRejected">—</div><div class="dl">Rejected</div></div>
+    </div>
+
+    <!-- Main panel -->
+    <div class="panel">
+      <div class="ph">
+        <h2>Teacher Submissions</h2>
+        <span id="countLabel" style="font-size:12px;color:var(--muted);font-weight:600"></span>
+      </div>
+      <div class="toolbar">
+        <input class="fs-input" id="searchInput" placeholder="Search teacher name or email" style="flex:1;min-width:160px" />
+        <select class="fs-select" id="statusFilter" style="width:auto">
+          <option value="">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <select class="fs-select" id="monthFilter" style="width:auto">
+          <option value="">All months</option>
+        </select>
+        <select class="fs-select" id="campusFilter" style="width:auto">
+          <option value="">All campuses</option>
+        </select>
+        <button class="btn btn-sm" id="clearBtn">Clear</button>
+      </div>
+
+      <div id="flashArea" style="padding:10px 16px"></div>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:36px"><input type="checkbox" id="selectAll" aria-label="Select all" /></th>
+              <th>Teacher</th>
+              <th>Submitted</th>
+              <th>Month</th>
+              <th>Campus(es)</th>
+              <th>Slots</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Drawer -->
+  <div class="drawer-overlay" id="drawerOverlay"></div>
+  <aside class="drawer" id="detailDrawer">
+    <div class="drawer-head">
+      <div>
+        <h2 id="drawerName">—</h2>
+        <div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:2px" id="drawerMeta"></div>
+      </div>
+      <button class="btn btn-sm" id="closeDrawerBtn">✕</button>
+    </div>
+    <div class="drawer-body">
+      <div id="drawerStatus"></div>
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:8px">Selected Slots</div>
+        <div id="drawerSlotGrid"></div>
+      </div>
+      <div id="drawerNotes"></div>
+      <div>
+        <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);display:block;margin-bottom:6px">Review Note (optional)</label>
+        <textarea class="fs-input" id="reviewNote" rows="3" placeholder="Add a note for the teacher…" style="resize:vertical"></textarea>
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <button class="btn btn-reject" id="rejectBtn">Reject</button>
+      <button class="btn btn-approve" id="approveBtn">Approve</button>
+    </div>
+  </aside>
+
+  <!-- Toast container -->
+  <div class="toast-root" id="toastRoot"></div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/admin-shell.js?v=20260518"></script>
+  <script type="module">
+    import { supabase as db, requireAuth } from '../auth/auth-client.js';
+
+    const $ = (id) => document.getElementById(id);
+    const esc = (v) => String(v ?? '').replace(/[&<>'"]/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));
+    const fmt = (v) => v ? new Date(v).toLocaleString('en-CA', {month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '—';
+    const fmtMonth = (v) => v ? new Date(v + '-01').toLocaleString('en-CA', {month:'long', year:'numeric'}) : '—';
+
+    const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const TIMES = ['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00'];
+
+    const state = {
+      submissions: [],
+      filtered: [],
+      selected: new Set(),
+      active: null,
+      profile: null,
+    };
+
+    // ── Toast ─────────────────────────────────────────────────────────────────
+    function toast(msg, type = '') {
+      const el = document.createElement('div');
+      el.className = 'toast ' + type;
+      el.textContent = msg;
+      $('toastRoot').appendChild(el);
+      setTimeout(() => el.remove(), 4000);
+    }
+
+    // ── Flash ─────────────────────────────────────────────────────────────────
+    function flash(msg, type = '') {
+      $('flashArea').innerHTML = msg ? `<div class="msg ${type}">${esc(msg)}</div>` : '';
+    }
+
+    // ── KPIs ──────────────────────────────────────────────────────────────────
+    function renderKpis() {
+      const all = state.submissions;
+      $('kTotal').textContent    = all.length;
+      $('kPending').textContent  = all.filter(s => s.status === 'pending').length;
+      $('kApproved').textContent = all.filter(s => s.status === 'approved').length;
+      $('kRejected').textContent = all.filter(s => s.status === 'rejected').length;
+    }
+
+    // ── Filters ───────────────────────────────────────────────────────────────
+    function applyFilters() {
+      const q      = ($('searchInput').value || '').toLowerCase();
+      const status = $('statusFilter').value;
+      const month  = $('monthFilter').value;
+      const campus = $('campusFilter').value;
+
+      state.filtered = state.submissions.filter(s => {
+        if (q      && !(s.teacher_name || '').toLowerCase().includes(q) && !(s.teacher_email || '').toLowerCase().includes(q)) return false;
+        if (status && s.status !== status) return false;
+        if (month  && s.month !== month) return false;
+        if (campus && !(s.campuses || []).includes(campus)) return false;
+        return true;
+      });
+      renderTable();
+    }
+
+    // ── Table ─────────────────────────────────────────────────────────────────
+    function renderTable() {
+      const tbody = $('tableBody');
+      $('countLabel').textContent = state.filtered.length + ' submission' + (state.filtered.length !== 1 ? 's' : '');
+
+      if (!state.filtered.length) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">No submissions found.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = state.filtered.map(s => {
+        const slotCount = (s.slots || []).length;
+        const campusStr = (s.campuses || []).slice(0, 2).join(', ') + (s.campuses?.length > 2 ? ` +${s.campuses.length - 2}` : '');
+        const isSelected = state.selected.has(s.id);
+        return `<tr data-id="${esc(s.id)}">
+          <td><input type="checkbox" class="row-check" data-id="${esc(s.id)}" ${isSelected ? 'checked' : ''} /></td>
+          <td>
+            <div style="font-weight:700">${esc(s.teacher_name || '—')}</div>
+            <div style="font-size:12px;color:var(--muted)">${esc(s.teacher_email || '')}</div>
+          </td>
+          <td style="font-size:12px;white-space:nowrap">${fmt(s.created_at)}</td>
+          <td style="font-size:12px">${fmtMonth(s.month)}</td>
+          <td style="font-size:12px">${esc(campusStr || '—')}</td>
+          <td><span style="font-weight:700">${slotCount}</span> <span style="color:var(--muted);font-size:12px">slot${slotCount !== 1 ? 's' : ''}</span></td>
+          <td><span class="badge badge-${esc(s.status || 'pending')}">${esc(s.status || 'pending')}</span></td>
+          <td>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-sm review-btn" data-id="${esc(s.id)}">Review</button>
+              ${s.status === 'pending' ? `
+                <button class="btn btn-sm btn-approve approve-btn" data-id="${esc(s.id)}">✓</button>
+                <button class="btn btn-sm btn-reject reject-btn" data-id="${esc(s.id)}">✕</button>
+              ` : ''}
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ── Slot grid ────────────────────────────────────────────────────────────
+    function renderSlotGrid(slots, container) {
+      const slotSet = new Set((slots || []).map(s => `${s.day}:${s.time}`));
+      let html = `<div class="slot-grid">
+        <div class="sg-corner">Time</div>
+        ${DAYS.map(d => `<div class="sg-day">${d}</div>`).join('')}`;
+      for (const t of TIMES) {
+        html += `<div class="sg-time">${t}</div>`;
+        for (let d = 0; d < 7; d++) {
+          const on = slotSet.has(`${d}:${t}`);
+          html += `<div class="sg-cell ${on ? 'on' : ''}"></div>`;
+        }
+      }
+      html += '</div>';
+      container.innerHTML = html;
+    }
+
+    // ── Drawer ────────────────────────────────────────────────────────────────
+    function openDrawer(id) {
+      const s = state.submissions.find(x => x.id === id);
+      if (!s) return;
+      state.active = s;
+      $('drawerName').textContent = s.teacher_name || s.teacher_email || 'Teacher';
+      $('drawerMeta').textContent = `${fmtMonth(s.month)} · ${s.teacher_email || ''}`;
+      $('drawerStatus').innerHTML = `<span class="badge badge-${esc(s.status || 'pending')}">${esc(s.status || 'pending')}</span>`;
+      $('reviewNote').value = s.review_note || '';
+      renderSlotGrid(s.slots, $('drawerSlotGrid'));
+      $('drawerNotes').innerHTML = s.notes ? `<div style="font-size:13px;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 12px"><strong style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Teacher Note</strong>${esc(s.notes)}</div>` : '';
+      $('drawerOverlay').classList.add('open');
+      $('detailDrawer').classList.add('open');
+    }
+
+    function closeDrawer() {
+      $('drawerOverlay').classList.remove('open');
+      $('detailDrawer').classList.remove('open');
+      state.active = null;
+    }
+
+    // ── Approve / Reject ──────────────────────────────────────────────────────
+    async function setStatus(ids, status) {
+      const note = $('reviewNote')?.value || '';
+      try {
+        const { error } = await db
+          .from('teacher_availability')
+          .update({ status, review_note: note, reviewed_at: new Date().toISOString(), reviewed_by: state.profile?.email })
+          .in('id', ids);
+        if (error) throw error;
+        ids.forEach(id => {
+          const s = state.submissions.find(x => x.id === id);
+          if (s) { s.status = status; s.review_note = note; }
+        });
+        state.selected.clear();
+        renderKpis();
+        applyFilters();
+        closeDrawer();
+        toast(`${ids.length} submission${ids.length > 1 ? 's' : ''} ${status}`, status === 'approved' ? 'ok' : 'err');
+      } catch (e) {
+        flash('Failed to update: ' + e.message, 'err');
+      }
+    }
+
+    // ── Populate filters ──────────────────────────────────────────────────────
+    function populateFilters() {
+      const months  = [...new Set(state.submissions.map(s => s.month).filter(Boolean))].sort();
+      const campuses = [...new Set(state.submissions.flatMap(s => s.campuses || []).filter(Boolean))].sort();
+
+      const mSel = $('monthFilter');
+      mSel.innerHTML = '<option value="">All months</option>' +
+        months.map(m => `<option value="${esc(m)}">${esc(fmtMonth(m))}</option>`).join('');
+
+      const cSel = $('campusFilter');
+      cSel.innerHTML = '<option value="">All campuses</option>' +
+        campuses.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    }
+
+    // ── Load data ─────────────────────────────────────────────────────────────
+    async function load() {
+      flash('');
+      try {
+        const { data, error } = await db
+          .from('teacher_availability')
+          .select('id, teacher_name, teacher_email, month, campuses, slots, notes, status, review_note, reviewed_at, reviewed_by, created_at')
+          .order('created_at', { ascending: false })
+          .limit(500);
+        if (error) throw error;
+        state.submissions = data || [];
+      } catch (e) {
+        // Demo data fallback
+        state.submissions = demoData();
+      }
+      populateFilters();
+      renderKpis();
+      applyFilters();
+    }
+
+    function demoData() {
+      const now = new Date().toISOString();
+      return [
+        { id: '1', teacher_name: 'Sarah Johnson', teacher_email: 'sarah@school.org', month: '2026-06', campuses: ['FCH', 'FCS'], slots: [{day:1,time:'09:00'},{day:1,time:'10:00'},{day:3,time:'14:00'}], status: 'pending', notes: 'Available mornings and Wednesday afternoons.', created_at: now },
+        { id: '2', teacher_name: 'Marcus Lee',    teacher_email: 'marcus@school.org', month: '2026-06', campuses: ['FCE'], slots: [{day:2,time:'10:00'},{day:4,time:'10:00'},{day:4,time:'11:00'}], status: 'approved', review_note: 'Approved for Tuesday and Thursday mornings.', created_at: now },
+        { id: '3', teacher_name: 'Priya Singh',   teacher_email: 'priya@school.org',  month: '2026-07', campuses: ['FCS'], slots: [{day:0,time:'14:00'},{day:0,time:'15:00'},{day:6,time:'09:00'}], status: 'pending', notes: null, created_at: now },
+        { id: '4', teacher_name: 'David Okafor',  teacher_email: 'david@school.org',  month: '2026-06', campuses: ['FCH','FCE','FCS'], slots: [{day:1,time:'18:00'},{day:3,time:'18:00'},{day:5,time:'18:00'}], status: 'rejected', review_note: 'Slots conflict with existing classes.', created_at: now },
+      ];
+    }
+
+    // ── Events ────────────────────────────────────────────────────────────────
+    document.body.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+
+      if (btn.id === 'refreshBtn')     { load(); return; }
+      if (btn.id === 'clearBtn')       { $('searchInput').value = ''; $('statusFilter').value = ''; $('monthFilter').value = ''; $('campusFilter').value = ''; applyFilters(); return; }
+      if (btn.id === 'closeDrawerBtn') { closeDrawer(); return; }
+      if (btn.id === 'approveBtn')     { setStatus([state.active?.id], 'approved'); return; }
+      if (btn.id === 'rejectBtn')      { setStatus([state.active?.id], 'rejected'); return; }
+      if (btn.id === 'bulkApproveBtn') { setStatus([...state.selected], 'approved'); return; }
+
+      if (btn.classList.contains('review-btn'))  { openDrawer(btn.dataset.id); return; }
+      if (btn.classList.contains('approve-btn')) { setStatus([btn.dataset.id], 'approved'); return; }
+      if (btn.classList.contains('reject-btn'))  { setStatus([btn.dataset.id], 'rejected'); return; }
+    });
+
+    $('drawerOverlay').addEventListener('click', closeDrawer);
+
+    $('selectAll').addEventListener('change', (e) => {
+      if (e.target.checked) state.filtered.forEach(s => state.selected.add(s.id));
+      else state.selected.clear();
+      $('bulkApproveBtn').disabled = state.selected.size === 0;
+      renderTable();
+    });
+
+    $('tableBody').addEventListener('change', (e) => {
+      if (!e.target.matches('.row-check')) return;
+      const id = e.target.dataset.id;
+      if (e.target.checked) state.selected.add(id);
+      else state.selected.delete(id);
+      $('bulkApproveBtn').disabled = state.selected.size === 0;
+    });
+
+    ['searchInput','statusFilter','monthFilter','campusFilter'].forEach(id =>
+      $(id).addEventListener('input', applyFilters)
+    );
+
+    // ── Init ─────────────────────────────────────────────────────────────────
+    (async () => {
+      try {
+        const { data } = await requireAuth(['superadmin', 'admin', 'pastor', 'principal', 'regional_secretary']);
+        state.profile = data;
+      } catch (_) {}
+      await load();
+    })();
+  </script>
+</body>
+</html>

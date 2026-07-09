@@ -13,70 +13,101 @@
   <link rel="stylesheet" href="../ui/admin-shell.css" />
   <link rel="stylesheet" href="../ui/primitives.css" />
   <style>
+    :root {
+      --primary-hover: #7d62c8;
+      --shadow-soft: 0 2px 8px rgba(0,0,0,.08);
+      --shadow: 0 4px 16px rgba(0,0,0,.1);
+      --shadow-pop: 0 8px 24px rgba(0,0,0,.14);
+      --border-2: 2px solid var(--border);
+      --soft-lav: color-mix(in srgb, var(--primary) 8%, var(--surface));
+      --warning: var(--warn, #c07400);
+      --warning-bg: var(--warn-bg, #fff8e6);
+    }
+    .dash-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+    @media (max-width: 700px) { .dash-kpis { grid-template-columns: repeat(2, 1fr); } }
+    .dk { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; box-shadow: var(--shadow-soft); }
+    .dv { font-size: 28px; font-weight: 800; letter-spacing: -0.03em; color: var(--text); line-height: 1; }
+    .dl { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-top: 4px; }
+    .page-hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+    .page-hd h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 4px; }
+    .page-hd-sub { color: var(--muted); font-size: 14px; font-weight: 500; margin: 0; }
+    .page-hd-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: "Manrope", sans-serif; color: var(--color-text-primary); background: radial-gradient(900px 460px at 100% -12%, rgba(244,190,65,.16), transparent 65%), radial-gradient(760px 380px at -10% -6%, rgba(91,63,165,.12), transparent 64%), var(--color-bg); min-height: 100dvh; }
+    body { margin: 0; font-family: "Manrope", sans-serif; color: var(--text); background: radial-gradient(900px 460px at 100% -12%, rgba(244,190,65,.16), transparent 65%), radial-gradient(760px 380px at -10% -6%, rgba(91,63,165,.12), transparent 64%), var(--bg); min-height: 100dvh; }
 
     /* JS-generated chip badges (renderRows / renderCards use chipClass()) */
     .chip { display: inline-flex; align-items: center; border-radius: var(--radius-full); padding: 2px var(--space-2); font-size: var(--fs-badge); font-weight: 600; }
-    .chip-draft     { background: var(--color-neutral-bg); color: var(--color-neutral-fg); }
-    .chip-active    { background: var(--color-success-bg); color: var(--color-success-fg); }
-    .chip-archived  { background: var(--color-neutral-bg); color: var(--color-text-muted); }
-    .chip-completed { background: var(--color-info-bg);    color: var(--color-info-fg); }
-    .chip-upcoming  { background: var(--color-warning-bg); color: var(--color-warning-fg); }
+    .chip-draft     { background: var(--soft-lavender); color: var(--text); }
+    .chip-active    { background: var(--success-bg); color: var(--success); }
+    .chip-archived  { background: var(--soft-lavender); color: var(--muted); }
+    .chip-completed { background: var(--info-bg);    color: var(--info); }
+    .chip-upcoming  { background: var(--warn-bg); color: var(--warn); }
 
     /* JS-generated row buttons (renderRows / renderCards emit .btn classes) */
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-1); border: 1px solid transparent; border-radius: var(--radius-md); padding: var(--space-1) var(--space-3); font: 500 var(--fs-meta)/1.4 inherit; cursor: pointer; white-space: nowrap; transition: background 120ms ease, border-color 120ms ease; }
     .btn:disabled { opacity: .5; cursor: not-allowed; }
-    .btn-ghost  { background: var(--color-surface); border-color: var(--color-border); color: var(--color-text-primary); }
-    .btn-ghost:hover:not(:disabled)   { background: var(--color-surface-raised); }
-    .btn-primary { background: var(--color-primary); color: var(--color-primary-fg); border-color: var(--color-primary); }
-    .btn-primary:hover:not(:disabled) { background: var(--color-primary-hover); border-color: var(--color-primary-hover); }
-    .btn-danger  { background: var(--color-danger-bg); color: var(--color-danger-fg); border-color: color-mix(in srgb, var(--color-danger-fg) 30%, transparent); }
-    .btn-danger:hover:not(:disabled)  { background: color-mix(in srgb, var(--color-danger-bg) 80%, var(--color-danger)); }
+    .btn-ghost  { background: var(--surface); border-color: var(--border); color: var(--text); }
+    .btn-ghost:hover:not(:disabled)   { background: var(--surface-2); }
+    .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-hover); border-color: var(--primary-hover); }
+    .btn-danger  { background: var(--danger-bg); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
+    .btn-danger:hover:not(:disabled)  { background: color-mix(in srgb, var(--danger-bg) 80%, var(--danger)); }
 
     /* JS-generated metadata text */
-    .meta { color: var(--color-text-muted); font-size: var(--fs-meta); margin: 0 0 var(--space-2); }
+    .meta { color: var(--muted); font-size: var(--fs-meta); margin: 0 0 var(--space-2); }
 
     /* Row action button container in table cells */
     .row-actions { display: flex; gap: var(--space-1); }
 
     /* Mobile card view */
     .cards { display: none; padding: var(--space-3); gap: var(--space-2); }
-    .batch-card { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-raised); padding: var(--space-3); box-shadow: var(--shadow-raised); }
+    .batch-card { border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); padding: var(--space-3); box-shadow: var(--shadow-soft); }
     .batch-card h3 { margin: 0 0 var(--space-1); font-size: var(--fs-section-title); }
 
     /* Empty state */
-    .empty-state { display: none; padding: var(--space-12) var(--space-6); text-align: center; color: var(--color-text-muted); }
+    .empty-state { display: none; padding: var(--space-12) var(--space-6); text-align: center; color: var(--muted); }
     .empty-state .emoji { font-size: 38px; margin-bottom: var(--space-2); }
 
     /* Skeleton loader */
-    .skeleton { height: 82px; border-radius: var(--radius-md); background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--color-primary), transparent 88%) 50%, transparent 70%) var(--color-surface-raised); background-size: 220% 100%; animation: shimmer 1.1s infinite; margin: var(--space-2) var(--space-4); border: 1px solid var(--color-border); }
+    .skeleton { height: 82px; border-radius: var(--radius-md); background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--primary), transparent 88%) 50%, transparent 70%) var(--surface-2); background-size: 220% 100%; animation: shimmer 1.1s infinite; margin: var(--space-2) var(--space-4); border: 1px solid var(--border); }
     @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 
     /* Toast notifications */
     .toast-root { position: fixed; z-index: 70; right: var(--space-4); top: var(--space-4); display: grid; gap: var(--space-2); width: min(360px, calc(100vw - 28px)); }
-    .toast { border-radius: var(--radius-md); border: 1px solid var(--color-border); box-shadow: var(--shadow-raised); padding: var(--space-3); color: var(--color-text-primary); background: var(--color-surface); animation: slideIn .28s ease; }
-    .toast.success { border-color: color-mix(in srgb, var(--color-success-fg), transparent 75%); background: var(--color-success-bg); }
-    .toast.error   { border-color: color-mix(in srgb, var(--color-danger-fg),  transparent 75%); background: var(--color-danger-bg); }
-    .toast.warning { border-color: color-mix(in srgb, var(--color-warning-fg), transparent 75%); background: var(--color-warning-bg); }
-    .toast.info    { border-color: color-mix(in srgb, var(--color-info-fg),    transparent 75%); background: var(--color-info-bg); }
+    .toast { border-radius: var(--radius-md); border: 1px solid var(--border); box-shadow: var(--shadow-soft); padding: var(--space-3); color: var(--text); background: var(--surface); animation: slideIn .28s ease; }
+    .toast.success { border-color: color-mix(in srgb, var(--success), transparent 75%); background: var(--success-bg); }
+    .toast.error   { border-color: color-mix(in srgb, var(--danger),  transparent 75%); background: var(--danger-bg); }
+    .toast.warning { border-color: color-mix(in srgb, var(--warn), transparent 75%); background: var(--warn-bg); }
+    .toast.info    { border-color: color-mix(in srgb, var(--info),    transparent 75%); background: var(--info-bg); }
     @keyframes slideIn { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
 
     /* Modal */
     .modal-overlay { position: fixed; inset: 0; background: rgba(10,10,20,.42); backdrop-filter: blur(3px); display: none; place-items: center; padding: var(--space-4); z-index: 60; }
     .modal-overlay.open { display: grid; }
-    .modal { width: min(760px, 96vw); max-height: 90dvh; overflow: auto; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-raised); }
-    .modal-head { padding: var(--space-4) var(--space-4) var(--space-3); border-bottom: 1px solid var(--color-border); }
+    .modal { width: min(760px, 96vw); max-height: 90dvh; overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-soft); }
+    .modal-head { padding: var(--space-4) var(--space-4) var(--space-3); border-bottom: 1px solid var(--border); }
     .modal-head h2 { margin: 0; font-size: var(--fs-section-title); }
     .modal-body { padding: var(--space-3) var(--space-4); }
     .modal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
     .field { display: grid; gap: var(--space-1); }
-    .field label { font-size: var(--fs-label); font-weight: 600; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .field label { font-size: var(--fs-label); font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
     .field.full { grid-column: 1 / -1; }
     .switch-wrap { display: inline-flex; align-items: center; gap: var(--space-2); }
-    .modal-foot { padding: var(--space-3) var(--space-4) var(--space-4); border-top: 1px solid var(--color-border); display: flex; justify-content: flex-end; gap: var(--space-2); }
+    .modal-foot { padding: var(--space-3) var(--space-4) var(--space-4); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: var(--space-2); }
 
     textarea.fs-input { resize: vertical; min-height: 72px; }
+
+    /* Campus registration controls + open classes */
+    .sec-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-3); }
+    .sec-title { font-size: var(--fs-section-title); font-weight: 800; margin: 0 0 var(--space-1); }
+    .sec-sub { margin: 0; color: var(--muted); font-size: var(--fs-meta); }
+    .campus-table { width: 100%; border-collapse: collapse; font-size: var(--fs-meta); }
+    .campus-table th { padding: var(--space-2) var(--space-3); text-align: left; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-size: 11px; border-bottom: 1px solid var(--border); }
+    .campus-table td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .campus-table tbody tr:last-child td { border-bottom: none; }
+    .pill-open   { display: inline-flex; align-items: center; border-radius: 99px; padding: 2px 10px; font-size: 12px; font-weight: 700; background: var(--success-bg); color: var(--success); }
+    .pill-closed { display: inline-flex; align-items: center; border-radius: 99px; padding: 2px 10px; font-size: 12px; font-weight: 700; background: var(--danger-bg); color: var(--danger); }
 
     @media (max-width: 980px) { .cards { display: grid; } .fs-table-wrap { display: none; } }
     @media (max-width: 768px) {
@@ -90,53 +121,48 @@
   </style>
 </head>
 <body>
-  <main class="main" id="appRoot">
+  <main class="fs-page fs-wrap-xl" id="appRoot">
     <span id="welcomeLine" hidden aria-hidden="true"></span>
-    <button id="themeToggle" hidden aria-hidden="true" class="fs-btn"></button>
+    <button id="themeToggle" hidden aria-hidden="true" style="display:none"></button>
 
-    <div class="fs-page-header">
+    <div class="page-hd">
       <div>
-        <h1 class="fs-page-title">Batch Management</h1>
+        <h1>Batch Management</h1>
+        <p class="page-hd-sub">Create and manage programme batches, campus controls, and open classes.</p>
       </div>
-      <div class="fs-page-actions">
-        <button class="fs-btn fs-btn-secondary" id="refreshBtn">Refresh</button>
-        <button class="fs-btn fs-btn-primary" id="openCreateBtn">+ Create Batch</button>
+      <div class="page-hd-actions">
+        <button class="btn" id="refreshBtn">Refresh</button>
+        <button class="btn btn-primary" id="openCreateBtn">+ Create Batch</button>
       </div>
     </div>
 
-    <section class="fs-metric-grid" aria-label="Batch summaries" style="margin-bottom: var(--space-4);">
-      <article class="fs-metric"><div class="fs-metric-label">Total Batches</div><div class="fs-metric-value" id="sumTotal">0</div></article>
-      <article class="fs-metric"><div class="fs-metric-label">Active</div><div class="fs-metric-value" id="sumActive">0</div></article>
-      <article class="fs-metric"><div class="fs-metric-label">Upcoming</div><div class="fs-metric-value" id="sumUpcoming">0</div></article>
-      <article class="fs-metric"><div class="fs-metric-label">Open Registration</div><div class="fs-metric-value" id="sumOpen">0</div></article>
-    </section>
+    <div class="dash-kpis" aria-label="Batch summaries">
+      <div class="dk"><div class="dv" id="sumTotal">0</div><div class="dl">Total Batches</div></div>
+      <div class="dk"><div class="dv" id="sumActive">0</div><div class="dl">Active</div></div>
+      <div class="dk"><div class="dv" id="sumUpcoming">0</div><div class="dl">Upcoming</div></div>
+      <div class="dk"><div class="dv" id="sumOpen">0</div><div class="dl">Open Registration</div></div>
+    </div>
 
     <section aria-label="Batch list">
-      <div class="fs-action-bar">
-        <div class="fs-action-bar-search">
-          <input class="fs-input" id="searchInput" placeholder="Search name, fellowship, subgroup, notes" aria-label="Search batches" />
-        </div>
-        <div class="fs-action-bar-filters">
-          <select class="fs-select" id="statusFilter" aria-label="Filter by status">
-            <option value="all">All statuses</option>
-            <option value="draft">Draft</option>
-            <option value="active">Active</option>
-            <option value="archived">Archived</option>
-            <option value="completed">Completed</option>
-            <option value="upcoming">Upcoming</option>
-          </select>
-          <select class="fs-select" id="groupFilter" aria-label="Filter by fellowship group">
-            <option value="all">All fellowships/groups</option>
-          </select>
-          <select class="fs-select" id="sortSelect" aria-label="Sort batches">
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-          </select>
-        </div>
-        <div class="fs-action-bar-actions">
-          <button class="fs-btn fs-btn-secondary" id="clearFiltersBtn">Clear</button>
-          <button class="fs-btn fs-btn-secondary" id="retryBtn">Retry Failed</button>
-        </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:14px;box-shadow:var(--shadow-soft);display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <input class="fs-input" id="searchInput" placeholder="Search name, fellowship, subgroup, notes" aria-label="Search batches" style="flex:1;min-width:180px" />
+        <select class="fs-select" id="statusFilter" aria-label="Filter by status" style="width:auto">
+          <option value="all">All statuses</option>
+          <option value="draft">Draft</option>
+          <option value="active">Active</option>
+          <option value="archived">Archived</option>
+          <option value="completed">Completed</option>
+          <option value="upcoming">Upcoming</option>
+        </select>
+        <select class="fs-select" id="groupFilter" aria-label="Filter by fellowship group" style="width:auto">
+          <option value="all">All fellowships/groups</option>
+        </select>
+        <select class="fs-select" id="sortSelect" aria-label="Sort batches" style="width:auto">
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+        </select>
+        <button class="btn" id="clearFiltersBtn">Clear</button>
+        <button class="btn" id="retryBtn">Retry Failed</button>
       </div>
 
       <div id="skeletonWrap" aria-hidden="true">
@@ -173,6 +199,65 @@
         <button class="fs-btn fs-btn-primary" id="emptyCreateBtn">Create Batch</button>
       </div>
     </section>
+
+    <!-- ═══ Campus Registration Controls ══════════════════════════════════════ -->
+    <section aria-label="Campus registration controls" style="margin-top:var(--space-8)" id="campusControlsSection">
+      <div class="sec-head">
+        <div>
+          <h2 class="sec-title">Campus Registration Controls</h2>
+          <p class="sec-sub">Open or close registration per campus within a batch.</p>
+        </div>
+        <select class="fs-select" id="campusBatchPicker" style="min-width:220px" aria-label="Select batch for campus controls">
+          <option value="">Select a batch…</option>
+        </select>
+      </div>
+      <div class="fs-table-wrap" id="campusControlsTableWrap">
+        <table class="campus-table">
+          <thead><tr><th>Campus / Fellowship</th><th>Open Classes</th><th>Registration</th><th>Closed Reason</th><th>Action</th></tr></thead>
+          <tbody id="campusControlsBody"></tbody>
+        </table>
+      </div>
+      <div class="cards" id="campusControlsCards"></div>
+      <div class="empty-state" id="campusControlsEmpty" style="display:none">
+        <div class="emoji">🏫</div>
+        <p id="campusControlsEmptyMsg">Select an active batch above to manage campus registration.</p>
+      </div>
+    </section>
+
+    <!-- ═══ Open Classes in Selected Batch ════════════════════════════════════ -->
+    <section aria-label="Open classes in selected batch" style="margin-top:var(--space-8)" id="openClassesSection">
+      <div class="sec-head">
+        <div>
+          <h2 class="sec-title">Open Classes in Selected Batch</h2>
+          <p class="sec-sub">All active class slots for the batch selected above. Campus status reflects current registration settings.</p>
+        </div>
+      </div>
+      <div id="ocSummaryChips" style="display:flex;gap:var(--space-2);flex-wrap:wrap;margin-bottom:var(--space-3)"></div>
+      <div class="fs-action-bar" style="margin-bottom:var(--space-3)">
+        <div class="fs-action-bar-search">
+          <input class="fs-input" id="ocFcFilter" placeholder="Filter by campus / fellowship code" aria-label="Filter by campus" />
+        </div>
+        <div class="fs-action-bar-filters">
+          <input class="fs-input" id="ocTeacherFilter" placeholder="Filter by teacher" style="width:180px" aria-label="Filter by teacher" />
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
+            <input type="checkbox" id="ocEnrollOpenOnly" /> Enrollment open only
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
+            <input type="checkbox" id="ocFullOnly" /> Full classes only
+          </label>
+        </div>
+      </div>
+      <div class="fs-table-wrap" id="openClassesTableWrap">
+        <table class="campus-table">
+          <thead><tr><th>Campus / Fellowship</th><th>Teacher</th><th>Day</th><th>Time</th><th>Enrolled</th><th>Max Capacity</th><th>Seats Remaining</th><th>Enrollment</th><th>Campus Reg</th><th>Class Status</th></tr></thead>
+          <tbody id="openClassesBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="openClassesEmpty" style="display:none">
+        <div class="emoji">📚</div>
+        <p>No classes found for the selected filters.</p>
+      </div>
+    </section>
   </main>
 
   <div class="modal-overlay" id="batchModalOverlay" role="dialog" aria-modal="true" aria-labelledby="batchModalTitle">
@@ -183,13 +268,13 @@
           <div class="field"><label for="fBatchId">Batch ID</label><input class="fs-input" id="fBatchId" required placeholder="e.g. 2026A" /></div>
           <div class="field"><label for="fBatchName">Batch name</label><input class="fs-input" id="fBatchName" required /></div>
           <div class="field"><label for="fGroup">Fellowship (optional)</label><input class="fs-input" id="fGroup" placeholder="CE / CS / WS or name (optional)" /></div>
-          <div class="field"><label for="fSubgroup">Subgroup (optional — leave blank for all)</label><select class="fs-select" id="fSubgroup"><option value="">— All subgroups —</option></select><small style="color:var(--color-text-muted);font-size:var(--fs-meta);">Leave blank to apply this batch to all subgroups. Only set this for subgroup-specific batches.</small></div>
+          <div class="field"><label for="fSubgroup">Subgroup (optional — leave blank for all)</label><select class="fs-select" id="fSubgroup"><option value="">— All subgroups —</option></select><small style="color:var(--muted);font-size:var(--fs-meta);">Leave blank to apply this batch to all subgroups. Only set this for subgroup-specific batches.</small></div>
           <div class="field"><label for="fStartDate">Start date</label><input class="fs-input" id="fStartDate" type="date" required /></div>
           <div class="field"><label for="fEndDate">End date</label><input class="fs-input" id="fEndDate" type="date" required /></div>
           <div class="field"><label for="fCapacity">Capacity</label><input class="fs-input" id="fCapacity" type="number" min="1" required /></div>
           <div class="field"><label for="fMoodleCourse">Moodle course mapping</label><select class="fs-select" id="fMoodleCourse"><option value="">No mapping</option></select></div>
           <div class="field full"><label for="fNotes">Notes</label><textarea class="fs-input" id="fNotes" rows="3"></textarea></div>
-          <div class="field full"><label>Active</label><div class="switch-wrap"><input id="fActive" type="checkbox" checked aria-label="Batch active toggle" /><span style="color: var(--color-text-muted);">Mark this batch active</span></div></div>
+          <div class="field full"><label>Active</label><div class="switch-wrap"><input id="fActive" type="checkbox" checked aria-label="Batch active toggle" /><span style="color: var(--muted);">Mark this batch active</span></div></div>
         </div>
       </form>
       <div class="modal-foot">
@@ -205,10 +290,10 @@
       <div class="modal-body">
         <div class="modal-grid">
           <div class="field"><label>Source Batch</label><input class="fs-input" id="rSrcBatch" disabled /></div>
-          <div class="field"><label for="rNewBatchId">New Batch ID <span style="color:var(--color-danger-fg)">*</span></label><input class="fs-input" id="rNewBatchId" required placeholder="e.g. 2026B" /></div>
-          <div class="field"><label for="rNewBatchName">New Batch Name <span style="color:var(--color-danger-fg)">*</span></label><input class="fs-input" id="rNewBatchName" required /></div>
-          <div class="field"><label for="rNewStart">Start Date <span style="color:var(--color-danger-fg)">*</span></label><input class="fs-input" id="rNewStart" type="date" required /></div>
-          <div class="field"><label for="rNewEnd">End Date <span style="color:var(--color-danger-fg)">*</span></label><input class="fs-input" id="rNewEnd" type="date" required /></div>
+          <div class="field"><label for="rNewBatchId">New Batch ID <span style="color:var(--danger)">*</span></label><input class="fs-input" id="rNewBatchId" required placeholder="e.g. 2026B" /></div>
+          <div class="field"><label for="rNewBatchName">New Batch Name <span style="color:var(--danger)">*</span></label><input class="fs-input" id="rNewBatchName" required /></div>
+          <div class="field"><label for="rNewStart">Start Date <span style="color:var(--danger)">*</span></label><input class="fs-input" id="rNewStart" type="date" required /></div>
+          <div class="field"><label for="rNewEnd">End Date <span style="color:var(--danger)">*</span></label><input class="fs-input" id="rNewEnd" type="date" required /></div>
           <div class="field full"><label for="rNotifyMsg">Rollover Notice Message (optional — queues email to all students in source batch)</label><textarea class="fs-input" id="rNotifyMsg" rows="3" placeholder="Include a welcome message for the new batch…"></textarea></div>
         </div>
       </div>
@@ -225,14 +310,14 @@
       <div class="modal-body">
         <div class="modal-grid">
           <div class="field full"><label>Batch</label><input class="fs-input" id="aBatch" disabled /></div>
-          <div class="field full"><label for="aSubject">Email Subject <span style="color:var(--color-danger-fg)">*</span></label><input class="fs-input" id="aSubject" required placeholder="Important update for your class" /></div>
-          <div class="field full"><label for="aMessage">Message <span style="color:var(--color-danger-fg)">*</span></label><textarea class="fs-input" id="aMessage" rows="5" required placeholder="Write your announcement here…"></textarea></div>
+          <div class="field full"><label for="aSubject">Email Subject <span style="color:var(--danger)">*</span></label><input class="fs-input" id="aSubject" required placeholder="Important update for your class" /></div>
+          <div class="field full"><label for="aMessage">Message <span style="color:var(--danger)">*</span></label><textarea class="fs-input" id="aMessage" rows="5" required placeholder="Write your announcement here…"></textarea></div>
           <div class="field full">
             <label>Send To</label>
             <div style="display:flex;gap:16px;flex-wrap:wrap;">
-              <label style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--color-text-primary);cursor:pointer;"><input type="radio" name="aRecipients" id="aRecipStudents" value="students" checked /> Students only</label>
-              <label style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--color-text-primary);cursor:pointer;"><input type="radio" name="aRecipients" id="aRecipTeachers" value="teachers" /> Teachers only</label>
-              <label style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--color-text-primary);cursor:pointer;"><input type="radio" name="aRecipients" id="aRecipBoth" value="both" /> Both</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer;"><input type="radio" name="aRecipients" id="aRecipStudents" value="students" checked /> Students only</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer;"><input type="radio" name="aRecipients" id="aRecipTeachers" value="teachers" /> Teachers only</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--text);cursor:pointer;"><input type="radio" name="aRecipients" id="aRecipBoth" value="both" /> Both</label>
             </div>
           </div>
         </div>
@@ -255,6 +340,23 @@
     </div>
   </div>
 
+  <!-- ═══ Close Campus Modal ══════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="closeCampusOverlay" role="dialog" aria-modal="true" aria-labelledby="closeCampusTitle">
+    <div class="modal" style="max-width:460px">
+      <div class="modal-head"><h2 id="closeCampusTitle">Close Campus Registration</h2></div>
+      <div class="modal-body">
+        <div class="modal-grid">
+          <div class="field full"><label>Campus</label><input class="fs-input" id="closeCampusName" disabled /></div>
+          <div class="field full"><label for="closeCampusReason">Reason <span style="color:var(--muted);font-weight:400">(optional)</span></label><textarea class="fs-input" id="closeCampusReason" rows="3" placeholder="e.g. Class roster full, waiting list only…"></textarea></div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="fs-btn fs-btn-secondary" id="cancelCloseCampusBtn">Cancel</button>
+        <button class="fs-btn fs-btn-danger" id="confirmCloseCampusBtn">Close Registration</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast-root" id="toastRoot" aria-live="polite" aria-atomic="true"></div>
 
   <script src="../js/config.js"></script>
@@ -263,7 +365,7 @@
     import { supabase, getCurrentProfile, isAdmin, isSuperadmin as _isSuperadmin, isRegionalSecretary } from "../auth/auth-client.js";
     const $ = (id) => document.getElementById(id);
     const els = { welcomeLine:$("welcomeLine"),themeToggle:$("themeToggle"),refreshBtn:$("refreshBtn"),signOutBtn:null,openCreateBtn:$("openCreateBtn"),emptyCreateBtn:$("emptyCreateBtn"),tableBody:$("tableBody"),mobileCards:$("mobileCards"),emptyState:$("emptyState"),skeletonWrap:$("skeletonWrap"),statusFilter:$("statusFilter"),groupFilter:$("groupFilter"),sortSelect:$("sortSelect"),searchInput:$("searchInput"),clearFiltersBtn:$("clearFiltersBtn"),retryBtn:$("retryBtn"),toastRoot:$("toastRoot"),sumTotal:$("sumTotal"),sumActive:$("sumActive"),sumUpcoming:$("sumUpcoming"),sumOpen:$("sumOpen"),batchModalOverlay:$("batchModalOverlay"),batchModalTitle:$("batchModalTitle"),batchForm:$("batchForm"),saveModalBtn:$("saveModalBtn"),cancelModalBtn:$("cancelModalBtn"),confirmOverlay:$("confirmOverlay"),confirmText:$("confirmText"),confirmCancelBtn:$("confirmCancelBtn"),confirmActionBtn:$("confirmActionBtn"),fBatchId:$("fBatchId"),fBatchName:$("fBatchName"),fGroup:$("fGroup"),fSubgroup:$("fSubgroup"),fStartDate:$("fStartDate"),fEndDate:$("fEndDate"),fCapacity:$("fCapacity"),fMoodleCourse:$("fMoodleCourse"),fNotes:$("fNotes"),fActive:$("fActive") };
-    const state = { batches:[], filtered:[], applicantsByBatch:new Map(), moodleByBatch:new Map(), moodleCourses:[], pendingWrites:[], editingId:null, confirmAction:null, profile:null, subgroupsList:[] };
+    const state = { batches:[], filtered:[], applicantsByBatch:new Map(), moodleByBatch:new Map(), moodleCourses:[], pendingWrites:[], editingId:null, confirmAction:null, profile:null, subgroupsList:[], campusSettings:new Map(), campusBatchId:null, openClasses:[], closeCampusPending:null };
     const isSuperadmin = () => _isSuperadmin(state.profile?.role);
     const moodleTables = ["moodle_courses","batch_moodle_courses"];
     const auditTables = ["audit_logs"];
@@ -297,7 +399,7 @@
     async function deleteBatch(id){ if(!isSuperadmin()){ toasts.push("Only superadmins can delete batches.","error"); return; } const idx=state.batches.findIndex((b)=>String(b.batch_id)===String(id)); if(idx<0)return; const r=state.batches[idx]; const prev=[...state.batches]; state.batches.splice(idx,1); applyFiltersAndRender(); const {error}=await supabase.from("batches").delete().eq("batch_id",id); if(error){ state.batches=prev; applyFiltersAndRender(); toasts.push(`Delete failed: ${error.message}`,"error",4200); } else { await writeAudit("BATCH_DELETED",id,{batch_id:id,batch_name:r.batch_name,status:r.status,active:r.active}); toasts.push("Batch permanently deleted.","success"); } closeModal(els.confirmOverlay); await refreshAll(); }
     async function retryPending(){ if(!state.pendingWrites.length){ toasts.push("No pending writes.","info"); return; } const q=[...state.pendingWrites]; state.pendingWrites=[]; for(const it of q){ if(it.type==="save"){ const ok=await upsertRetrySafe(it.payload); if(!ok)state.pendingWrites.push(it); } if(it.type==="archive"){ const p={active:false,archived:true,archived_at:new Date().toISOString(),registration_open:false,status:"Archived",updated_at:new Date().toISOString()}; const {error}=await supabase.from("batches").update(p).eq("batch_id",it.batchId); if(error)state.pendingWrites.push(it); } } toasts.push(state.pendingWrites.length?"Some writes still pending.":"Pending writes synced.",state.pendingWrites.length?"warning":"success"); await refreshAll(); }
     async function loadSubgroups(){ const {data,error}=await supabase.from("fellowship_map").select("subgroup_id").eq("active",true); if(error||!data) return; const sgs=[...new Set(data.map((r)=>r.subgroup_id).filter(Boolean))].sort(); state.subgroupsList=sgs; const cur=els.fSubgroup.value; els.fSubgroup.innerHTML='<option value="">— Select subgroup (optional) —</option>'+sgs.map((s)=>`<option value="${esc(s)}">${esc(s)}</option>`).join(""); els.fSubgroup.value=cur; }
-    async function refreshAll(){ await Promise.all([loadMoodleCourses(),loadApplicantsCount()]); await loadBatches(); }
+    async function refreshAll(){ await Promise.all([loadMoodleCourses(),loadApplicantsCount()]); await loadBatches(); populateCampusBatchPicker(); if(state.campusBatchId) await loadCampusAndClasses(state.campusBatchId); }
     let rolloverSourceId=null; let announceBatchId=null;
     async function closeBatch(id){ const patch={active:false,status:"Completed",updated_at:new Date().toISOString()}; const {error}=await supabase.from("batches").update(patch).eq("batch_id",id); if(error){ toasts.push(`Close failed: ${error.message}`,"error"); return; } await writeAudit("CLOSE_BATCH",id,patch); toasts.push("Batch closed.","success"); await refreshAll(); }
     async function reopenBatch(id){ const patch={active:true,status:"Active",archived:false,archived_at:null,updated_at:new Date().toISOString()}; const {error}=await supabase.from("batches").update(patch).eq("batch_id",id); if(error){ toasts.push(`Reopen failed: ${error.message}`,"error"); return; } await writeAudit("REOPEN_BATCH",id,patch); toasts.push("Batch reopened.","success"); await refreshAll(); }
@@ -305,8 +407,187 @@
     async function saveRollover(){ const newId=$("rNewBatchId").value.trim(); const newName=$("rNewBatchName").value.trim(); const start=$("rNewStart").value; const end=$("rNewEnd").value; const msg=$("rNotifyMsg").value.trim(); if(!newId||!newName||!start||!end){ toasts.push("Fill all required fields.","warning"); return; } const src=state.batches.find((b)=>String(b.batch_id)===String(rolloverSourceId)); const payload={batch_id:newId,batch_name:newName,start_date:start,start_sunday:start,end_date:end,capacity:src?.capacity||src?.max_capacity||30,fellowship_group:src?.fellowship_group||src?.group_id||null,subgroup:src?.subgroup||src?.subgroup_id||null,subgroup_id:src?.subgroup_id||null,notes:msg||src?.notes||null,status:new Date(start)>new Date()?"Upcoming":"Active",active:true,archived:false,created_at:new Date().toISOString(),updated_at:new Date().toISOString()}; const {error}=await supabase.from("batches").insert(payload); if(error){ toasts.push(`Rollover failed: ${error.message}`,"error"); return; } if(msg){ const {data:students}=await supabase.from("students").select("email,full_name").eq("batch_id",rolloverSourceId).limit(500); await Promise.all((students||[]).filter(s=>s.email).map(s=>supabase.from("email_queue").insert({recipient_email:s.email,recipient_name:s.full_name||"",template_key:"batch_rollover_notice",subject:`Your class is continuing — ${newName}`,status:"Pending",payload:{full_name:s.full_name,new_batch_id:newId,new_batch_name:newName,start_date:start,end_date:end,message:msg}}))); } await writeAudit("ROLLOVER_BATCH",newId,{source_batch_id:rolloverSourceId,...payload}); toasts.push("Rollover batch created.","success"); closeModal($("rolloverOverlay")); await refreshAll(); }
     function openAnnounceModal(id){ announceBatchId=id; const r=state.batches.find((b)=>String(b.batch_id)===String(id)); $("aBatch").value=r?(r.batch_name||r.batch_id):id; $("aSubject").value=""; $("aMessage").value=""; openModal($("announceOverlay"),$("aSubject")); }
     async function sendAnnounce(){ const subject=$("aSubject").value.trim(); const message=$("aMessage").value.trim(); if(!subject||!message){ toasts.push("Subject and message are required.","warning"); return; } const recipientType=document.querySelector('input[name="aRecipients"]:checked')?.value||"students"; $("sendAnnounceBtn").disabled=true; $("sendAnnounceBtn").textContent="Sending…"; const inserts=[]; if(recipientType==="students"||recipientType==="both"){ const {data:students,error}=await supabase.from("students").select("email,full_name").eq("batch_id",announceBatchId).limit(500); if(error){ toasts.push(`Could not load students: ${error.message}`,"error"); $("sendAnnounceBtn").disabled=false; $("sendAnnounceBtn").textContent="Send Announcement"; return; } (students||[]).filter(s=>s.email).forEach(s=>inserts.push({recipient_email:s.email,recipient_name:s.full_name||"",template_key:"announcement",subject,status:"Pending",payload:{full_name:s.full_name,message,recipient_type:"student"}})); } if(recipientType==="teachers"||recipientType==="both"){ const {data:teachers,error}=await supabase.from("teachers").select("email,full_name").eq("active",true).limit(500); if(error){ toasts.push(`Could not load teachers: ${error.message}`,"error"); $("sendAnnounceBtn").disabled=false; $("sendAnnounceBtn").textContent="Send Announcement"; return; } (teachers||[]).filter(t=>t.email).forEach(t=>inserts.push({recipient_email:t.email,recipient_name:t.full_name||"",template_key:"announcement",subject,status:"Pending",payload:{full_name:t.full_name,message,recipient_type:"teacher"}})); } if(!inserts.length){ toasts.push("No recipients found for the selected group.","warning"); $("sendAnnounceBtn").disabled=false; $("sendAnnounceBtn").textContent="Send Announcement"; return; } await Promise.all(inserts.map(r=>supabase.from("email_queue").insert(r))); await writeAudit("ANNOUNCE_BATCH",announceBatchId,{subject,recipient_count:inserts.length,recipient_type:recipientType}); toasts.push(`Announcement queued for ${inserts.length} recipient${inserts.length===1?"":"s"}.`,"success"); $("sendAnnounceBtn").disabled=false; $("sendAnnounceBtn").textContent="Send Announcement"; closeModal($("announceOverlay")); }
-    function bindEvents(){ document.documentElement.dataset.theme="light"; localStorage.setItem("fs_batch_theme","light"); if(els.themeToggle) els.themeToggle.style.display="none"; els.signOutBtn?.addEventListener("click",async()=>{ await supabase.auth.signOut(); window.location.href="login.html"; }); els.refreshBtn.addEventListener("click",refreshAll); els.openCreateBtn.addEventListener("click",openModalForCreate); els.emptyCreateBtn.addEventListener("click",openModalForCreate); els.clearFiltersBtn.addEventListener("click",()=>{ els.searchInput.value=""; els.statusFilter.value="all"; els.groupFilter.value="all"; els.sortSelect.value="newest"; applyFiltersAndRender(); }); els.retryBtn.addEventListener("click",retryPending); [els.searchInput,els.statusFilter,els.groupFilter,els.sortSelect].forEach((el)=>{ el.addEventListener("input",applyFiltersAndRender); el.addEventListener("change",applyFiltersAndRender); }); document.addEventListener("click",(e)=>{ const eb=e.target.closest(".js-edit"); if(eb)openModalForEdit(eb.dataset.id); const ab=e.target.closest(".js-archive"); if(ab)askArchive(ab.dataset.id); const db=e.target.closest(".js-delete"); if(db)askDelete(db.dataset.id); const cb=e.target.closest(".js-close"); if(cb){ if(!isSuperadmin()){ toasts.push("Only superadmins can close batches.","error"); return; } $("confirmTitle").textContent="Close Batch"; els.confirmActionBtn.textContent="Close"; els.confirmText.textContent=`Close batch? It will be marked as Completed.`; state.confirmAction=async()=>closeBatch(cb.dataset.id); openModal(els.confirmOverlay,els.confirmActionBtn); } const rb=e.target.closest(".js-reopen"); if(rb){ els.confirmText.textContent=`Reopen this batch and mark it Active?`; state.confirmAction=async()=>reopenBatch(rb.dataset.id); openModal(els.confirmOverlay,els.confirmActionBtn); } const rov=e.target.closest(".js-rollover"); if(rov)openRolloverModal(rov.dataset.id); const ann=e.target.closest(".js-announce"); if(ann)openAnnounceModal(ann.dataset.id); }); els.cancelModalBtn.addEventListener("click",()=>closeModal(els.batchModalOverlay)); els.saveModalBtn.addEventListener("click",saveBatch); els.confirmCancelBtn.addEventListener("click",()=>closeModal(els.confirmOverlay)); els.confirmActionBtn.addEventListener("click",async()=>{ if(typeof state.confirmAction==="function") await state.confirmAction(); }); $("cancelRolloverBtn").addEventListener("click",()=>closeModal($("rolloverOverlay"))); $("saveRolloverBtn").addEventListener("click",saveRollover); $("cancelAnnounceBtn").addEventListener("click",()=>closeModal($("announceOverlay"))); $("sendAnnounceBtn").addEventListener("click",sendAnnounce); [els.batchModalOverlay,els.confirmOverlay,$("rolloverOverlay"),$("announceOverlay")].forEach((o)=>o&&o.addEventListener("click",(e)=>{ if(e.target===o)closeModal(o); })); document.addEventListener("keydown",(e)=>{ if(e.key==="Escape"){ closeModal(els.batchModalOverlay); closeModal(els.confirmOverlay); closeModal($("rolloverOverlay")); closeModal($("announceOverlay")); } }); }
-    async function init(){ if(!window.FS_CONFIG||!window.FS_CONFIG.SUPABASE_URL){ window.FSAdminShell&&window.FSAdminShell.mount({active:"batch",pageTitle:"Batch Management",profileName:"Not connected"}); const b=document.createElement("div"); b.style.cssText="margin-bottom:10px;padding:12px 14px;border-radius:12px;border:1px solid #92400e;background:#fff5df;color:#92400e;font-weight:600;font-size:13px;"; b.textContent="⚠ Not connected — open this page through a live server with config.js in place to load data"; els.skeletonWrap.before(b); els.skeletonWrap.style.display="none"; return; } const ok=await ensureAccess(); if(!ok) return; window.FSAdminShell && window.FSAdminShell.mount({ active: "batch", pageTitle: "Batch Management", profileName: state.profile?.full_name || state.profile?.email || "Admin", role: state.profile?.role || "" }); bindEvents(); await refreshAll(); toasts.push("Batch management ready.","info",1700); }
+    function bindEvents(){ document.documentElement.dataset.theme="light"; localStorage.setItem("fs_batch_theme","light"); if(els.themeToggle) els.themeToggle.style.display="none"; els.signOutBtn?.addEventListener("click",async()=>{ await supabase.auth.signOut(); window.location.href="login.html"; }); els.refreshBtn.addEventListener("click",refreshAll); els.openCreateBtn.addEventListener("click",openModalForCreate); els.emptyCreateBtn.addEventListener("click",openModalForCreate); els.clearFiltersBtn.addEventListener("click",()=>{ els.searchInput.value=""; els.statusFilter.value="all"; els.groupFilter.value="all"; els.sortSelect.value="newest"; applyFiltersAndRender(); }); els.retryBtn.addEventListener("click",retryPending); [els.searchInput,els.statusFilter,els.groupFilter,els.sortSelect].forEach((el)=>{ el.addEventListener("input",applyFiltersAndRender); el.addEventListener("change",applyFiltersAndRender); }); document.addEventListener("click",(e)=>{ const eb=e.target.closest(".js-edit"); if(eb)openModalForEdit(eb.dataset.id); const ab=e.target.closest(".js-archive"); if(ab)askArchive(ab.dataset.id); const db=e.target.closest(".js-delete"); if(db)askDelete(db.dataset.id); const cb=e.target.closest(".js-close"); if(cb){ if(!isSuperadmin()){ toasts.push("Only superadmins can close batches.","error"); return; } $("confirmTitle").textContent="Close Batch"; els.confirmActionBtn.textContent="Close"; els.confirmText.textContent=`Close batch? It will be marked as Completed.`; state.confirmAction=async()=>closeBatch(cb.dataset.id); openModal(els.confirmOverlay,els.confirmActionBtn); } const rb=e.target.closest(".js-reopen"); if(rb){ els.confirmText.textContent=`Reopen this batch and mark it Active?`; state.confirmAction=async()=>reopenBatch(rb.dataset.id); openModal(els.confirmOverlay,els.confirmActionBtn); } const rov=e.target.closest(".js-rollover"); if(rov)openRolloverModal(rov.dataset.id); const ann=e.target.closest(".js-announce"); if(ann)openAnnounceModal(ann.dataset.id); }); els.cancelModalBtn.addEventListener("click",()=>closeModal(els.batchModalOverlay)); els.saveModalBtn.addEventListener("click",saveBatch); els.confirmCancelBtn.addEventListener("click",()=>closeModal(els.confirmOverlay)); els.confirmActionBtn.addEventListener("click",async()=>{ if(typeof state.confirmAction==="function") await state.confirmAction(); }); $("cancelRolloverBtn").addEventListener("click",()=>closeModal($("rolloverOverlay"))); $("saveRolloverBtn").addEventListener("click",saveRollover); $("cancelAnnounceBtn").addEventListener("click",()=>closeModal($("announceOverlay"))); $("sendAnnounceBtn").addEventListener("click",sendAnnounce); [els.batchModalOverlay,els.confirmOverlay,$("rolloverOverlay"),$("announceOverlay")].forEach((o)=>o&&o.addEventListener("click",(e)=>{ if(e.target===o)closeModal(o); })); document.addEventListener("keydown",(e)=>{ if(e.key==="Escape"){ closeModal(els.batchModalOverlay); closeModal(els.confirmOverlay); closeModal($("rolloverOverlay")); closeModal($("announceOverlay")); closeModal($("closeCampusOverlay")); } }); }
+    // ── Campus Registration Controls ──────────────────────────────────────────
+    function canManageCampus(){ const r=state.profile?.role||""; return ["superadmin","admin","regional_secretary","subgroup_admin"].includes(r); }
+
+    function populateCampusBatchPicker(){
+      const picker=$("campusBatchPicker"); if(!picker) return;
+      const cur=picker.value;
+      picker.innerHTML='<option value="">Select a batch…</option>'+
+        state.batches
+          .filter(b=>b._status==="active"||b._status==="upcoming")
+          .map(b=>`<option value="${esc(b.batch_id)}">${esc(b.batch_name||b.batch_id)}</option>`)
+          .join("");
+      if(cur&&[...picker.options].some(o=>o.value===cur)) picker.value=cur;
+    }
+
+    async function loadCampusAndClasses(batchId){
+      state.campusBatchId=batchId;
+      await Promise.all([loadCampusSettings(batchId), loadOpenClasses(batchId)]);
+    }
+
+    async function loadCampusSettings(batchId){
+      if(!batchId){ renderCampusControls([]); return; }
+      const [fcRes, settingsRes, slotRes] = await Promise.all([
+        supabase.from("fellowship_map").select("fellowship_code,campus_name,subgroup_id,group_id").eq("active",true).order("campus_name"),
+        supabase.from("batch_campus_registration_settings").select("*").eq("batch_id",batchId),
+        supabase.from("class_slots").select("class_option_id,class_options(fellowship_codes,enrollment_open)").eq("batch_id",batchId).eq("status","Active")
+      ]);
+      const settingMap=new Map((settingsRes.data||[]).map(s=>[s.fellowship_code,s]));
+      const openClassCount=new Map();
+      (slotRes.data||[]).forEach(slot=>{
+        const co=slot.class_options; if(!co) return;
+        const codes=String(co.fellowship_codes||'{}').replace(/^\{|\}$/g,'').split(',').map(c=>c.trim()).filter(Boolean);
+        codes.forEach(c=>{ if(co.enrollment_open) openClassCount.set(c,(openClassCount.get(c)||0)+1); });
+      });
+      state.campusSettings=settingMap;
+      let fcRows=fcRes.data||[];
+      const role=state.profile?.role||"";
+      if(role==="subgroup_admin") fcRows=fcRows.filter(r=>r.subgroup_id===(state.profile?.subgroup_id||""));
+      else if(role==="pastor") fcRows=fcRows.filter(r=>r.fellowship_code===(state.profile?.fellowship_code||""));
+      renderCampusControls(fcRows, settingMap, openClassCount, batchId);
+    }
+
+    function renderCampusControls(fcRows, settingMap=new Map(), openClassCount=new Map(), batchId=null){
+      const body=$("campusControlsBody"), cards=$("campusControlsCards"), empty=$("campusControlsEmpty");
+      if(!body) return;
+      if(!batchId||!fcRows.length){ body.innerHTML=""; if(cards)cards.innerHTML=""; if(empty){empty.style.display="block";} return; }
+      if(empty) empty.style.display="none";
+      const can=canManageCampus();
+      body.innerHTML=fcRows.map(fc=>{
+        const s=settingMap.get(fc.fellowship_code); const isOpen=!s||s.registration_open!==false;
+        const cnt=openClassCount.get(fc.fellowship_code)||0;
+        const pill=isOpen?`<span class="pill-open">Open</span>`:`<span class="pill-closed">Closed</span>`;
+        const reason=(!isOpen&&s?.closed_reason)?esc(s.closed_reason):"-";
+        const actionBtn=!can?"":isOpen?`<button class="btn btn-ghost js-close-campus" data-fc="${esc(fc.fellowship_code)}" data-name="${esc(fc.campus_name)}" data-batch="${esc(batchId)}">Close</button>`:`<button class="btn btn-primary js-open-campus" data-fc="${esc(fc.fellowship_code)}" data-batch="${esc(batchId)}">Reopen</button>`;
+        return `<tr><td><strong>${esc(fc.campus_name)}</strong><div class="meta">${esc(fc.fellowship_code)}</div></td><td>${cnt}</td><td>${pill}</td><td style="max-width:200px;color:var(--muted);font-size:11px">${reason}</td><td><div class="row-actions">${actionBtn}</div></td></tr>`;
+      }).join("");
+      if(cards) cards.innerHTML=fcRows.map(fc=>{
+        const s=settingMap.get(fc.fellowship_code); const isOpen=!s||s.registration_open!==false;
+        const cnt=openClassCount.get(fc.fellowship_code)||0;
+        const pill=isOpen?`<span class="pill-open">Open</span>`:`<span class="pill-closed">Closed</span>`;
+        const can2=canManageCampus();
+        const actionBtn=!can2?"":isOpen?`<button class="btn btn-ghost js-close-campus" data-fc="${esc(fc.fellowship_code)}" data-name="${esc(fc.campus_name)}" data-batch="${esc(batchId)}">Close</button>`:`<button class="btn btn-primary js-open-campus" data-fc="${esc(fc.fellowship_code)}" data-batch="${esc(batchId)}">Reopen</button>`;
+        return `<article class="batch-card"><h3>${esc(fc.campus_name)}</h3><p class="meta">${esc(fc.fellowship_code)}</p><p class="meta">Open classes: ${cnt} · ${pill}${!isOpen&&s?.closed_reason?` · Reason: ${esc(s.closed_reason)}`:""}</p><div class="row-actions">${actionBtn}</div></article>`;
+      }).join("");
+    }
+
+    async function closeCampusReg(batchId, fcCode, reason){
+      const actor=state.profile?.email||null;
+      const {error}=await supabase.from("batch_campus_registration_settings").upsert({
+        batch_id:batchId, fellowship_code:fcCode, registration_open:false,
+        closed_reason:reason||null, closed_by:actor, closed_at:new Date().toISOString(),
+        reopened_by:null, reopened_at:null, updated_at:new Date().toISOString()
+      },{onConflict:"batch_id,fellowship_code"});
+      if(error){ toasts.push(`Close failed: ${error.message}`,"error"); return; }
+      await writeAudit("CAMPUS_REG_CLOSED",batchId,{fellowship_code:fcCode,reason});
+      toasts.push(`Registration closed for ${fcCode}.`,"success");
+      await loadCampusSettings(batchId);
+    }
+
+    async function openCampusReg(batchId, fcCode){
+      const actor=state.profile?.email||null;
+      const {error}=await supabase.from("batch_campus_registration_settings").upsert({
+        batch_id:batchId, fellowship_code:fcCode, registration_open:true,
+        closed_reason:null, closed_by:null, closed_at:null,
+        reopened_by:actor, reopened_at:new Date().toISOString(), updated_at:new Date().toISOString()
+      },{onConflict:"batch_id,fellowship_code"});
+      if(error){ toasts.push(`Reopen failed: ${error.message}`,"error"); return; }
+      await writeAudit("CAMPUS_REG_OPENED",batchId,{fellowship_code:fcCode});
+      toasts.push(`Registration reopened for ${fcCode}.`,"success");
+      await loadCampusSettings(batchId);
+    }
+
+    async function loadOpenClasses(batchId){
+      if(!batchId){ renderOpenClasses([]); return; }
+      const {data,error}=await supabase
+        .from("class_slots")
+        .select("class_slot_id,batch_id,teacher_name,status,current_enrolment,max_capacity,class_options(class_option_id,fellowship_codes,day,class_time,enrollment_open,active)")
+        .eq("batch_id",batchId)
+        .eq("status","Active")
+        .order("teacher_name");
+      if(error){ toasts.push(`Could not load classes: ${error.message}`,"error"); return; }
+      state.openClasses=(data||[]).filter(r=>r.class_options?.active!==false);
+      renderOpenClasses(state.openClasses);
+    }
+
+    function renderOpenClasses(rows){
+      const body=$("openClassesBody"), empty=$("openClassesEmpty"), chips=$("ocSummaryChips"); if(!body) return;
+      const fcF=($("ocFcFilter")?.value||"").toLowerCase().trim();
+      const tF=($("ocTeacherFilter")?.value||"").toLowerCase().trim();
+      const enrollOnly=$("ocEnrollOpenOnly")?.checked;
+      const fullOnly=$("ocFullOnly")?.checked;
+      const to12h=(t)=>{ if(!t)return"-"; const[h,m]=String(t).split(":").map(Number); return`${((h%12)||12)}:${String(m||0).padStart(2,"0")} ${h>=12?"PM":"AM"}`; };
+      const parseFc=(fc)=>String(fc||'{}').replace(/^\{|\}$/g,'').split(',').map(c=>c.trim()).filter(Boolean);
+      const campusClosed=(co)=>parseFc(co?.fellowship_codes).some(c=>{ const s=state.campusSettings.get(c); return s&&s.registration_open===false; });
+      // Summary chips computed from all rows before filtering
+      if(chips){
+        const totalActive=rows.length;
+        const totalOpen=rows.filter(r=>r.class_options?.enrollment_open).length;
+        const totalFull=rows.filter(r=>r.max_capacity!=null&&(r.current_enrolment||0)>=r.max_capacity).length;
+        const totalCap=rows.reduce((s,r)=>s+(r.max_capacity||0),0);
+        const totalEnrol=rows.reduce((s,r)=>s+(r.current_enrolment||0),0);
+        const availSeats=Math.max(0,totalCap-totalEnrol);
+        chips.innerHTML=rows.length?[
+          `<span class="chip chip-active">Active Classes: ${totalActive}</span>`,
+          `<span class="chip chip-active">Enrollment Open: ${totalOpen}</span>`,
+          `<span class="chip chip-draft">Full: ${totalFull}</span>`,
+          `<span class="chip" style="background:var(--color-info-bg,#dbeafe);color:var(--color-info-fg,#1d4ed8)">Available Seats: ${availSeats}</span>`,
+          `<span class="chip chip-draft">Total Enrolled: ${totalEnrol}</span>`,
+          `<span class="chip chip-draft">Total Capacity: ${totalCap}</span>`
+        ].join(""):"";
+      }
+      const filtered=rows.filter(r=>{
+        const co=r.class_options; if(!co) return false;
+        const fcStr=String(co.fellowship_codes||'{}').replace(/^\{|\}$/g,'').toLowerCase();
+        if(fcF&&!fcStr.includes(fcF)) return false;
+        if(tF&&!String(r.teacher_name||"").toLowerCase().includes(tF)) return false;
+        if(enrollOnly&&!co.enrollment_open) return false;
+        const isFull=r.max_capacity!=null&&(r.current_enrolment||0)>=r.max_capacity;
+        if(fullOnly&&!isFull) return false;
+        return true;
+      });
+      if(empty) empty.style.display=filtered.length?"none":"block";
+      body.innerHTML=filtered.map(r=>{
+        const co=r.class_options;
+        const fcStr=String(co?.fellowship_codes||'{}').replace(/^\{|\}$/g,'');
+        const enrol=r.current_enrolment??0;
+        const cap=r.max_capacity;
+        const isFull=cap!=null&&enrol>=cap;
+        const seats=cap!=null?Math.max(0,cap-enrol):"-";
+        const isClosed=campusClosed(co);
+        const seatsCell=isFull?`<span style="color:var(--danger);font-weight:700">0</span> <span class="chip chip-draft" style="font-size:11px">Full</span>`:seats;
+        const enrollBadge=co?.enrollment_open?`<span class="pill-open">Open</span>`:`<span class="pill-closed">Closed</span>`;
+        const campusBadge=isClosed?`<span class="pill-closed">Campus Closed</span>`:`<span class="pill-open">Open</span>`;
+        return `<tr><td style="font-size:12px"><strong>${esc(fcStr)}</strong></td><td>${esc(r.teacher_name||"-")}</td><td>${esc(co?.day||"-")}</td><td style="white-space:nowrap">${esc(to12h(co?.class_time))}</td><td style="text-align:center">${enrol}</td><td style="text-align:center">${cap??"-"}</td><td style="text-align:center">${seatsCell}</td><td>${enrollBadge}</td><td>${campusBadge}</td><td><span class="chip ${r.status==="Active"?"chip-active":"chip-draft"}">${esc(r.status||"-")}</span></td></tr>`;
+      }).join("");
+    }
+
+    function bindCampusEvents(){
+      const picker=$("campusBatchPicker");
+      if(picker) picker.addEventListener("change",async(e)=>{ const bid=e.target.value; if(!bid){state.campusBatchId=null;renderCampusControls([]);renderOpenClasses([]);return;} await loadCampusAndClasses(bid); });
+      [$("ocFcFilter"),$("ocTeacherFilter")].forEach(el=>el?.addEventListener("input",()=>renderOpenClasses(state.openClasses)));
+      [$("ocEnrollOpenOnly"),$("ocFullOnly")].forEach(el=>el?.addEventListener("change",()=>renderOpenClasses(state.openClasses)));
+      document.addEventListener("click",async(e)=>{
+        const cc=e.target.closest(".js-close-campus");
+        if(cc){ if(!canManageCampus()){toasts.push("Insufficient permissions.","error");return;} state.closeCampusPending={batchId:cc.dataset.batch,fcCode:cc.dataset.fc}; $("closeCampusName").value=`${cc.dataset.name} (${cc.dataset.fc})`; $("closeCampusReason").value=""; openModal($("closeCampusOverlay"),$("closeCampusReason")); return; }
+        const oc=e.target.closest(".js-open-campus");
+        if(oc){ if(!canManageCampus()){toasts.push("Insufficient permissions.","error");return;} await openCampusReg(oc.dataset.batch,oc.dataset.fc); }
+      });
+      $("cancelCloseCampusBtn")?.addEventListener("click",()=>closeModal($("closeCampusOverlay")));
+      $("confirmCloseCampusBtn")?.addEventListener("click",async()=>{
+        if(!state.closeCampusPending) return;
+        $("confirmCloseCampusBtn").disabled=true; $("confirmCloseCampusBtn").textContent="Closing…";
+        const reason=$("closeCampusReason")?.value.trim()||null;
+        await closeCampusReg(state.closeCampusPending.batchId,state.closeCampusPending.fcCode,reason);
+        state.closeCampusPending=null; closeModal($("closeCampusOverlay"));
+        $("confirmCloseCampusBtn").disabled=false; $("confirmCloseCampusBtn").textContent="Close Registration";
+      });
+      $("closeCampusOverlay")?.addEventListener("click",(e)=>{ if(e.target===$("closeCampusOverlay"))closeModal($("closeCampusOverlay")); });
+    }
+
+    async function init(){ if(!window.FS_CONFIG||!window.FS_CONFIG.SUPABASE_URL){ window.FSAdminShell&&window.FSAdminShell.mount({active:"batch",pageTitle:"Batch Management",profileName:"Not connected"}); const b=document.createElement("div"); b.style.cssText="margin-bottom:10px;padding:12px 14px;border-radius:12px;border:1px solid #92400e;background:#fff5df;color:#92400e;font-weight:600;font-size:13px;"; b.textContent="⚠ Not connected — open this page through a live server with config.js in place to load data"; els.skeletonWrap.before(b); els.skeletonWrap.style.display="none"; return; } const ok=await ensureAccess(); if(!ok) return; window.FSAdminShell && window.FSAdminShell.mount({ active: "batch", pageTitle: "Batch Management", profileName: state.profile?.full_name || state.profile?.email || "Admin", role: state.profile?.role || "" }); bindEvents(); bindCampusEvents(); await refreshAll(); toasts.push("Batch management ready.","info",1700); }
     init();
   </script>
   <script src="../ui/premium-shell.js"></script>

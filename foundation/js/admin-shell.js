@@ -13,7 +13,7 @@
   if (!existingBootStyle) {
     const bootStyle = document.createElement("style");
     bootStyle.id = BOOT_STYLE_ID;
-    bootStyle.textContent = "body { opacity: 0; transition: opacity 150ms ease; }";
+    bootStyle.textContent = "body:not(.fs-iframe-child) { opacity: 0; transition: opacity 150ms ease; }";
     const head = document.head || document.getElementsByTagName("head")[0];
     if (head) head.prepend(bootStyle);
   }
@@ -27,6 +27,45 @@
   const TEACHER_MODE_ELIGIBLE_ROLES = new Set(["regional_secretary", "admin", "superadmin"]);
   const OPERATIONAL_ROLES = ["regional_secretary", "principal", "subgroup_admin", "pastor", "admin", "superadmin"];
   const SYSTEM_ADMIN_ROLES = ["admin", "superadmin"];
+
+  /* SVG icon map — stroke-based 24×24 icons, one per nav key */
+  const ICONS = {
+    dashboard:          `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`,
+    portal:             `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+    batch:              `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+    applicants:         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+    waitlist:           `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+    classeditor:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>`,
+    reports:            `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+    attendance:         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`,
+    schedule:           `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/></svg>`,
+    "teacher-slots":    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+    progress:           `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+    help:               `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+    messages:           `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+    notifications:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`,
+    email:              `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`,
+    adminactivity:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
+    roleaudit:          `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+    teachers:           `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+    trace:              `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
+    fellowships:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+    clickupmanagement:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`,
+    failedsyncs:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>`,
+    health:             `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+    moodlesettings:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M4.93 19.07l1.41-1.41M19.07 19.07l-1.41-1.41M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>`,
+    audit:              `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
+    milestones:         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+  };
+
+  /* Inject CSS for SVG icon sizing once */
+  (function injectIconStyle() {
+    if (document.getElementById("fs-sb-icon-style")) return;
+    const s = document.createElement("style");
+    s.id = "fs-sb-icon-style";
+    s.textContent = `.sb-icon svg{width:16px;height:16px;display:block;flex-shrink:0}.user-info{display:flex;flex-direction:column;line-height:1.2}.user-role{font-size:10px;font-weight:600;opacity:.65;text-transform:capitalize}`;
+    (document.head || document.body).appendChild(s);
+  })();
 
   const NAV_SECTIONS = [
     {
@@ -62,6 +101,7 @@
       items: [
         { key: "attendance", label: "Attendance", href: "../teacher/teacher-attendance.html", icon: "AT" },
         { key: "schedule", label: "Schedule", href: "teacher-schedule.html", icon: "SC" },
+        { key: "teacher-slots", label: "Teacher Slots", href: "teacher-schedule.html", icon: "TS", roles: OPERATIONAL_ROLES },
         { key: "progress", label: "Student Progress", href: "StudentProgressView.html", icon: "SP" }
       ]
     },
@@ -114,7 +154,7 @@
     "adminactivity",
     "roleaudit",
   ]);
-  const TEACHER_KEYS = new Set(["attendance", "schedule", "progress", "help"]);
+  const TEACHER_KEYS = new Set(["attendance", "schedule", "teacher-slots", "progress", "help"]);
 
   function resolveLoginPath() {
     const p = window.location.pathname || "";
@@ -183,6 +223,10 @@
   }
 
   function applyCollapsedState(collapsed) {
+    if (window.innerWidth <= 768) {
+      document.body.classList.remove("fs-shell-collapsed");
+      return;
+    }
     document.body.classList.toggle("fs-shell-collapsed", !!collapsed);
     try {
       localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
@@ -191,7 +235,13 @@
     if (btn) {
       btn.setAttribute("aria-pressed", collapsed ? "true" : "false");
       btn.title = collapsed ? "Expand sidebar" : "Collapse sidebar";
-      btn.textContent = collapsed ? ">" : "<";
+      btn.innerHTML = collapsed ? "&#8250;" : "&#8249;";
+    }
+    const railBtn = document.getElementById("fs-sidebar-toggle");
+    if (railBtn) {
+      railBtn.setAttribute("aria-pressed", collapsed ? "true" : "false");
+      railBtn.title = collapsed ? "Expand sidebar" : "Collapse sidebar";
+      railBtn.innerHTML = collapsed ? "&#8250;" : "&#8249;";
     }
   }
 
@@ -229,8 +279,7 @@
     try {
       collapsed = localStorage.getItem(COLLAPSE_KEY) === "1";
     } catch (_) {}
-    if (window.innerWidth <= 768) collapsed = false;
-    applyCollapsedState(collapsed);
+    applyCollapsedState(window.innerWidth <= 768 ? false : collapsed);
   }
 
   function inferActive() {
@@ -289,9 +338,9 @@
       visibleItems.forEach(function (item) {
         const isActive = item.key === active;
         const badge = bc[item.key] ? `<span class="sb-badge" style="background:var(--amber)">${bc[item.key]}</span>` : "";
-        const iconText = String(item.icon || item.label || "?").slice(0, 2).toUpperCase();
+        const iconSvg = ICONS[item.key] || `<span style="font-size:11px;font-weight:800">${String(item.icon || item.label || "?").slice(0, 2).toUpperCase()}</span>`;
         nav += `<a class="sb-link${isActive ? " active" : ""}" href="${item.href}" data-key="${item.key}" title="${item.label}">
-          <span class="sb-icon">${iconText}</span>
+          <span class="sb-icon">${iconSvg}</span>
           <span>${item.label}</span>
           ${badge}
         </a>`;
@@ -318,6 +367,7 @@
   }
 
   Shell.mount = async function mount(options) {
+    document.body.classList.add("fs-iframe-child");
     options = options || {};
     if (document.getElementById("fs-admin-sb")) {
       window.clearTimeout(mountFailSafeTimer);
@@ -373,6 +423,7 @@
           <div class="sb-name">Rock Solid</div>
           <div class="sb-sub">Admin Portal</div>
         </div>
+        <button class="sb-collapse-btn" id="fs-sidebar-toggle" type="button" aria-label="Toggle sidebar width" aria-pressed="false">&#8249;</button>
       </div>
       <nav class="sb-nav" aria-label="Admin navigation">
         ${buildSidebarHTML(active, badgeCounts, effectiveRole)}
@@ -403,7 +454,10 @@
         ` : ""}
         <span class="user-chip">
           <span class="user-av" id="fs-user-av">${profileInitial}</span>
-          <span id="fs-user-name">${profileName}</span>
+          <span class="user-info">
+            <span id="fs-user-name">${safeProfileName}</span>
+            <span id="fs-user-role" class="user-role">${role.replace(/_/g, " ") || ""}</span>
+          </span>
         </span>
         <button class="btn-out" id="fs-collapse-btn" aria-label="Toggle sidebar width" aria-pressed="false"><</button>
         <button class="ham" id="fs-ham" aria-label="Menu" aria-expanded="false">&#9776;</button>
@@ -450,6 +504,7 @@
     const hamBtn = document.getElementById("fs-ham");
     const hamburgerBtn = document.getElementById("fs-hamburger");
     const collapseBtn = document.getElementById("fs-collapse-btn");
+    const sidebarToggleBtn = document.getElementById("fs-sidebar-toggle");
     const sb = document.getElementById("fs-admin-sb");
     const ov = document.getElementById("fs-s-ov");
 
@@ -477,6 +532,11 @@
     mobileBackdrop.addEventListener("click", closeSidebar);
 
     collapseBtn && collapseBtn.addEventListener("click", function () {
+      const next = !document.body.classList.contains("fs-shell-collapsed");
+      applyCollapsedState(next);
+    });
+    sidebarToggleBtn && sidebarToggleBtn.addEventListener("click", function (event) {
+      event.stopPropagation();
       const next = !document.body.classList.contains("fs-shell-collapsed");
       applyCollapsedState(next);
     });
@@ -510,12 +570,16 @@
     modeAdminBtn && modeAdminBtn.addEventListener("click", function () { applyRegionalMode("admin"); });
     modeTeacherBtn && modeTeacherBtn.addEventListener("click", function () { applyRegionalMode("teacher"); });
 
+    let lastMobile = window.innerWidth <= 768;
     window.addEventListener("resize", function () {
-      if (window.innerWidth <= 768) {
+      const isMobile = window.innerWidth <= 768;
+      if (isMobile) {
         document.body.classList.remove("fs-shell-collapsed");
-      } else {
+        closeSidebar();
+      } else if (isMobile !== lastMobile) {
         initCollapsedState();
       }
+      lastMobile = isMobile;
     });
 
     const logoutLink = document.getElementById("fs-admin-logout");
@@ -548,6 +612,13 @@
     }
 
     function navigateTo(url, key, replaceState) {
+      if (key) {
+        const urlObj = new URL(window.location.href);
+        urlObj.searchParams.set("page", key);
+        const method = replaceState ? "replaceState" : "pushState";
+        history[method]({ key, url }, "", urlObj.toString());
+      }
+
       if (!iframeShell || !frame) {
         startShellTransition();
         window.setTimeout(function () {
@@ -555,26 +626,33 @@
         }, 140);
         return;
       }
-      startShellTransition();
-      frame.style.transition = "opacity 0.15s ease";
+
+      const main = document.querySelector(".fs-shell-main, .fs-content.main, main.main, main");
+      if (main) main.classList.add("fs-loading");
+      document.body.classList.add("fs-nav-transitioning");
+      const bar = ensureProgressBar();
+      bar.style.opacity = "1";
+      bar.style.width = "70%";
+      try { sessionStorage.setItem("fs_nav_progress_pending", "1"); } catch (_) {}
+
+      frame.style.transition = "opacity 0.12s ease";
       frame.style.opacity = "0";
+
       window.setTimeout(function () {
         frame.onload = function () {
-          frame.style.opacity = "1";
-          const main = document.querySelector(".fs-shell-main, .fs-content.main, main.main, main");
+          frame.onload = null;
           if (main) main.classList.remove("fs-loading");
-          document.body.classList.remove("fs-nav-transitioning");
           updateActiveNav(key);
           completeProgressBar();
-          if (key) {
-            const urlObj = new URL(window.location.href);
-            urlObj.searchParams.set("page", key);
-            const method = replaceState ? "replaceState" : "pushState";
-            history[method]({ key, url }, "", urlObj.toString());
-          }
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+              frame.style.transition = "opacity 0.18s ease";
+              frame.style.opacity = "1";
+            });
+          });
         };
         frame.src = url;
-      }, 150);
+      }, 130);
     }
 
     sidebar.querySelectorAll(".sb-link").forEach(function (link) {
@@ -684,12 +762,17 @@
     })();
   };
 
-  Shell.setProfile = function (name, initial) {
-    const av = document.getElementById("fs-user-av");
-    const nm = document.getElementById("fs-user-name");
-    const safeName = typeof name === "string" ? name : (name == null ? "" : String(name));
+  Shell.setProfile = function (nameOrObj, initial) {
+    const av   = document.getElementById("fs-user-av");
+    const nm   = document.getElementById("fs-user-name");
+    const rl   = document.getElementById("fs-user-role");
+    const isObj = nameOrObj !== null && typeof nameOrObj === "object";
+    const name  = isObj ? (nameOrObj.profileName || nameOrObj.name || "") : nameOrObj;
+    const roleVal = isObj ? (nameOrObj.role || "") : "";
+    const safeName = typeof name === "string" ? name : String(name ?? "");
     if (av) av.textContent = initial || (safeName || "?").charAt(0).toUpperCase();
-    if (nm) nm.textContent = safeName || "";
+    if (nm) nm.textContent = safeName;
+    if (rl && roleVal) rl.textContent = String(roleVal).replace(/_/g, " ");
   };
 
   Shell.setPageTitle = function (title) {

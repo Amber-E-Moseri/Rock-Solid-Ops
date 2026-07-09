@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -6,7 +6,7 @@
   <title>Rock Solid - Applicant Directory</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../ui/premium-theme.css" />
   <link rel="stylesheet" href="../ui/admin-shell.css" />
   <link rel="stylesheet" href="../ui/components.css" />
@@ -15,8 +15,8 @@
   <style>
     :root {
       --bg-grad: radial-gradient(1200px 600px at -8% -20%, rgba(140, 113, 255, 0.24), transparent 52%), radial-gradient(900px 500px at 102% 0%, rgba(214, 191, 255, 0.28), transparent 44%), linear-gradient(180deg, color-mix(in srgb, var(--bg) 96%, #fff) 0%, var(--bg) 100%);
-      --shell: color-mix(in srgb, var(--color-surface) 88%, transparent);
-      --glass: color-mix(in srgb, var(--color-surface) 74%, transparent);
+      --shell: color-mix(in srgb, var(--surface) 88%, transparent);
+      --glass: color-mix(in srgb, var(--surface) 74%, transparent);
       --line: color-mix(in srgb, var(--border) 86%, transparent);
       --line-soft: color-mix(in srgb, var(--border) 56%, transparent);
       --shadow-lg: 0 22px 56px rgba(26, 20, 43, 0.16);
@@ -30,11 +30,21 @@
       --pill-duplicate: #b42318;
       --pill-completed: #15803d;
       --pill-unassigned: #667085;
+      /* RockSolid OPS token aliases */
+      --primary-hover: #7d62c8;
+      --shadow-soft: var(--shadow-sm);
+      --shadow-pop: var(--shadow-lg);
+      --warning: var(--warn, #c07400);
+      --warning-bg: var(--warn-bg, #fff8e6);
+      --soft-lav: color-mix(in srgb, var(--primary) 8%, var(--surface));
+      --r-md: var(--radius-md);
+      --r-lg: var(--radius-lg);
+      --r-full: 9999px;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; min-height: 100%; }
     body {
-      font-family: "DM Sans", system-ui, -apple-system, sans-serif;
+      font-family: "Manrope", system-ui, -apple-system, sans-serif;
       background: var(--bg-grad);
       color: var(--text);
       line-height: 1.4;
@@ -49,7 +59,7 @@
       backdrop-filter: blur(14px);
     }
     .title h2 { margin: 0; font-size: 24px; letter-spacing: -0.02em; }
-    .title p { margin: 3px 0 0; color: var(--color-text-muted); font-size: 12px; }
+    .title p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
     .searchbox input, .filter-row select, .filter-row input, .modal-grid select, .modal-grid input {
       width: 100%; border-radius: 12px; border: 1px solid var(--line-soft); background: var(--surface-2);
       color: var(--text); font: inherit; padding: 10px 12px;
@@ -70,40 +80,51 @@
     .icon-btn:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--primary) 25%, var(--line-soft)); }
     .kpi-grid { margin-top: 14px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
     .card {
-      background: color-mix(in srgb, var(--color-surface) 96%, white 4%);
+      background: color-mix(in srgb, var(--surface) 96%, white 4%);
       border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 14px;
     }
-    .kpi-label { color: var(--color-text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+    .kpi-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
     .kpi-value { margin-top: 8px; font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
-    .kpi-sub { margin-top: 4px; color: var(--color-text-muted); font-size: 12px; }
+    .kpi-sub { margin-top: 4px; color: var(--muted); font-size: 12px; }
     .filter-row { margin-top: 2px; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; align-items: center; }
     .table-card { margin-top: 12px; }
     .table-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
     .table-top h3 { margin: 0; font-size: 17px; }
-    .table-top p { margin: 3px 0 0; color: var(--color-text-muted); font-size: 12px; }
-    .table-wrap { overflow: auto; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--color-surface); }
+    .table-top p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+    .table-wrap { overflow: auto; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--surface); }
     table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1280px; }
     th, td {
       padding: 11px 10px; border-bottom: 1px solid var(--line); text-align: left; font-size: 13px; background: transparent;
     }
     th {
-      font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-muted);
+      font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
       background: color-mix(in srgb, var(--surface-2) 92%, white 8%); position: sticky; top: 0; z-index: 1;
     }
     tbody tr { transition: transform .14s ease, box-shadow .14s ease; }
     tbody tr:hover { transform: translateY(-1px); }
-    tbody tr:hover td { background: color-mix(in srgb, var(--soft-lavender) 54%, var(--color-surface)); }
+    tbody tr:hover td { background: color-mix(in srgb, var(--soft-lavender) 54%, var(--surface)); }
     .student-cell .name { font-weight: 700; }
-    .student-cell .sub { font-size: 12px; color: var(--color-text-muted); }
+    .student-cell .sub { font-size: 12px; color: var(--muted); }
     .pill {
       border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 700; display: inline-flex;
       align-items: center; gap: 4px; border: 1px solid transparent; white-space: nowrap;
     }
-    .assigned { color: var(--pill-assigned); background: color-mix(in srgb, var(--pill-assigned) 14%, var(--color-surface)); border-color: color-mix(in srgb, var(--pill-assigned) 35%, var(--color-surface)); }
-    .attention { color: var(--pill-attention); background: color-mix(in srgb, var(--pill-attention) 16%, var(--color-surface)); border-color: color-mix(in srgb, var(--pill-attention) 42%, var(--color-surface)); }
-    .duplicate { color: var(--pill-duplicate); background: color-mix(in srgb, var(--pill-duplicate) 12%, var(--color-surface)); border-color: color-mix(in srgb, var(--pill-duplicate) 34%, var(--color-surface)); }
-    .completed { color: var(--pill-completed); background: color-mix(in srgb, var(--pill-completed) 14%, var(--color-surface)); border-color: color-mix(in srgb, var(--pill-completed) 35%, var(--color-surface)); }
-    .unassigned { color: var(--pill-unassigned); background: color-mix(in srgb, var(--pill-unassigned) 12%, var(--color-surface)); border-color: color-mix(in srgb, var(--pill-unassigned) 30%, var(--color-surface)); }
+    .assigned { color: var(--pill-assigned); background: color-mix(in srgb, var(--pill-assigned) 14%, var(--surface)); border-color: color-mix(in srgb, var(--pill-assigned) 35%, var(--surface)); }
+    .attention { color: var(--pill-attention); background: color-mix(in srgb, var(--pill-attention) 16%, var(--surface)); border-color: color-mix(in srgb, var(--pill-attention) 42%, var(--surface)); }
+    .duplicate { color: var(--pill-duplicate); background: color-mix(in srgb, var(--pill-duplicate) 12%, var(--surface)); border-color: color-mix(in srgb, var(--pill-duplicate) 34%, var(--surface)); }
+    .completed { color: var(--pill-completed); background: color-mix(in srgb, var(--pill-completed) 14%, var(--surface)); border-color: color-mix(in srgb, var(--pill-completed) 35%, var(--surface)); }
+    .unassigned { color: var(--pill-unassigned); background: color-mix(in srgb, var(--pill-unassigned) 12%, var(--surface)); border-color: color-mix(in srgb, var(--pill-unassigned) 30%, var(--surface)); }
+    .duplicate-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--pill-duplicate) 24%, var(--line-soft)); background: color-mix(in srgb, var(--pill-duplicate) 10%, var(--surface)); color: var(--pill-duplicate); font-size: 12px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
+    .duplicate-cell { display: flex; flex-direction: column; gap: 6px; }
+    .duplicate-meta { font-size: 11px; color: var(--muted); line-height: 1.35; }
+    .duplicate-alert-btn { border: 0; background: transparent; color: var(--pill-duplicate); cursor: pointer; font-size: 15px; font-weight: 800; padding: 0; margin-right: 6px; vertical-align: middle; }
+    .duplicate-alert-btn:hover { opacity: .8; }
+    .duplicate-panel-list { display: grid; gap: 10px; }
+    .duplicate-panel-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 14px; border: 1px solid var(--line-soft); border-radius: 14px; background: var(--surface-2); }
+    .duplicate-panel-item h4 { margin: 0 0 4px; font-size: 13px; font-weight: 800; }
+    .duplicate-panel-meta { font-size: 12px; color: var(--muted); line-height: 1.5; }
+    .duplicate-inline-link { color: var(--pill-duplicate); font-weight: 700; text-decoration: none; }
+    .duplicate-inline-link:hover { text-decoration: underline; }
     .btns { display: flex; flex-wrap: wrap; gap: 6px; }
     .btn {
       border-radius: 10px; border: 1px solid var(--line-soft); background: var(--surface-2); color: var(--text);
@@ -113,7 +134,7 @@
     .btn.primary { background: var(--primary); color: #fff; border-color: color-mix(in srgb, var(--primary) 86%, black); }
     .drawer {
       position: fixed; right: 0; top: 0; bottom: 0; width: min(580px, 100%); transform: translateX(100%);
-      transition: transform .22s ease; background: var(--color-surface); border-left: 1px solid var(--line); box-shadow: var(--shadow-lg);
+      transition: transform .22s ease; background: var(--surface); border-left: 1px solid var(--line); box-shadow: var(--shadow-lg);
       z-index: 60; display: flex; flex-direction: column;
     }
     .drawer.open { transform: translateX(0); }
@@ -123,7 +144,7 @@
     .kv div {
       background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; min-width: 0;
     }
-    .kv label { display: block; font-size: 11px; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: .05em; }
+    .kv label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
     .kv strong { font-size: 13px; display: block; margin-top: 3px; word-break: break-word; }
     .chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .chip {
@@ -137,7 +158,7 @@
       display: flex; justify-content: space-between; gap: 8px; align-items: center;
     }
     .list .row:last-child { border-bottom: 0; }
-    .muted { color: var(--color-text-muted); }
+    .muted { color: var(--muted); }
     .overlay {
       position: fixed; inset: 0; background: rgba(11, 8, 19, 0.42); backdrop-filter: blur(3px); z-index: 55;
       opacity: 0; pointer-events: none; transition: opacity .2s;
@@ -146,48 +167,278 @@
     .modal { position: fixed; inset: 0; z-index: 70; display: none; align-items: center; justify-content: center; padding: 14px; }
     .modal.open { display: flex; }
     .modal-card {
-      width: min(700px, 100%); max-height: 92vh; overflow: auto; background: var(--color-surface);
+      width: min(700px, 100%); max-height: 92vh; overflow: auto; background: var(--surface);
       border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow-lg); padding: 14px; display: grid; gap: 10px;
     }
     .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .warn {
-      border: 1px solid color-mix(in srgb, #f59e0b 35%, var(--color-surface));
-      background: color-mix(in srgb, #f59e0b 14%, var(--color-surface)); color: #854d0e;
+      border: 1px solid color-mix(in srgb, #f59e0b 35%, var(--surface));
+      background: color-mix(in srgb, #f59e0b 14%, var(--surface)); color: #854d0e;
       border-radius: 12px; padding: 8px 10px; font-size: 12px;
     }
     .err {
-      border: 1px solid color-mix(in srgb, #ef4444 38%, var(--color-surface));
-      background: color-mix(in srgb, #ef4444 15%, var(--color-surface)); color: #b42318;
+      border: 1px solid color-mix(in srgb, #ef4444 38%, var(--surface));
+      background: color-mix(in srgb, #ef4444 15%, var(--surface)); color: #b42318;
       border-radius: 12px; padding: 8px 10px; font-size: 12px;
     }
     .success {
-      border: 1px solid color-mix(in srgb, #22c55e 35%, var(--color-surface));
-      background: color-mix(in srgb, #22c55e 14%, var(--color-surface)); color: #166534;
+      border: 1px solid color-mix(in srgb, #22c55e 35%, var(--surface));
+      background: color-mix(in srgb, #22c55e 14%, var(--surface)); color: #166534;
       border-radius: 12px; padding: 8px 10px; font-size: 12px;
     }
     .mobile-cards { display: none; gap: 10px; }
-    .mobile-card { border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: var(--color-surface); box-shadow: var(--shadow-sm); }
+    .mobile-card { border: 1px solid var(--line); border-radius: 14px; padding: 12px; background: var(--surface); box-shadow: var(--shadow-sm); }
     .sticky-mobile { position: sticky; bottom: 8px; z-index: 10; margin-top: 8px; display: none; }
+    .review-shell { display:none; grid-template-columns: 470px minmax(0,1fr); gap: 18px; margin-top: 12px; align-items: start; }
+    .review-queue, .review-detail {
+      background: color-mix(in srgb, var(--surface) 96%, white 4%);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+    .review-queue-head, .review-detail-head { padding: 16px 18px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--surface-2) 70%, white 30%); }
+    .review-queue-list { padding: 10px; display:grid; gap: 12px; max-height: calc(100vh - 240px); overflow:auto; }
+    .review-item {
+      display:grid; grid-template-columns: 48px minmax(0,1fr) auto; gap:14px; align-items:center;
+      padding: 14px 16px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); cursor:pointer;
+      box-shadow: var(--shadow-sm); position:relative;
+    }
+    .review-item.active { border-color: color-mix(in srgb, var(--primary) 45%, var(--line)); box-shadow: inset 3px 0 0 var(--primary), var(--shadow-md); }
+    .review-avatar {
+      width: 46px; height: 46px; border-radius: 50%; display:grid; place-items:center; background: color-mix(in srgb, var(--primary) 12%, white);
+      color: var(--primary); font-weight: 800; font-size: 18px;
+    }
+    .review-name { font-size: 16px; font-weight: 800; line-height: 1.2; }
+    .review-sub { margin-top: 4px; color: var(--muted); font-size: 13px; }
+    .review-time { margin-top: 8px; color: var(--muted); font-size: 13px; text-align:right; }
+    .review-status { display:inline-flex; align-items:center; justify-content:center; min-width: 98px; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+    .review-status.duplicate { color:#ff4d3a; background:#ffe9e7; }
+    .review-status.review { color:#e18b00; background:#fff0cf; }
+    .review-status.pending { color:#6e6a93; background:#f5f2fb; }
+    .review-status.assigned { color:#16974d; background:#e7f8ea; }
+    .review-detail-body { padding: 0; }
+    .review-student-head {
+      padding: 22px 28px 18px; display:flex; gap:18px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap;
+    }
+    .review-student-main { display:flex; gap:16px; align-items:flex-start; }
+    .review-student-meta h3 { margin: 0; font-size: 19px; line-height:1.15; }
+    .review-student-meta p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+    .review-alert { padding: 18px 28px; border-top: 1px solid var(--line); color:#574f73; font-size:14px; }
+    .review-compare {
+      padding: 0 28px 22px; display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px;
+    }
+    .compare-card {
+      border: 1px solid var(--line); border-radius: 22px; overflow:hidden; background: var(--surface);
+    }
+    .compare-card.selected { border-color: color-mix(in srgb, var(--primary) 52%, var(--line)); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent); }
+    .compare-card-head { padding: 16px 18px; display:flex; justify-content:space-between; gap:10px; align-items:flex-start; border-bottom:1px solid var(--line); }
+    .compare-kicker { color: var(--muted); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; font-weight: 800; }
+    .compare-name { font-size: 15px; font-weight: 800; margin-top: 4px; }
+    .compare-date { color: var(--muted); font-size: 13px; margin-top: 4px; }
+    .compare-badge { display:inline-flex; align-items:center; justify-content:center; padding:6px 12px; border-radius:999px; font-size:12px; font-weight:800; text-transform:uppercase; }
+    .compare-badge.incoming { background:#fff0cf; color:#e18b00; }
+    .compare-badge.assigned { background:#e7f8ea; color:#16974d; }
+    .compare-grid .row {
+      display:grid; grid-template-columns: 120px 1fr; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); font-size: 14px;
+    }
+    .compare-grid .row:last-child { border-bottom: 0; }
+    .compare-grid .key { color: #6f6885; font-weight: 700; }
+    .compare-grid .value { color: #1c1631; font-weight: 700; text-align:right; word-break:break-word; }
+    .compare-grid .row.diff { background: #fff7e8; }
+    .compare-footer {
+      display:flex; align-items:center; justify-content:center; min-height: 44px; padding: 12px 18px; border-top: 1px solid var(--line);
+      color: var(--primary); font-weight: 800; background: color-mix(in srgb, var(--primary) 6%, white);
+    }
+    .review-note-wrap { padding: 0 28px 22px; }
+    .review-note-label { font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+    .review-note-wrap textarea {
+      width:100%; min-height: 78px; border-radius: 18px; border:1px solid var(--line-soft); background: var(--surface-2); color: var(--text); font: inherit; padding: 14px 16px; resize: vertical;
+    }
+    .review-actions-bar {
+      display:flex; gap: 12px; flex-wrap:wrap; padding: 20px 28px 24px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--surface-2) 66%, white 34%);
+    }
+    .review-primary-btn, .review-secondary-btn, .review-warn-btn {
+      min-height: 48px; padding: 0 20px; border-radius: 18px; font: inherit; font-size: 15px; font-weight: 800; cursor:pointer;
+      border: 1px solid var(--line-soft); background: var(--surface); color: var(--text);
+    }
+    .review-primary-btn { background: var(--primary); color:#fff; border-color: color-mix(in srgb, var(--primary) 82%, black); }
+    .review-warn-btn { color:#e18b00; background:#fff6e6; border-color:#ffd28a; }
+    .review-empty { padding: 34px 24px; text-align:center; color: var(--muted); }
 
-    /* Quick tab strip & mode tabs � pill style */
+    /* Quick tab strip & mode tabs — pill style */
     #quickTabStrip, #modeTabs { display: flex; gap: 4px; flex-wrap: wrap; background: var(--surface-2); border: 1px solid var(--line-soft); border-radius: 12px; padding: 3px; }
     #quickTabStrip button, #modeTabs button {
       border: none; background: transparent; border-radius: 9px; padding: 6px 14px;
-      font: 700 12px/1.4 inherit; color: var(--color-text-muted); cursor: pointer;
+      font: 700 12px/1.4 inherit; color: var(--muted); cursor: pointer;
       transition: background .15s, color .15s, box-shadow .15s; white-space: nowrap;
     }
     #quickTabStrip button:hover, #modeTabs button:hover { background: rgba(76,42,146,.07); color: var(--text); }
     #quickTabStrip button.active, #modeTabs button.active {
-      background: #fff; color: var(--color-primary, #4C2A92);
+      background: #fff; color: var(--primary);
       box-shadow: 0 1px 4px rgba(76,42,146,.16);
     }
+    #reviewWorkspace,
+    .table-card,
+    .batch-section,
+    .duplicate-panel {
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      will-change: opacity, transform;
+    }
     /* Drawer section labels */
-    .drawer-section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-muted); margin-bottom: 6px; }
+    .drawer-section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 6px; }
+
+    /* ── Motion & polish ─────────────────────────────────────────────── */
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @keyframes scaleIn { from { opacity: 0; transform: scale(.96) translateY(6px); } to { opacity: 1; transform: none; } }
+
+    /* Page sections cascade in on load */
+    .main > section { animation: fadeUp .42s cubic-bezier(.22, .9, .3, 1) backwards; }
+    .main > section:nth-child(1) { animation-delay: .03s; }
+    .main > section:nth-child(2) { animation-delay: .07s; }
+    .main > section:nth-child(3) { animation-delay: .11s; }
+    .main > section:nth-child(4) { animation-delay: .15s; }
+    .main > section:nth-child(5) { animation-delay: .19s; }
+    .main > section:nth-child(n+6) { animation-delay: .23s; }
+
+    /* KPI cards: accent bar + lift on hover, stable digits while counting */
+    .kpi-card { position: relative; overflow: hidden; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+    .kpi-card::before {
+      content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+      background: linear-gradient(180deg, var(--primary), color-mix(in srgb, var(--primary) 35%, transparent));
+      opacity: 0; transition: opacity .18s ease;
+    }
+    .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: color-mix(in srgb, var(--primary) 24%, var(--line)); }
+    .kpi-card:hover::before { opacity: 1; }
+    .kpi-value { font-variant-numeric: tabular-nums; }
+
+    /* First rows/cards fade in with a light stagger (capped so large result
+       sets don't animate thousands of nodes) */
+    tbody tr:nth-child(-n+14) { animation: fadeUp .28s ease backwards; }
+    tbody tr:nth-child(2) { animation-delay: .025s; }
+    tbody tr:nth-child(3) { animation-delay: .05s; }
+    tbody tr:nth-child(4) { animation-delay: .075s; }
+    tbody tr:nth-child(5) { animation-delay: .1s; }
+    tbody tr:nth-child(6) { animation-delay: .125s; }
+    tbody tr:nth-child(7) { animation-delay: .15s; }
+    tbody tr:nth-child(n+8):nth-child(-n+14) { animation-delay: .175s; }
+    .mobile-card { transition: transform .16s ease, box-shadow .16s ease; }
+    .mobile-card:nth-child(-n+10) { animation: fadeUp .3s ease backwards; }
+    .mobile-card:nth-child(2) { animation-delay: .04s; }
+    .mobile-card:nth-child(3) { animation-delay: .08s; }
+    .mobile-card:nth-child(n+4):nth-child(-n+10) { animation-delay: .12s; }
+    .mobile-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+
+    /* Buttons & pills: tactile press, soft focus rings */
+    .btn:active, .fs-btn:active, .icon-btn:active, .review-primary-btn:active,
+    .review-secondary-btn:active, .review-warn-btn:active { transform: translateY(0) scale(.97); }
+    .btn:focus-visible, .fs-btn:focus-visible, .icon-btn:focus-visible {
+      outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent);
+    }
+    .pill { transition: transform .14s ease; }
+    tbody tr:hover .pill { transform: translateY(-1px); }
+
+    /* Drawer: springier slide, content cascades in */
+    .drawer { transition: transform .34s cubic-bezier(.32, .72, .24, 1); }
+    .drawer.open .drawer-body > * { animation: fadeUp .34s ease backwards; }
+    .drawer.open .drawer-body > *:nth-child(2) { animation-delay: .05s; }
+    .drawer.open .drawer-body > *:nth-child(3) { animation-delay: .09s; }
+    .drawer.open .drawer-body > *:nth-child(4) { animation-delay: .13s; }
+    .drawer.open .drawer-body > *:nth-child(n+5) { animation-delay: .17s; }
+
+    /* Modals pop in */
+    .modal.open .modal-card { animation: scaleIn .26s cubic-bezier(.22, .9, .3, 1); }
+
+    /* Review queue & duplicate panel items */
+    .review-item { transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease; }
+    .review-item:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); border-color: color-mix(in srgb, var(--primary) 28%, var(--line)); }
+    .duplicate-panel-item { transition: transform .16s ease, box-shadow .16s ease; }
+    .duplicate-panel-item:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+    .list .row { transition: background .14s ease; }
+    .list .row:hover { background: color-mix(in srgb, var(--primary) 5%, var(--surface-2)); }
+
+    /* Flash + skeleton feedback */
+    #flashArea > div { animation: fadeUp .25s ease; }
+
+    /* Refined scrollbars for the table region */
+    .table-wrap::-webkit-scrollbar, .review-queue-list::-webkit-scrollbar { height: 10px; width: 10px; }
+    .table-wrap::-webkit-scrollbar-thumb, .review-queue-list::-webkit-scrollbar-thumb {
+      background: color-mix(in srgb, var(--primary) 22%, var(--border)); border-radius: 999px;
+      border: 2px solid transparent; background-clip: padding-box;
+    }
+    .table-wrap::-webkit-scrollbar-track, .review-queue-list::-webkit-scrollbar-track { background: transparent; }
+
+    /* ── User-friendliness layer ─────────────────────────────────────── */
+    /* Active filter chips */
+    .filter-chips { display: none; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
+    /* button.filter-chip outranks premium-theme's global button:not(...) rule */
+    button.filter-chip {
+      display: inline-flex; align-items: center; gap: 8px; border-radius: 999px !important; padding: 6px 12px;
+      border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--line-soft)) !important;
+      background: color-mix(in srgb, var(--primary) 8%, var(--surface)) !important;
+      color: var(--primary) !important; font: 700 12px/1.3 inherit; cursor: pointer;
+      transition: transform .14s ease, background .14s ease;
+      animation: fadeUp .2s ease backwards;
+    }
+    button.filter-chip span { font-size: 11px; opacity: .65; }
+    button.filter-chip:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--primary) 15%, var(--surface)) !important; }
+    button.filter-chip-clear { color: var(--muted) !important; background: var(--surface-2) !important; border-color: var(--line-soft) !important; }
+
+    /* Clickable KPI cards */
+    .kpi-clickable { cursor: pointer; user-select: none; }
+    .kpi-clickable.active {
+      border-color: color-mix(in srgb, var(--primary) 45%, var(--line));
+      box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary) 22%, transparent), var(--shadow-sm);
+    }
+    .kpi-clickable:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent); }
+
+    /* Slim table fits without sideways scrolling; full mode scrolls as before */
+    table.slim { min-width: 0; }
+
+    /* Pagination footer */
+    .table-foot {
+      display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap;
+      padding: 12px 14px; border-top: 1px solid var(--line);
+      background: color-mix(in srgb, var(--surface-2) 70%, white 30%);
+      font-size: 12px; color: var(--muted);
+    }
+
+    /* Friendly empty states */
+    .table-empty { padding: 44px 16px; text-align: center; color: var(--muted); display: grid; gap: 8px; justify-items: center; }
+    .table-empty h4 { margin: 0; font-size: 15px; color: var(--text); }
+    .table-empty p { margin: 0; font-size: 13px; }
+
+    /* Collapsible cards (details/summary) */
+    details.card > summary {
+      cursor: pointer; list-style: none; display: flex; align-items: center; gap: 10px;
+      justify-content: space-between; flex-wrap: wrap; font-weight: 800; font-size: 14px;
+    }
+    details.card > summary::-webkit-details-marker { display: none; }
+    details.card > summary::after { content: "▾"; color: var(--muted); transition: transform .18s ease; margin-left: auto; }
+    details.card > summary .summary-sub { font-weight: 600; color: var(--muted); font-size: 12px; }
+    details.card > summary + * { margin-top: 4px; }
+    details.card[open] > summary::after { transform: rotate(180deg); }
+    .count-badge {
+      background: color-mix(in srgb, var(--primary) 12%, var(--surface)); color: var(--primary);
+      border-radius: 999px; padding: 2px 10px; font-size: 11px; font-weight: 800;
+    }
+
+    /* Accessibility: gut all motion when the user asks for it */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-delay: 0ms !important;
+        transition-duration: .01ms !important;
+      }
+    }
+
     @media (max-width: 1260px) {
       .page-toolbar { grid-template-columns: 1fr; }
       .quick-filter { overflow: auto; }
       .kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .filter-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .review-shell { grid-template-columns: 1fr; }
+      .review-queue-list { max-height: none; }
     }
     @media (max-width: 768px) {
       .table-wrap { display: none; }
@@ -200,18 +451,13 @@
       .drawer { width: 100%; }
       .searchbox, .searchbox input { width: 100%; }
       #bulkBar { flex-direction: column; align-items: stretch !important; }
-    }
-    @media (max-width: 768px) {
-      #tableWrap table thead th:nth-child(4),
-      #tableWrap table tbody td:nth-child(4),
-      #tableWrap table thead th:nth-child(8),
-      #tableWrap table tbody td:nth-child(8) { display: none; }
+      .review-compare { grid-template-columns: 1fr; padding-inline: 16px; }
+      .review-student-head, .review-alert, .review-note-wrap, .review-actions-bar { padding-left: 16px; padding-right: 16px; }
     }
   </style>
 </head>
 <body>
-  <div class="shell fs-shell">
-    <main class="main fs-content">
+  <main class="main fs-content">
       <section class="page-toolbar">
         <div class="title">
           <h2 id="pageTitle">Applicants</h2>
@@ -219,49 +465,66 @@
         </div>
         <div class="searchbox"><input id="globalSearch" placeholder="Search name, email, phone" /></div>
         <div class="quick-filter">
-          <select id="quickAssignment"><option value="">All Assignment</option><option value="assigned">Assigned</option><option value="unassigned">Unassigned</option></select>
-          <select id="quickNotif"><option value="">All Notification</option><option value="SENT">Sent</option><option value="PENDING">Pending</option><option value="FAILED">Failed</option><option value="RETRIED">Retried</option></select>
+          <select id="quickAssignment" aria-label="Filter by class assignment"><option value="">Class: All</option><option value="assigned">Has a class</option><option value="unassigned">Needs a class</option></select>
+          <select id="quickNotif" aria-label="Filter by email status"><option value="">Email: All</option><option value="SENT">Sent</option><option value="PENDING">Pending</option><option value="FAILED">Failed</option><option value="RETRIED">Retried</option></select>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button class="icon-btn" id="refreshBtnTop" title="Refresh" aria-label="Refresh">?</button>
+          <button class="icon-btn" id="refreshBtnTop" title="Refresh" aria-label="Refresh">↻</button>
         </div>
       </section>
+
+      <div id="activeFilterChips" class="filter-chips" role="status" aria-label="Active filters"></div>
 
       <section class="kpi-grid fs-metric-grid" id="kpiGrid"></section>
 
       <section class="card" id="quickTabSection" style="margin-top:10px">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-          <span style="font-size:11px;font-weight:700;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Quick View</span>
+          <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Quick View</span>
           <div id="quickTabStrip"></div>
+          <div id="modeTabs" style="margin-left:auto"></div>
         </div>
       </section>
 
       <section class="card">
         <div class="filter-row fs-filter-row fs-action-bar">
           <select id="fellowshipFilter"><option value="">All Fellowships</option></select>
+          <select id="subgroupFilter"><option value="">All Subgroups</option></select>
           <select id="classFilter"><option value="">All Classes</option></select>
           <select id="batchFilter"><option value="">All Batches</option></select>
-          <select id="milestoneFilter"><option value="">All Milestones</option></select>
+          <select id="statusFilter"><option value="">All Status</option><option value="PENDING">Pending</option><option value="ASSIGNED">Assigned</option><option value="WAITLISTED">Waitlisted</option><option value="DUPLICATE">Duplicate</option><option value="REVIEW">Review</option><option value="INACTIVE">Inactive</option><option value="COMPLETED">Completed</option></select>
+          <select id="duplicateFilter"><option value="">All Records</option><option value="duplicate_only">Duplicates Only</option><option value="unresolved_only">Unresolved Duplicates</option><option value="unassigned_only">Unassigned Only</option></select>
           <select id="attendanceFilter"><option value="">All Attendance</option><option value="high">High (75%+)</option><option value="low">Low (&lt;75%)</option><option value="none">No data</option></select>
-          <select id="statusFilter"><option value="">All Status</option></select>
-          <input id="dateFilter" type="date" />
+          <select id="milestoneFilter"><option value="">All Milestones</option></select>
+          <div class="duplicate-chip" id="duplicateCountChip" aria-live="polite">Duplicates: 0</div>
           <button class="fs-btn fs-btn-secondary" id="clearFilters">Clear Filters</button>
           <button class="fs-btn fs-btn-secondary" id="toggleAdvFilters">Advanced Filters <span id="advFilterBadge" style="display:none;background:var(--primary);color:#fff;border-radius:999px;padding:1px 7px;font-size:10px;margin-left:4px"></span></button>
         </div>
       </section>
 
+      <details class="card duplicate-panel" id="duplicateNotificationPanel">
+        <summary>
+          <span style="display:flex;align-items:center;gap:10px">Duplicate Notifications <span class="count-badge" id="duplicateNotificationCount">0</span></span>
+          <span class="summary-sub">Possible double registrations that need a decision</span>
+        </summary>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">
+          <div id="duplicateNotificationMeta" class="muted" style="font-size:12px"></div>
+          <a class="duplicate-inline-link" id="duplicatePanelFilterLink" href="applicant-directory.html?duplicate=unresolved_only">View duplicates only</a>
+        </div>
+        <div id="duplicateNotificationList" class="duplicate-panel-list" style="margin-top:12px"></div>
+      </details>
+
       <section class="card" id="advFilterPanel" style="display:none;margin-top:-2px">
         <div style="font-size:13px;font-weight:700;margin-bottom:10px">Advanced Filters</div>
         <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
-          <div class="field"><label for="afDateFrom" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);font-weight:700">Registered From</label><input id="afDateFrom" type="date" style="width:100%;border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px" /></div>
-          <div class="field"><label for="afDateTo" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);font-weight:700">Registered To</label><input id="afDateTo" type="date" style="width:100%;border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px" /></div>
-          <div class="field"><label for="afMoodle" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);font-weight:700">Moodle Account</label>
+          <div class="field"><label for="afDateFrom" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700">Registered From</label><input id="afDateFrom" type="date" style="width:100%;border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px" /></div>
+          <div class="field"><label for="afDateTo" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700">Registered To</label><input id="afDateTo" type="date" style="width:100%;border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px" /></div>
+          <div class="field"><label for="afMoodle" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700">Moodle Account</label>
             <select id="afMoodle" style="width:100%;border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px">
               <option value="">Any</option><option value="yes">Has Moodle account</option>
               <option value="no">No Moodle account</option><option value="synced">Synced</option><option value="failed">Sync failed</option>
             </select>
           </div>
-          <div class="field"><label for="afAttStatus" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-muted);font-weight:700">Attendance Status</label>
+          <div class="field"><label for="afAttStatus" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700">Attendance Status</label>
             <select id="afAttStatus" style="width:100%;border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px">
               <option value="">Any</option><option value="never">Never Attended</option>
               <option value="active">Active (75%+)</option><option value="atrisk">At Risk (&lt;75%)</option>
@@ -272,54 +535,66 @@
           <button class="fs-btn fs-btn-primary" id="afApplyBtn">Apply Filters</button>
           <button class="fs-btn fs-btn-secondary" id="afResetBtn">Reset</button>
           <button class="fs-btn fs-btn-secondary" id="afSaveBtn">Save Preset</button>
-          <select id="afPresetSelect" style="border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:8px 12px;min-width:140px"><option value="">Load preset�</option></select>
+          <select id="afPresetSelect" style="border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:8px 12px;min-width:140px"><option value="">Load preset…</option></select>
         </div>
       </section>
-      <section class="card" style="margin-top:10px">
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-          <span style="font-size:11px;font-weight:700;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Display Mode</span>
-          <div id="modeTabs"></div>
-        </div>
-      </section>
-
-      <section class="card" id="studentsByBatchSection">
-        <div class="table-top">
-          <div>
-            <h3>Students by Batch</h3>
-            <p>Grouped list of visible students in each batch</p>
-          </div>
-        </div>
-        <div id="batchStudentsWrap" class="list"></div>
-      </section>
+      <details class="card batch-section" id="studentsByBatchSection" open>
+        <summary>
+          <span style="display:flex;align-items:center;gap:10px">Students by Batch <span class="count-badge" id="batchCount">0</span></span>
+          <span class="summary-sub">Grouped by batch — click a student to open</span>
+        </summary>
+        <div id="batchStudentsWrap" class="list" style="margin-top:10px"></div>
+      </details>
 
       <section class="card table-card">
         <div class="table-top">
           <div>
-            <h3>Registrants</h3>
+            <h3>Registrations</h3>
             <p id="rowMeta">Loading...</p>
           </div>
-          <button class="fs-btn fs-btn-secondary" id="refreshBtn">Refresh</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="fs-btn fs-btn-secondary" id="toggleColumnsBtn" title="Show or hide the extra table columns">More columns</button>
+            <button class="fs-btn fs-btn-secondary" id="exportCsvBtn" title="Export visible registrations as CSV">Export CSV</button>
+            <button class="fs-btn fs-btn-secondary" id="refreshBtn">Refresh</button>
+          </div>
         </div>
         <div id="flashArea"></div>
-        <div id="bulkBar" style="display:none;padding:10px 14px;background:color-mix(in srgb,var(--primary) 10%,var(--color-surface));border:1px solid color-mix(in srgb,var(--primary) 30%,var(--line));border-radius:var(--radius-lg);margin-bottom:8px;gap:10px;align-items:center;flex-wrap:wrap">
+        <div id="bulkBar" style="display:none;padding:10px 14px;background:color-mix(in srgb,var(--primary) 10%,var(--surface));border:1px solid color-mix(in srgb,var(--primary) 30%,var(--line));border-radius:var(--radius-lg);margin-bottom:8px;gap:10px;align-items:center;flex-wrap:wrap">
           <span id="bulkCount" style="font-weight:800;font-size:13px;white-space:nowrap;color:var(--primary)">0 selected</span>
           <select id="bulkStatusSelect" style="border-radius:10px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:8px 10px">
-            <option value="">Change Status�</option>
+            <option value="">Change Status…</option>
             <option value="PENDING">PENDING</option><option value="ASSIGNED">ASSIGNED</option>
             <option value="WAITLISTED">WAITLISTED</option><option value="REVIEW">REVIEW</option><option value="INACTIVE">INACTIVE</option>
           </select>
-          <select id="bulkClassSelect" style="border-radius:10px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:8px 10px;min-width:160px"><option value="">Change Class�</option></select>
+          <select id="bulkClassSelect" style="border-radius:10px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:8px 10px;min-width:160px"><option value="">Change Class…</option></select>
           <button class="fs-btn fs-btn-secondary" id="bulkEmailBtn">Send Email</button>
           <button class="fs-btn fs-btn-secondary" id="bulkExportBtn">Export CSV</button>
-          <button class="fs-btn fs-btn-secondary" id="bulkClearBtn">? Clear</button>
-          <div id="bulkProgress" style="display:none;font-size:12px;color:var(--color-text-muted)"></div>
+          <button class="fs-btn fs-btn-secondary" id="bulkClearBtn">✕ Clear</button>
+          <div id="bulkProgress" style="display:none;font-size:12px;color:var(--muted)"></div>
         </div>
         <div class="table-wrap fs-table-wrap" id="tableWrap"></div>
         <div class="mobile-cards" id="mobileCards"></div>
         <div class="sticky-mobile"><button class="fs-btn fs-btn-primary" style="width:100%" id="openSelectedBtn">Open Latest Viewed Student</button></div>
       </section>
-    </main>
-  </div>
+
+      <section id="reviewWorkspace" class="review-shell">
+        <aside class="review-queue">
+          <div class="review-queue-head">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+              <strong id="reviewQueueMeta">Showing 0</strong>
+              <button class="btn" id="reviewResetBtn" type="button">Reset filters</button>
+            </div>
+          </div>
+          <div id="reviewQueueList" class="review-queue-list"></div>
+        </aside>
+        <section class="review-detail">
+          <div class="review-detail-head">
+            <strong>Review workspace</strong>
+          </div>
+          <div id="reviewDetailBody" class="review-detail-body"></div>
+        </section>
+      </section>
+  </main>
 
   <div id="drawerOverlay" class="overlay"></div>
   <aside id="detailDrawer" class="drawer" aria-hidden="true">
@@ -331,7 +606,7 @@
         </div>
         <div id="drawerSub" class="muted" style="font-size:12px;margin-top:2px"></div>
       </div>
-      <button class="fs-btn fs-btn-secondary" id="closeDrawerBtn" style="flex-shrink:0">? Close</button>
+      <button class="fs-btn fs-btn-secondary" id="closeDrawerBtn" style="flex-shrink:0">✕ Close</button>
     </div>
     <div class="drawer-body">
       <div class="fs-btns" style="flex-wrap:wrap">
@@ -340,7 +615,7 @@
         <button class="fs-btn fs-btn-secondary" id="sendEmailBtn">Send Email</button>
         <button class="fs-btn fs-btn-secondary" id="openAttendanceBtn">Attendance</button>
         <button class="fs-btn fs-btn-secondary" id="openMilestonesBtn">Milestones</button>
-        <button class="fs-btn fs-btn-secondary" id="retryNotificationBtn">Retry Notif.</button>
+        <button class="fs-btn fs-btn-secondary" id="retryNotificationBtn">Retry Email</button>
         <button class="fs-btn fs-btn-secondary" id="openClickupBtn">ClickUp Task</button>
       </div>
       <section class="card" style="margin:0"><div class="kv" id="overviewKv"></div></section>
@@ -351,6 +626,11 @@
       <section class="card" style="margin:0">
         <div class="drawer-section-label">Attendance Summary</div>
         <div class="kv" id="attendanceKv"></div>
+      </section>
+      <section class="card" style="margin:0" id="duplicateSection" style="display:none">
+        <div class="drawer-section-label">Duplicate Registration</div>
+        <div class="kv" id="duplicateKv" style="grid-template-columns:1fr"></div>
+        <div id="duplicateGroupMembers" class="list" style="margin-top:8px"></div>
       </section>
       <section class="card" style="margin:0">
         <div class="drawer-section-label">Notification History</div>
@@ -368,7 +648,7 @@
         <div class="drawer-section-label">Status Override</div>
         <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:6px;align-items:end">
           <select id="statusOverrideSelect" style="border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px;">
-            <option value="">� pick status �</option>
+            <option value="">— pick status —</option>
             <option value="PENDING">PENDING</option>
             <option value="WAITLISTED">WAITLISTED</option>
             <option value="REVIEW">REVIEW</option>
@@ -407,12 +687,41 @@
       <div id="modalWarnings"></div>
       <div class="field" style="grid-column:1/-1">
         <label for="correctionReason">Reason for Change <span style="color:#b42318">*</span></label>
-        <textarea id="correctionReason" rows="3" style="width:100%;border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px;resize:vertical;min-height:64px;transition:border-color .16s ease,box-shadow .16s ease;" placeholder="Explain why the class is being changed (min 10 characters)�"></textarea>
+        <textarea id="correctionReason" rows="3" style="width:100%;border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px;resize:vertical;min-height:64px;transition:border-color .16s ease,box-shadow .16s ease;" placeholder="Explain why the class is being changed (min 10 characters)…"></textarea>
       </div>
       <div class="warn">Safety: if class is full this update is blocked. This flow queues a <code>class_reassignment_notice</code> email and resets Moodle sync.</div>
       <div class="fs-btns" style="justify-content:flex-end">
         <button class="fs-btn fs-btn-secondary" id="cancelCorrectionBtn">Cancel</button>
         <button class="fs-btn fs-btn-primary" id="saveCorrectionBtn">Confirm & Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="duplicateResolutionModal">
+    <div class="modal-card" style="max-width:900px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div>
+          <div style="font-size:18px;font-weight:800">Duplicate Registration Resolution</div>
+          <div class="muted" style="font-size:12px">Review and resolve duplicate registrations</div>
+        </div>
+        <button class="fs-btn fs-btn-secondary" id="closeDuplicateBtn">Close</button>
+      </div>
+      <div id="duplicateModalError"></div>
+      <div id="duplicateRecords" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;border:1px solid var(--line-soft);border-radius:12px;padding:14px;background:var(--surface-2)"></div>
+      <div class="modal-grid">
+        <div>
+          <label for="duplicatePrimarySelect">Primary Record (Keep)</label>
+          <select id="duplicatePrimarySelect" style="width:100%;border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px"></select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="duplicateResolutionNote">Resolution Note</label>
+        <textarea id="duplicateResolutionNote" rows="3" style="width:100%;border-radius:12px;border:1px solid var(--line-soft);background:var(--surface-2);color:var(--text);font:inherit;padding:10px 12px;resize:vertical;min-height:64px" placeholder="Document why these are/are not duplicates"></textarea>
+      </div>
+      <div class="warn">This will mark duplicate records and send notifications. Action is logged in audit trail.</div>
+      <div class="fs-btns" style="justify-content:flex-end">
+        <button class="fs-btn fs-btn-secondary" id="cancelDuplicateBtn">Cancel</button>
+        <button class="fs-btn fs-btn-primary" id="resolveduplicateBtn">Confirm & Mark Primary</button>
       </div>
     </div>
   </div>
@@ -424,9 +733,33 @@
 <script src="../js/applicant-directory-filters.js"></script>
 <script src="../js/applicant-directory-drawer.js"></script>
 <script src="../js/applicant-directory-actions.js"></script>
+<script type="module">
+  import { DuplicateManager, DuplicateUI } from "../js/applicant-directory-duplicates.js";
+  
+  // Expose DuplicateManager and DuplicateUI to window for use in applicant-directory.js
+  window.DuplicateManager = DuplicateManager;
+  window.DuplicateUI = DuplicateUI;
+  
+  // Export CSV button handler
+  document.getElementById('exportCsvBtn')?.addEventListener('click', function() {
+    // This will be connected to the applicant-directory.js module
+    const event = new CustomEvent('export-csv');
+    document.dispatchEvent(event);
+  });
+  
+  // Close buttons for duplicate modal
+  document.getElementById('closeDuplicateBtn')?.addEventListener('click', function() {
+    DuplicateUI.closeResolutionModal();
+  });
+  
+  document.getElementById('cancelDuplicateBtn')?.addEventListener('click', function() {
+    DuplicateUI.closeResolutionModal();
+  });
+</script>
 <script type="module" src="../js/applicant-directory.js"></script>
 </body>
 </html>
+
 
 
 

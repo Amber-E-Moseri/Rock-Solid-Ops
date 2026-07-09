@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Teacher Student Progress</title>
+  <style>
+    :root {
+      --tp-bg:#f6f3ff; --tp-surface:#fff; --tp-border:#e6def8; --tp-text:#19152d; --tp-muted:#736d8b;
+      --tp-primary:#5631a7; --tp-green:#16a34a; --tp-shadow:0 16px 40px rgba(86,49,167,.08);
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--tp-bg); color:var(--tp-text); font-family:"Manrope",system-ui,sans-serif; }
+    .page { max-width:1360px; margin:0 auto; padding:38px 28px 60px; }
+    .hero { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:24px; align-items:start; margin-bottom:18px; }
+    .hero h1 { margin:0; font-size:32px; line-height:1.05; letter-spacing:-.03em; }
+    .hero h2 { margin:24px 0 0; font-size:22px; }
+    .hero p, .hero-note { margin:8px 0 0; color:var(--tp-muted); font-size:16px; font-weight:600; }
+    .filter { min-width:196px; min-height:48px; border:1px solid var(--tp-border); border-radius:18px; background:#fff; padding:0 16px; font:700 15px/1 "Manrope",sans-serif; }
+    .panel { background:var(--tp-surface); border:1px solid var(--tp-border); border-radius:28px; box-shadow:var(--tp-shadow); overflow:hidden; }
+    .legend { padding:16px 18px; border-bottom:1px solid var(--tp-border); display:flex; align-items:center; gap:18px; flex-wrap:wrap; color:var(--tp-muted); font-size:14px; font-weight:700; }
+    .legend-item { display:inline-flex; align-items:center; gap:8px; }
+    .legend-dot { width:16px; height:16px; border-radius:5px; background:var(--tp-green); }
+    .table-head, .row { display:grid; grid-template-columns:minmax(230px,1.3fr) minmax(180px,1fr) 180px 180px 140px; gap:18px; align-items:center; padding:0 18px; }
+    .table-head { min-height:50px; border-bottom:1px solid var(--tp-border); color:var(--tp-muted); font-size:13px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; }
+    .row { min-height:68px; border-bottom:1px solid #f0ebfb; }
+    .row:last-child { border-bottom:none; }
+    .student { display:flex; align-items:center; gap:12px; }
+    .avatar { width:36px; height:36px; border-radius:50%; background:#efe8ff; color:var(--tp-primary); display:grid; place-items:center; font-size:13px; font-weight:800; }
+    .student__name { font-size:15px; font-weight:800; }
+    .student__meta { font-size:14px; color:var(--tp-muted); font-weight:600; margin-top:2px; }
+    .checks { display:flex; align-items:center; gap:8px; }
+    .check { width:18px; height:18px; border-radius:6px; border:1px solid #ddd3f6; background:#fff; }
+    .check.on { background:var(--tp-green); border-color:var(--tp-green); }
+    .progress { display:flex; align-items:center; gap:12px; }
+    .progress__bar { width:100%; max-width:126px; height:10px; border-radius:999px; background:#f1ecfb; overflow:hidden; }
+    .progress__fill { height:100%; border-radius:999px; background:linear-gradient(90deg,#6c46c8,#5631a7); }
+    .pct, .attend { font-size:15px; font-weight:800; }
+    .attend.good { color:#0f9f4b; }
+    .attend.warn { color:#d97706; }
+    .attend.bad { color:#ef4444; }
+    @media (max-width: 1100px) {
+      .page { padding:24px 16px 40px; }
+      .hero { grid-template-columns:1fr; }
+      .table-head, .row { grid-template-columns:1.5fr 1fr 1fr; }
+      .table-head > :nth-child(2), .row > :nth-child(2) { display:none; }
+    }
+    @media (max-width: 720px) {
+      .legend { font-size:13px; }
+      .table-head { display:none; }
+      .row { grid-template-columns:1fr; gap:10px; padding:14px 16px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div>
+        <h1 id="welcomeTitle">Welcome back, Teacher</h1>
+        <h2>Your students</h2>
+        <p>Tap a milestone square to mark it complete for that student. Attendance is from submitted sessions.</p>
+      </div>
+      <div>
+        <div class="hero-note" id="summaryNote">You teach 0 classes this week · 0 still need attendance submitted.</div>
+        <div style="margin-top:26px;text-align:right">
+          <select class="filter" id="classFilter"></select>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="legend" id="legend"></div>
+      <div class="table-head">
+        <div>Student</div>
+        <div>Class</div>
+        <div>Milestones</div>
+        <div>Progress</div>
+        <div>Attendance</div>
+      </div>
+      <div id="rows"></div>
+    </section>
+  </main>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/config-helper.js"></script>
+  <script src="../js/teacher-shell.js"></script>
+  <script type="module">
+    import { supabase, requireAuth, getCurrentProfile } from "../auth/auth-client.js";
+
+    const milestoneCodes = ["BORN_AGAIN", "FILLED_WITH_SPIRIT", "PARTNERSHIP", "FOUNDATION_COMPLETED"];
+    const milestoneLabels = {
+      BORN_AGAIN: "1 · Foundation class",
+      FILLED_WITH_SPIRIT: "2 · Water baptism",
+      PARTNERSHIP: "3 · Cell placement",
+      FOUNDATION_COMPLETED: "4 · Maturity class",
+    };
+    const state = { profile: null, classes: [], selectedClass: "all", rows: [] };
+    const el = {
+      welcomeTitle: document.getElementById("welcomeTitle"),
+      summaryNote: document.getElementById("summaryNote"),
+      classFilter: document.getElementById("classFilter"),
+      legend: document.getElementById("legend"),
+      rows: document.getElementById("rows"),
+    };
+    function esc(v) { return String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+    function initials(name) { return String(name || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join(""); }
+    function colorClass(pct) { return pct >= 85 ? "good" : pct >= 65 ? "warn" : "bad"; }
+    function formatTime(raw) {
+      const m = String(raw || "").match(/^(\d{1,2}):(\d{2})/);
+      if (!m) return String(raw || "");
+      const hh = Number(m[1]); const ap = hh >= 12 ? "PM" : "AM"; const h12 = hh === 0 ? 12 : hh > 12 ? hh - 12 : hh;
+      return `${h12}:${m[2]} ${ap}`;
+    }
+    function classLabel(item) {
+      const codes = Array.isArray(item.fellowship_codes) ? item.fellowship_codes.filter(Boolean) : [];
+      return `${codes.join(", ") || item.fellowship || "Class"} · ${item.day || ""} ${formatTime(item.class_time || item.time || item.time_slot || "")}`.trim();
+    }
+    function renderLegend() {
+      el.legend.innerHTML = `<strong>Milestones:</strong>` + milestoneCodes.map((code) => `<span class="legend-item"><span class="legend-dot"></span><span>${esc(milestoneLabels[code])}</span></span>`).join("");
+    }
+    function renderFilter() {
+      el.classFilter.innerHTML = `<option value="all">All my classes</option>` + state.classes.map((item) => `<option value="${esc(item.class_option_id || "")}">${esc(classLabel(item))}</option>`).join("");
+      el.classFilter.value = state.selectedClass;
+    }
+    function filteredRows() {
+      if (state.selectedClass === "all") return state.rows;
+      return state.rows.filter((row) => String(row.classOptionId) === String(state.selectedClass));
+    }
+    function renderRows() {
+      const rows = filteredRows();
+      el.rows.innerHTML = rows.map((row) => {
+        const completed = milestoneCodes.filter((code) => row.milestones[code]).length;
+        const pct = milestoneCodes.length ? Math.round((completed / milestoneCodes.length) * 100) : 0;
+        const attend = row.attendancePct || 0;
+        return `
+          <div class="row">
+            <div class="student">
+              <div class="avatar">${esc(initials(row.fullName))}</div>
+              <div>
+                <div class="student__name">${esc(row.fullName)}</div>
+                <div class="student__meta">${esc(row.className)}</div>
+              </div>
+            </div>
+            <div class="student__meta">${esc(row.className)}</div>
+            <div class="checks">${milestoneCodes.map((code) => `<span class="check ${row.milestones[code] ? "on" : ""}"></span>`).join("")}</div>
+            <div class="progress"><div class="progress__bar"><div class="progress__fill" style="width:${pct}%"></div></div><div class="pct">${pct}%</div></div>
+            <div class="attend ${colorClass(attend)}">${attend}%</div>
+          </div>
+        `;
+      }).join("") || `<div class="row"><div class="student__meta">No students found.</div></div>`;
+    }
+
+    async function boot() {
+      await requireAuth(["teacher", "principal", "admin", "superadmin"]);
+      window.FSTeacherShell?.mount({ active: "progress" });
+      state.profile = await getCurrentProfile();
+
+      const { data: classesResp } = await supabase.functions.invoke("teacher-portal-api", {
+        body: { action: "getTeacherActiveClassOptions", params: { teacherId: state.profile?.user_id || null } },
+      });
+      state.classes = Array.isArray(classesResp?.data) ? classesResp.data : [];
+      const teacherName = String(window.FSTeacherShell?.identity?.fullName || state.profile?.full_name || "Teacher").split(/\s+/)[0] || "Teacher";
+      el.welcomeTitle.textContent = `Welcome back, ${teacherName}`;
+      el.summaryNote.textContent = `You teach ${state.classes.length} class${state.classes.length === 1 ? "" : "es"} this week · track milestone progress here.`;
+
+      const allRows = [];
+      for (const classItem of state.classes) {
+        const classOptionId = String(classItem.class_option_id || "");
+        if (!classOptionId) continue;
+
+        const [{ data: students }, { data: milestones }, { data: attendance }] = await Promise.all([
+          supabase.from("students").select("student_id,full_name,class_option_id").eq("class_option_id", classOptionId).is("deleted_at", null).limit(5000),
+          supabase.from("student_milestone_status").select("student_id,milestone_code,completed,status").limit(20000),
+          supabase.from("attendance_log").select("student_id,present").eq("class_option_id", classOptionId).limit(20000),
+        ]);
+
+        const milestoneByStudent = new Map();
+        (milestones || []).forEach((item) => {
+          const sid = String(item.student_id || "");
+          if (!sid) return;
+          if (!milestoneByStudent.has(sid)) milestoneByStudent.set(sid, {});
+          milestoneByStudent.get(sid)[String(item.milestone_code || "").toUpperCase()] = item.completed === true || String(item.status || "").toLowerCase() === "completed";
+        });
+
+        const attendanceByStudent = new Map();
+        (attendance || []).forEach((item) => {
+          const sid = String(item.student_id || "");
+          if (!sid) return;
+          if (!attendanceByStudent.has(sid)) attendanceByStudent.set(sid, { total: 0, present: 0 });
+          const agg = attendanceByStudent.get(sid);
+          agg.total += 1;
+          if (item.present === true) agg.present += 1;
+        });
+
+        (students || []).forEach((student) => {
+          const sid = String(student.student_id || "");
+          const attendanceAgg = attendanceByStudent.get(sid) || { total: 0, present: 0 };
+          allRows.push({
+            classOptionId,
+            className: classLabel(classItem),
+            fullName: student.full_name || "Student",
+            milestones: Object.fromEntries(milestoneCodes.map((code) => [code, !!milestoneByStudent.get(sid)?.[code]])),
+            attendancePct: attendanceAgg.total ? Math.round((attendanceAgg.present / attendanceAgg.total) * 100) : 0,
+          });
+        });
+      }
+
+      state.rows = allRows;
+      renderLegend();
+      renderFilter();
+      renderRows();
+      el.classFilter.addEventListener("change", () => { state.selectedClass = el.classFilter.value; renderRows(); });
+    }
+
+    boot().catch(() => {
+      window.FSTeacherShell?.mount({ active: "progress" });
+      renderLegend();
+      el.rows.innerHTML = `<div class="row"><div class="student__meta">Could not load student progress.</div></div>`;
+    });
+  </script>
+</body>
+</html>

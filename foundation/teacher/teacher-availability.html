@@ -3,29 +3,56 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Rock Solid - Teacher Availability</title>
+  <title>Teacher Availability</title>
   <link rel="stylesheet" href="../ui/tokens.css" />
   <link rel="stylesheet" href="../ui/primitives.css" />
-  <link rel="stylesheet" href="../ui/admin-shell.css" />
   <style>
-    body { font-family:"Manrope", system-ui, sans-serif; background: var(--bg, #f5f5f7); }
-    .fs-content { max-width: 1240px; margin: 0 auto; padding: 16px; }
-    #main-content .fs-card { border-radius: 12px; box-shadow: 0 4px 18px rgba(76,42,146,.08); }
-    #main-content .ta-pill { border-radius: 999px; min-height: 34px; }
-    #main-content .ta-pill.active { background:#4C2A92 !important; border-color:#4C2A92 !important; color:#fff; }
-    #main-content .ta-days { background:#f8f6ff; }
-    #main-content .ta-cell.on { background:#ede9fe; color:#4C2A92; }
-    #main-content .fs-btn-primary { background:#4C2A92; border-color:#4C2A92; min-height:44px; font-weight:700; }
-    #main-content .fs-btn-primary:hover { background:#3f2179; }
-    #main-content .ta-layout aside.fs-card { box-shadow: 0 6px 20px rgba(76,42,146,.1); }
-    @media (max-width: 768px) {
-      .fs-content { padding: 12px; }
-      #main-content .fs-btn, #main-content .fs-input, #main-content .fs-select { min-height:44px; }
+    body { margin:0; background:#f6f3ff; color:#19152d; font-family:"Manrope",system-ui,sans-serif; }
+    .page { max-width:1360px; margin:0 auto; padding:38px 28px 56px; }
+    .hero { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:24px; align-items:start; margin-bottom:22px; }
+    .hero h1 { margin:0; font-size:32px; line-height:1.05; letter-spacing:-.03em; }
+    .hero h2 { margin:24px 0 0; font-size:22px; }
+    .hero p, .hero-note { margin:8px 0 0; color:#736d8b; font-size:16px; font-weight:600; }
+    #main-content .ta-page-head { display:none; }
+    #main-content .ta-card {
+      background:#fff !important;
+      border:1px solid #e6def8 !important;
+      border-radius:28px !important;
+      box-shadow:0 16px 40px rgba(86,49,167,.08) !important;
+      padding:18px !important;
+      margin-top:0 !important;
+    }
+    #main-content .availability-layout { gap:20px !important; }
+    #main-content .ta-card.ta-summary { border-radius:24px !important; }
+    #main-content .ta-save-btn, #main-content .fs-btn-primary {
+      background:#5631a7 !important;
+      border-color:#5631a7 !important;
+      border-radius:18px !important;
+      min-height:52px !important;
+      box-shadow:0 12px 24px rgba(86,49,167,.22) !important;
+    }
+    #main-content .ta-days, #main-content .ta-time { background:#faf7ff !important; }
+    #main-content .ta-cell.on { background:#5631a7 !important; color:#fff !important; }
+    #main-content .ta-pill.active { background:#5631a7 !important; border-color:#5631a7 !important; }
+    @media (max-width: 900px) {
+      .page { padding:24px 16px 40px; }
+      .hero { grid-template-columns:1fr; }
     }
   </style>
 </head>
 <body>
-  <main class="fs-content" style="max-width:1200px;margin:0 auto;padding:16px;">
+  <main class="page">
+    <section class="hero">
+      <div>
+        <h1 id="welcomeTitle">Welcome back, Teacher</h1>
+        <h2>When can you teach?</h2>
+        <p>Drag across the calendar to paint the times you're free. Your coordinator places you into a class from these.</p>
+      </div>
+      <div>
+        <div class="hero-note" id="availabilitySummary">You teach 0 classes this week · availability pending.</div>
+        <div style="margin-top:26px;text-align:right"><span style="display:inline-flex;padding:8px 14px;border-radius:999px;background:#fff2d9;color:#d97706;font:800 13px/1 Manrope,sans-serif;">PENDING APPROVAL</span></div>
+      </div>
+    </section>
     <div id="main-content"></div>
   </main>
 
@@ -33,25 +60,25 @@
   <script src="../js/config-helper.js"></script>
   <script src="../js/teacher-shell.js"></script>
   <script type="module">
-    import { CONFIG, requireAuth } from "../auth/auth-client.js";
+    import { CONFIG, requireAuth, getCurrentProfile } from "../auth/auth-client.js";
     import { mountTeacherAvailability } from "../js/teacher-availability-module.js";
-
-    document.documentElement.setAttribute("data-theme", "light");
-    document.body.classList.add("fs-force-light");
 
     async function boot() {
       if (!CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY || CONFIG.SUPABASE_URL.includes("YOUR-PROJECT-REF")) {
-        throw new Error("Supabase config is missing in foundation/auth/auth-client.js.");
+        throw new Error("Supabase config is missing.");
       }
-      const auth = await requireAuth(["teacher", "principal", "admin", "superadmin"]);
-      if (!auth) return;
+      await requireAuth(["teacher", "principal", "admin", "superadmin"]);
       window.FSTeacherShell?.mount({ active: "availability" });
+      const profile = await getCurrentProfile();
+      const teacherName = String(window.FSTeacherShell?.identity?.fullName || profile?.full_name || "Teacher").split(/\s+/)[0] || "Teacher";
+      document.getElementById("welcomeTitle").textContent = `Welcome back, ${teacherName}`;
+      document.getElementById("availabilitySummary").textContent = "Use your weekly grid to submit time blocks for class placement.";
       await mountTeacherAvailability("main-content");
     }
 
     boot().catch((e) => {
-      const el = document.getElementById("main-content");
-      el.innerHTML = `<section class="fs-card"><div class="fs-banner fs-banner-danger">Failed to load teacher availability: ${String(e?.message || e)}</div></section>`;
+      window.FSTeacherShell?.mount({ active: "availability" });
+      document.getElementById("main-content").innerHTML = `<section style="background:#fff;border:1px solid #e6def8;border-radius:24px;padding:20px;color:#ef4444;font-weight:700;">Failed to load teacher availability: ${String(e?.message || e)}</section>`;
     });
   </script>
 </body>

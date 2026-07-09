@@ -13,11 +13,20 @@
   <link rel="stylesheet" href="../ui/admin-shell.css" />
   <link rel='stylesheet' href='../ui/primitives.css' />
   <style>
-    body { font-family: "Manrope", system-ui, sans-serif; }
+    :root {
+      --primary-hover: #7d62c8;
+      --shadow-soft: 0 2px 8px rgba(0,0,0,.08);
+      --shadow: 0 4px 16px rgba(0,0,0,.1);
+      --shadow-pop: 0 8px 24px rgba(0,0,0,.14);
+      --soft-lav: color-mix(in srgb, var(--primary) 8%, var(--surface));
+      --warning: var(--warn, #c07400);
+      --warning-bg: var(--warn-bg, #fff8e6);
+    }
+    body { font-family: "Manrope", system-ui, sans-serif; background: radial-gradient(900px 460px at 100% -12%, rgba(244,190,65,.10), transparent 65%), radial-gradient(760px 380px at -10% -6%, rgba(91,63,165,.08), transparent 64%), var(--bg); }
     .filters { display: grid; grid-template-columns: 1.2fr repeat(4, minmax(0, 1fr)); gap: 10px; }
-    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-    .tab { border: 1px solid var(--border); background: var(--fs-surface); color: var(--text); border-radius: 999px; padding: 7px 12px; font-size: 12px; font-weight: 800; cursor: pointer; }
-    .tab.active { background: var(--soft-lavender); color: var(--primary); border-color: color-mix(in srgb, var(--primary), transparent 65%); }
+    .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .tab { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 8px; padding: 6px 14px; font-size: 13px; font-weight: 700; cursor: pointer; transition: background .12s, border-color .12s; }
+    .tab.active { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 4px 14px rgba(76,42,146,.22); }
     .table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: 12px; }
     table { width: 100%; min-width: 980px; border-collapse: collapse; }
     th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
@@ -41,38 +50,41 @@
       .tm-modal-overlay { align-items: end; padding: 0; }
       .tm-modal { width: 100%; max-width: 100%; border-radius: 16px 16px 0 0; max-height: 90dvh; }
     }
-    .tm-modal-overlay { position: fixed; inset: 0; background: color-mix(in srgb, var(--color-text-primary), transparent 60%); display: none; align-items: center; justify-content: center; z-index: 1200; padding: var(--space-4); }
+    .tm-modal-overlay { position: fixed; inset: 0; background: color-mix(in srgb, var(--text), transparent 60%); display: none; align-items: center; justify-content: center; z-index: 1200; padding: var(--space-4); }
     .tm-modal-overlay.open { display: flex; }
-    .tm-modal { width: min(760px, 100%); max-height: 92vh; overflow: auto; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-raised); padding: var(--space-4); display: grid; gap: var(--space-3); }
-    .tm-modal h2 { margin: 0; font-size: var(--fs-section-title); color: var(--color-text-primary); }
+    .tm-modal { width: min(760px, 100%); max-height: 92vh; overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-raised); padding: var(--space-4); display: grid; gap: var(--space-3); }
+    .tm-modal h2 { margin: 0; font-size: var(--fs-section-title); color: var(--text); }
     .tm-modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
     .tm-field { display: grid; gap: var(--space-2); }
     .tm-field-full { grid-column: 1 / -1; }
-    .tm-label { font-size: var(--fs-label); letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-text-secondary); font-weight: 600; }
+    .tm-label { font-size: var(--fs-label); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-2); font-weight: 600; }
     .tm-password-wrap { display: grid; grid-template-columns: 1fr auto; gap: var(--space-2); align-items: center; }
-    .tm-note { margin: 0; font-size: var(--fs-meta); color: var(--color-text-muted); }
-    .tm-result { border: 1px solid var(--color-border); background: var(--color-surface-raised); border-radius: var(--radius-md); padding: var(--space-3); display: grid; gap: var(--space-2); }
-    .tm-result pre { margin: 0; padding: var(--space-2); border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text-primary); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 12px; overflow: auto; }
+    .tm-note { margin: 0; font-size: var(--fs-meta); color: var(--muted); }
+    .tm-result { border: 1px solid var(--border); background: var(--surface-2); border-radius: var(--radius-md); padding: var(--space-3); display: grid; gap: var(--space-2); }
+    .tm-result pre { margin: 0; padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 12px; overflow: auto; }
     .tm-modal-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
     @media (max-width: 760px) { .tm-modal-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <main class="fs-page fs-wrap-xl">
-    <section class="hero">
-      <h1 class="hero-title">Teacher Management</h1>
-      <p class="hero-sub">Primary lifecycle workflow for approving, activating, suspending, unsuspending, and deactivating teachers.</p>
-    </section>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:20px">
+      <div>
+        <h1 style="font-size:26px;font-weight:800;letter-spacing:-0.02em;margin:0 0 4px">Teacher Management</h1>
+        <p style="color:var(--muted);font-size:14px;font-weight:500;margin:0">Approve, activate, suspend and manage teacher lifecycle.</p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="addTeacherBtn" class="fs-btn fs-btn-primary">Add Teacher</button>
+        <button id="refreshBtn" class="fs-btn">Refresh</button>
+      </div>
+    </div>
 
-    <section class="card">
+    <section class="card" style="margin-bottom:16px">
       <div class="tabs" id="statusTabs"></div>
-      <div class="filters fs-action-bar">
+      <div class="filters" style="gap:10px">
         <input id="searchInput" class="fs-input" placeholder="Search name, email, subgroup" aria-label="Search teachers" />
         <input id="groupFilter" class="fs-input" placeholder="Group" aria-label="Filter by group" />
         <input id="subgroupFilter" class="fs-input" placeholder="Subgroup" aria-label="Filter by subgroup" />
-        <button id="addTeacherBtn" class="fs-btn primary fs-btn fs-btn-primary">Add Teacher</button>
-        <button id="refreshBtn" class="fs-btn fs-btn fs-btn-secondary">Refresh</button>
-        <a href="admin-portal.html" class="fs-btn fs-btn fs-btn-secondary">Back to Admin Portal</a>
       </div>
     </section>
 
@@ -106,11 +118,11 @@
   <div id="actionReasonModal" class="tm-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="actionReasonTitle">
     <div class="tm-modal" style="max-width:480px;">
       <h2 id="actionReasonTitle">Confirm Action</h2>
-      <p id="actionReasonDesc" style="margin:0;color:var(--color-text-secondary,var(--fs-text-muted));font-size:14px;"></p>
+      <p id="actionReasonDesc" style="margin:0;color:var(--text-2);font-size:14px;"></p>
       <div class="tm-field tm-field-full" style="margin-top:12px;">
-        <label class="tm-label" for="actionReasonInput">Reason <span id="actionReasonRequired" style="color:var(--color-danger-fg,#b53030);">*</span></label>
+        <label class="tm-label" for="actionReasonInput">Reason <span id="actionReasonRequired" style="color:var(--danger);">*</span></label>
         <textarea id="actionReasonInput" class="fs-input" rows="3" placeholder="Enter reason…" style="resize:vertical;"></textarea>
-        <p id="actionReasonError" class="tm-note" style="color:var(--color-danger-fg,#b53030);min-height:18px;margin-top:4px;"></p>
+        <p id="actionReasonError" class="tm-note" style="color:var(--danger);min-height:18px;margin-top:4px;"></p>
       </div>
       <div class="tm-modal-actions">
         <button id="actionReasonCancelBtn" type="button" class="fs-btn fs-btn fs-btn-secondary">Cancel</button>
@@ -229,6 +241,7 @@
   <script src="../js/teacher-management.js"></script>
 </body>
 </html>
+
 
 
 

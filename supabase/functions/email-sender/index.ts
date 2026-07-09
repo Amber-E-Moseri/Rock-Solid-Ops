@@ -51,18 +51,42 @@ Deno.serve(async (): Promise<Response> => {
     const senderName = String(cfg['SENDER_NAME'] ?? 'Foundation School Team')
     const replyTo    = String(cfg['REPLY_TO']    ?? '')
 
-    // Step 1: Fetch up to BATCH_SIZE pending emails.
-    const { data: queue, error: qErr } = await supabase
+    // Step 0: Recover rows stuck in Processing by a crashed previous run.
+    // (email_queue.updated_at is maintained by trigger_set_updated_at.)
+    const staleCutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+    await supabase
       .from('email_queue')
-      .select('id, template_key, recipient_email, recipient_name, subject, status, payload, trace_id')
+      .update({ status: 'Pending' })
+      .eq('status', 'Processing')
+      .lt('updated_at', staleCutoff)
+
+    // Step 1: Fetch up to BATCH_SIZE pending email ids.
+    const { data: pending, error: qErr } = await supabase
+      .from('email_queue')
+      .select('id')
       .eq('status', 'Pending')
       .order('created_at', { ascending: true })
       .limit(BATCH_SIZE)
 
     if (qErr) throw qErr
-    if (!queue?.length) {
+    if (!pending?.length) {
       await logSync('EMAIL_SENDER_RUN', 'No pending emails.', { sent: 0, failed: 0 })
       return json({ ok: true, ...result, message: 'No pending emails' })
+    }
+
+    // Step 1b: Atomically claim the batch. Only rows still Pending transition
+    // to Processing, so overlapping runs (cron + manual POST) can never pick
+    // up the same row and double-send.
+    const { data: queue, error: claimErr } = await supabase
+      .from('email_queue')
+      .update({ status: 'Processing' })
+      .in('id', pending.map(r => r.id))
+      .eq('status', 'Pending')
+      .select('id, template_key, recipient_email, recipient_name, subject, status, payload, trace_id')
+
+    if (claimErr) throw claimErr
+    if (!queue?.length) {
+      return json({ ok: true, ...result, message: 'Batch already claimed by a concurrent run' })
     }
 
     // Load all unique templates needed for this batch in one query.
@@ -85,19 +109,28 @@ Deno.serve(async (): Promise<Response> => {
       }
     }
 
+    // Pre-aggregate sent counts for all recipients in a single query.
+    const recipientEmails = [...new Set(queue.map(r => r.recipient_email))]
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+    const { data: sentCounts } = await supabase
+      .from('email_queue')
+      .select('recipient_email')
+      .in('recipient_email', recipientEmails)
+      .eq('status', 'Sent')
+      .gt('sent_at', twentyFourHoursAgo)
+
+    const sentCountMap = new Map<string, number>()
+    for (const row of sentCounts ?? []) {
+      sentCountMap.set(row.recipient_email, (sentCountMap.get(row.recipient_email) ?? 0) + 1)
+    }
+
     // Process each row.
     for (const row of queue as EmailQueueRow[]) {
       try {
-        const { count: sentInLast24Hours, error: rateErr } = await supabase
-          .from('email_queue')
-          .select('id', { count: 'exact', head: true })
-          .eq('recipient_email', row.recipient_email)
-          .eq('status', 'Sent')
-          .gt('sent_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        const sentInLast24Hours = sentCountMap.get(row.recipient_email) ?? 0
 
-        if (rateErr) throw rateErr
-
-        if ((sentInLast24Hours ?? 0) >= 3) {
+        if (sentInLast24Hours >= 3) {
           await supabase
             .from('email_queue')
             .update({
@@ -142,6 +175,9 @@ Deno.serve(async (): Promise<Response> => {
             .from('email_queue')
             .update({ status: 'Sent', sent_at: new Date().toISOString(), error_message: null })
             .eq('id', row.id)
+          // Count this send toward the 24h cap so a batch with multiple
+          // emails to one recipient still respects the limit.
+          sentCountMap.set(row.recipient_email, sentInLast24Hours + 1)
           result.sent++
         }
       } catch (rowErr) {

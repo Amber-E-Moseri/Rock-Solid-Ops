@@ -14,31 +14,31 @@
   <link rel="stylesheet" href="../ui/primitives.css" />
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: "Manrope", sans-serif; color: var(--color-text-primary); background: var(--color-bg); }
+    body { margin: 0; font-family: "Manrope", sans-serif; color: var(--text); background: var(--bg); }
     .na-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:12px; }
-    .na-pill { border:1px solid var(--color-border); border-radius:12px; padding:12px; background:var(--color-surface); display:flex; align-items:center; justify-content:space-between; gap:8px; }
-    .na-pill .label { font-size:12px; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:.05em; font-weight:700; }
+    .na-pill { border:1px solid var(--border); border-radius:12px; padding:12px; background:var(--surface); display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .na-pill .label { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; font-weight:700; }
     .na-pill .count { font-size:24px; font-weight:800; }
     .na-pill.student .count { color:#b91c1c; }
     .na-pill.teacher .count { color:#b45309; }
     .na-pill.system .count { color:#7c2d12; }
-    .na-meta { margin:6px 0 12px; font-size:12px; color:var(--color-text-muted); }
+    .na-meta { margin:6px 0 12px; font-size:12px; color:var(--muted); }
     .na-controls { margin-bottom:12px; }
-    .na-accordion { border:1px solid var(--color-border); border-radius:14px; background:var(--color-surface); margin-bottom:12px; overflow:hidden; }
-    .na-accordion > summary { list-style:none; cursor:pointer; padding:12px 14px; display:flex; justify-content:space-between; align-items:center; gap:10px; font-weight:800; font-size:14px; border-bottom:1px solid color-mix(in srgb, var(--color-border) 45%, transparent); }
+    .na-accordion { border:1px solid var(--border); border-radius:14px; background:var(--surface); margin-bottom:12px; overflow:hidden; }
+    .na-accordion > summary { list-style:none; cursor:pointer; padding:12px 14px; display:flex; justify-content:space-between; align-items:center; gap:10px; font-weight:800; font-size:14px; border-bottom:1px solid color-mix(in srgb, var(--border) 45%, transparent); }
     .na-accordion > summary::-webkit-details-marker { display:none; }
     .na-badge { display:inline-flex; align-items:center; border-radius:999px; padding:2px 9px; font-size:11px; font-weight:700; }
     .na-badge.critical { background:#fee2e2; color:#991b1b; }
     .na-badge.warning { background:#fef3c7; color:#92400e; }
     .na-badge.info { background:#dbeafe; color:#1d4ed8; }
     .na-pane { padding:12px; }
-    .na-state { padding:12px; border:1px dashed var(--color-border); border-radius:10px; color:var(--color-text-muted); font-size:13px; }
+    .na-state { padding:12px; border:1px dashed var(--border); border-radius:10px; color:var(--muted); font-size:13px; }
     .na-actions { display:flex; gap:6px; flex-wrap:wrap; }
     .na-system-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
-    .na-system-card { border:1px solid var(--color-border); border-radius:12px; padding:10px; background:var(--color-surface-raised); }
+    .na-system-card { border:1px solid var(--border); border-radius:12px; padding:10px; background:var(--surface-2); }
     .na-system-card .title { font-size:12px; font-weight:800; }
     .na-system-card .count { margin-top:6px; font-size:22px; font-weight:800; }
-    .na-system-card .detail { margin-top:6px; font-size:12px; color:var(--color-text-muted); }
+    .na-system-card .detail { margin-top:6px; font-size:12px; color:var(--muted); }
     .is-resolved { opacity:.58; }
     @media (max-width: 980px) {
       .na-summary { grid-template-columns:1fr; }
@@ -53,7 +53,7 @@
       .na-accordion { width: 100%; }
     }
     .mobile-cards { display:none; }
-    .mobile-card { border:1px solid var(--color-border); border-radius:12px; padding:10px; background:var(--color-surface); }
+    .mobile-card { border:1px solid var(--border); border-radius:12px; padding:10px; background:var(--surface); }
   </style>
 </head>
 <body>
@@ -328,7 +328,7 @@
         const resolved = isResolved(r.flag_type, "student", r.applicant_id);
         return `<tr class="${resolved ? "is-resolved" : ""}">
           <td>${esc(FLAG_LABELS[r.flag_type] || r.flag_type)}</td>
-          <td><strong>${esc(r.full_name || "-")}</strong><div style="font-size:12px;color:var(--color-text-muted)">${esc(r.email || "")}</div>${resolved ? `<div style="font-size:11px;color:var(--color-text-muted)">${esc(noteResolvedText(r.flag_type, "student", r.applicant_id))}</div>` : ""}</td>
+          <td><strong>${esc(r.full_name || "-")}</strong><div style="font-size:12px;color:var(--muted)">${esc(r.email || "")}</div>${resolved ? `<div style="font-size:11px;color:var(--muted)">${esc(noteResolvedText(r.flag_type, "student", r.applicant_id))}</div>` : ""}</td>
           <td>${esc(r.fellowship_code || "-")}</td>
           <td>${esc(r.teacher_name || "-")}</td>
           <td>${esc(r.detail || "")}</td>
@@ -344,9 +344,9 @@
         const resolved = isResolved(r.flag_type, "student", r.applicant_id);
         return `<article class="mobile-card ${resolved ? "is-resolved" : ""}">
           <div style="display:flex;justify-content:space-between;gap:8px"><strong>${esc(r.full_name || "-")}</strong><span class="na-badge ${badgeCls(r.severity)}">${esc(r.severity || "info")}</span></div>
-          <div style="font-size:12px;color:var(--color-text-muted)">${esc(r.email || "-")}</div>
+          <div style="font-size:12px;color:var(--muted)">${esc(r.email || "-")}</div>
           <div style="margin-top:6px;font-size:12px;">${esc(FLAG_LABELS[r.flag_type] || r.flag_type)} · ${esc(r.teacher_name || "-")}</div>
-          <div style="margin-top:6px;font-size:12px;color:var(--color-text-muted)">${esc(r.detail || "")}</div>
+          <div style="margin-top:6px;font-size:12px;color:var(--muted)">${esc(r.detail || "")}</div>
           <div class="na-actions" style="margin-top:8px;">
             <button class="fs-btn fs-btn-secondary" data-act="view-profile" data-id="${esc(r.applicant_id)}">Profile</button>
             <button class="fs-btn fs-btn-secondary" data-act="send-email" data-id="${esc(r.applicant_id)}" data-email="${esc(r.email || "")}" data-name="${esc(r.full_name || "")}">Email</button>
@@ -373,7 +373,7 @@
         const resolved = isResolved(r.flag_type, "teacher", r.teacher_id);
         return `<tr class="${resolved ? "is-resolved" : ""}">
           <td>${esc(FLAG_LABELS[r.flag_type] || r.flag_type)}</td>
-          <td><strong>${esc(r.full_name || "-")}</strong>${resolved ? `<div style="font-size:11px;color:var(--color-text-muted)">${esc(noteResolvedText(r.flag_type, "teacher", r.teacher_id))}</div>` : ""}</td>
+          <td><strong>${esc(r.full_name || "-")}</strong>${resolved ? `<div style="font-size:11px;color:var(--muted)">${esc(noteResolvedText(r.flag_type, "teacher", r.teacher_id))}</div>` : ""}</td>
           <td>${esc(r.email || "-")}</td>
           <td>${esc(r.class_count || 0)}</td>
           <td>${esc(r.detail || "")}</td>
@@ -388,9 +388,9 @@
       }).join("");
       cards.innerHTML = rows.map((r) => `<article class="mobile-card">
         <div style="display:flex;justify-content:space-between;gap:8px"><strong>${esc(r.full_name || "-")}</strong><span class="na-badge ${badgeCls(r.severity)}">${esc(r.severity || "info")}</span></div>
-        <div style="font-size:12px;color:var(--color-text-muted)">${esc(r.email || "-")}</div>
+        <div style="font-size:12px;color:var(--muted)">${esc(r.email || "-")}</div>
         <div style="margin-top:6px;font-size:12px;">${esc(FLAG_LABELS[r.flag_type] || r.flag_type)} · Classes ${esc(r.class_count || 0)}</div>
-        <div style="margin-top:6px;font-size:12px;color:var(--color-text-muted)">${esc(r.detail || "")}</div>
+        <div style="margin-top:6px;font-size:12px;color:var(--muted)">${esc(r.detail || "")}</div>
         <div class="na-actions" style="margin-top:8px;">
           <a class="fs-btn fs-btn-secondary" href="teacher-management.html?teacher_id=${encodeURIComponent(r.teacher_id || "")}">Teacher</a>
           <button class="fs-btn fs-btn-secondary" data-act="send-reminder" data-id="${esc(r.teacher_id)}" data-email="${esc(r.email || "")}" data-name="${esc(r.full_name || "")}">Reminder</button>

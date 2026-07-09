@@ -177,12 +177,41 @@ Deno.serve(async (req) => {
     );
 
     if (validationErrors.length > 0) {
-      return jsonResponse({ 
-        ok: false, 
-        error: validationErrors.map(e => e.message).join(", "), 
+      return jsonResponse({
+        ok: false,
+        error: validationErrors.map(e => e.message).join(", "),
         code: "VALIDATION_ERROR",
         statusCode: 400
       }, 400);
+    }
+
+    // ── Layer 2: Payload validation hardening (runs before any DB writes) ──
+    if (full_name.length > 255 || email.length > 255) {
+      return jsonResponse({ ok: false, error: "FIELD_TOO_LONG", code: "VALIDATION" }, 400);
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return jsonResponse({ ok: false, error: "INVALID_EMAIL", code: "VALIDATION" }, 400);
+    }
+    if (phone && !/^[\d\s+\-().]+$/.test(phone)) {
+      return jsonResponse({ ok: false, error: "INVALID_PHONE", code: "VALIDATION" }, 400);
+    }
+
+    // ── Layer 3: Double-click / resubmission guard ────────────────────────
+    const { data: recentSubmission } = await db
+      .from("applicants")
+      .select("id")
+      .eq("email", email)
+      .eq("batch_id", batch_id || "")
+      .gt("created_at", new Date(Date.now() - 5 * 60 * 1000).toISOString())
+      .limit(1)
+      .maybeSingle();
+
+    if (recentSubmission) {
+      return jsonResponse({
+        ok: true,
+        isDuplicate: true,
+        message: "Your registration was already received.",
+      }, 200);
     }
 
     const nowIso = new Date().toISOString();

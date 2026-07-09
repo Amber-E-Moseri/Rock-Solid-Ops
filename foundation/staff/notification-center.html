@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
@@ -15,11 +15,11 @@
   <style>
         .ops-head { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; flex-wrap:wrap; }
     .ops-title { margin:0; font-size:clamp(1.5rem,3.2vw,2.1rem); color:var(--text); }
-    .ops-sub { margin:6px 0 0; color:var(--color-text-muted); font-size:13px; }
+    .ops-sub { margin:6px 0 0; color:var(--muted); font-size:13px; }
 
     .ops-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
-    .ops-stat { border:1px solid var(--border); border-radius:12px; background:var(--color-surface); padding:14px; }
-    .ops-stat .lbl { font-size:11px; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:.06em; font-weight:700; }
+    .ops-stat { border:1px solid var(--border); border-radius:12px; background:var(--surface); padding:14px; }
+    .ops-stat .lbl { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; font-weight:700; }
     .ops-stat .val { margin-top:6px; font-size:28px; font-weight:800; color:var(--text); }
 
     .ops-filters { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; }
@@ -28,9 +28,9 @@
     .table-wrap { overflow:auto; border:1px solid var(--border); border-radius:12px; }
     table { width:100%; border-collapse:collapse; min-width: 1120px; }
     th, td { padding:10px 12px; border-bottom:1px solid var(--border); text-align:left; vertical-align:top; }
-    th { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--color-text-muted); background:var(--surface-2); }
-    .state-cell { text-align:center; color:var(--color-text-muted); padding:24px; }
-    .muted-cell { color:var(--color-text-muted); max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    th { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); background:var(--surface-2); }
+    .state-cell { text-align:center; color:var(--muted); padding:24px; }
+    .muted-cell { color:var(--muted); max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
     .chip { display:inline-flex; border-radius:999px; padding:4px 10px; font-size:11px; font-weight:700; border:1px solid var(--border); }
     .chip.bad { background:var(--danger-soft); color:#9d3232; }
@@ -166,6 +166,7 @@
   <script type="module" src="../js/notification-center.js"></script>
 </body>
 </html>
+
 
 
 

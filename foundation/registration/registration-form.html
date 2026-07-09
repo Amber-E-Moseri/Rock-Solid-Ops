@@ -1105,6 +1105,7 @@ const formData = {};
 let fellowships = [];
 let classes = [];
 let classesLoaded = false;
+let closedCampuses = new Set(); // fellowship codes with registration_open=false in active batches
 let fellowshipTzMap = {};
 let fellowshipLookup = {};
 let classViewMode = 'normal';
@@ -1737,6 +1738,27 @@ async function loadClasses() {
     if (grid) grid.innerHTML = `<div class="field-error show">Could not load class options: ${String(err.message || err)}</div>`;
   }
   classesLoaded = true;
+  // Load closed-campus settings for currently active batches (non-fatal if unavailable)
+  try {
+    const batchRes = await fetch(
+      `${CONFIG.SUPABASE_URL}/rest/v1/batches?status=eq.Active&registration_open=eq.true&select=batch_id&limit=20`,
+      { headers: { 'apikey': CONFIG.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${CONFIG.SUPABASE_ANON_KEY}` } }
+    );
+    if (batchRes.ok) {
+      const activeBatches = await batchRes.json();
+      const ids = (activeBatches || []).map(b => b.batch_id).filter(Boolean);
+      if (ids.length) {
+        const csRes = await fetch(
+          `${CONFIG.SUPABASE_URL}/rest/v1/batch_campus_registration_settings?registration_open=eq.false&batch_id=in.(${ids.join(',')})&select=fellowship_code`,
+          { headers: { 'apikey': CONFIG.SUPABASE_ANON_KEY, 'Authorization': `Bearer ${CONFIG.SUPABASE_ANON_KEY}` } }
+        );
+        if (csRes.ok) {
+          const closed = await csRes.json();
+          closedCampuses = new Set((closed || []).map(r => String(r.fellowship_code || '').trim().toUpperCase()));
+        }
+      }
+    }
+  } catch (_) { /* non-fatal: show all classes if campus settings unreachable */ }
   if (loading) loading.style.display = 'none';
   if (grid) grid.style.display = '';
   if (formData.fellowshipCode) renderClassesForSelectedFellowship();
@@ -1750,6 +1772,17 @@ function renderClassesForSelectedFellowship(mode = classViewMode) {
   grid.innerHTML = '';
   if (loading) loading.style.display = 'none';
   grid.style.display = '';
+  // If this campus's registration is administratively closed, block display
+  if (selectedCode && closedCampuses.has(selectedCode.toUpperCase())) {
+    const msg = document.createElement('div');
+    msg.className = 'q-hint';
+    msg.style.cssText = 'text-align:center;padding:20px 0;color:var(--color-danger-fg,#b91c1c)';
+    msg.textContent = 'Registration for your campus is currently closed. Please check back later or contact your fellowship coordinator.';
+    grid.appendChild(msg);
+    noClassOptionsShown = true;
+    formData.availability = 'NO_CLASS_AVAILABLE';
+    return;
+  }
   const activeRows = classes.filter(cls => { const a = String(cls.active||'').trim().toLowerCase(); return a===''||a==='true'||a==='yes'||a==='1'; });
   let filtered = activeRows.filter(cls => classMatchesFellowship(cls.fellowshipCode, selectedCode));
   const regionalRows = activeRows.filter(cls => isRegionalCode(cls.fellowshipCode));

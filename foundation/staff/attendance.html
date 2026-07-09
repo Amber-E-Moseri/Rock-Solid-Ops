@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rock Solid — Attendance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../ui/premium-theme.css" />
+  <link rel="stylesheet" href="../ui/components.css" />
+  <link rel="stylesheet" href="../ui/layout.css" />
+  <link rel="stylesheet" href="../ui/admin-shell.css" />
+  <link rel="stylesheet" href="../ui/primitives.css" />
+  <style>
+    :root {
+      --warning:       var(--warn);
+      --warning-bg:    var(--warn-bg);
+      --soft-purple:   var(--soft-lav);
+      --border-2:      var(--border);
+      --shadow-soft:   var(--sh-xs);
+      --shadow:        0 4px 16px rgba(76,42,146,.09);
+      --shadow-pop:    0 8px 28px rgba(0,0,0,.16);
+      --primary-hover: color-mix(in srgb, var(--primary) 80%, black);
+    }
+
+    /* KPI row */
+    .dash-kpis { display: grid; gap: 12px; margin-bottom: 18px; }
+    .dk  { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); padding: 14px 18px; box-shadow: var(--shadow-soft); }
+    .dv  { font-size: 28px; font-weight: 800; line-height: 1; color: var(--text); }
+    .dl  { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-top: 5px; }
+    .dk.danger { border-color: color-mix(in srgb, var(--danger) 28%, var(--border)); }
+    .dk.danger .dv { color: var(--danger); }
+    .dk.warn .dv   { color: var(--warn); }
+
+    /* Toolbar */
+    .toolbar2 { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+    .fselect  { height: 38px; padding: 0 14px; border-radius: var(--r-md); border: 1px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: var(--shadow-soft); }
+
+    /* Two-column layout */
+    .att { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 18px; align-items: start; }
+    @media (max-width: 1040px) { .att { grid-template-columns: 1fr; } }
+
+    /* Class list */
+    .clist  { display: flex; flex-direction: column; gap: 10px; }
+    .clabel { font-size: 12px; font-weight: 700; color: var(--muted); padding: 0 4px 6px; }
+    .cl { display: flex; align-items: center; gap: 12px; padding: 13px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-soft); cursor: pointer; transition: border-color .14s, box-shadow .18s, transform .12s; position: relative; }
+    .cl:hover { border-color: var(--border-2); box-shadow: var(--shadow); transform: translateY(-1px); }
+    .cl.sel { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent), var(--shadow-soft); }
+    .cl.sel::before { content: ''; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 0 3px 3px 0; background: var(--primary); }
+    .cl-ic { width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; font-weight: 800; }
+    .cl-ic.ok   { background: var(--success-bg); color: var(--success); }
+    .cl-ic.miss { background: var(--danger-bg);  color: var(--danger);  }
+    .cl-ic.part { background: var(--warning-bg); color: var(--warning); }
+    .cl-main    { flex: 1; min-width: 0; }
+    .cl-main b  { font-size: 14px; font-weight: 700; display: block; }
+    .cl-main .m { font-size: 11.5px; color: var(--muted); font-weight: 600; margin-top: 2px; }
+    .cl-right      { text-align: right; flex-shrink: 0; }
+    .cl-right .pct { font-size: 14px; font-weight: 800; }
+
+    /* Roster panel */
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--shadow-soft); }
+    .rhead     { display: flex; align-items: flex-start; gap: 14px; padding: 18px 22px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .rhead .ti  { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
+    .rhead .sub { font-size: 12.5px; color: var(--muted); font-weight: 600; margin-top: 2px; }
+    .tallies { display: flex; gap: 8px; margin-left: auto; }
+    .tally   { text-align: center; border-radius: var(--r-md); padding: 7px 14px; min-width: 64px; }
+    .tally .n { font-size: 18px; font-weight: 800; line-height: 1; }
+    .tally .l { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-top: 4px; opacity: .8; }
+    .tally.p  { background: var(--success-bg); color: var(--success); }
+    .tally.l8 { background: var(--warning-bg); color: var(--warning); }
+    .tally.a  { background: var(--danger-bg);  color: var(--danger);  }
+
+    .rrow      { display: flex; align-items: center; gap: 13px; padding: 12px 22px; border-bottom: 1px solid var(--border-2); }
+    .rrow:last-child { border-bottom: 0; }
+    .ravi      { width: 34px; height: 34px; border-radius: 50%; background: var(--soft-purple); color: var(--primary); font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .rname     { flex: 1; min-width: 0; }
+    .rname b   { font-size: 13.5px; font-weight: 700; }
+    .rname .m  { font-size: 11px; color: var(--muted); font-weight: 600; }
+    .segatt    { display: inline-flex; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; background: var(--surface-2); }
+    .segatt button { font-family: inherit; font-size: 11.5px; font-weight: 700; color: var(--muted); background: transparent; border: 0; border-right: 1px solid var(--border); cursor: pointer; padding: 7px 13px; transition: .12s; }
+    .segatt button:last-child { border-right: 0; }
+    .segatt button.on-p { background: var(--success); color: #fff; }
+    .segatt button.on-l { background: var(--warning); color: #fff; }
+    .segatt button.on-a { background: var(--danger);  color: #fff; }
+
+    .rfoot      { padding: 16px 22px; border-top: 1px solid var(--border); background: var(--surface-2); border-radius: 0 0 var(--r-lg) var(--r-lg); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .rfoot .note { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+    .rbtn { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 20px; border-radius: var(--r-md); border: 0; background: linear-gradient(140deg, var(--primary-hover), var(--primary)); color: #fff; font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 18px rgba(76,42,146,.26); transition: transform .13s; }
+    .rbtn:hover { transform: translateY(-1px); }
+    .roster-empty { padding: 56px 22px; text-align: center; color: var(--muted); font-size: 14px; font-weight: 600; }
+
+    /* Toasts */
+    #toasts { position: fixed; right: 22px; bottom: 22px; z-index: 200; display: flex; flex-direction: column; gap: 10px; }
+    .toast  { display: flex; align-items: center; gap: 11px; background: var(--text); color: #fff; padding: 12px 16px; border-radius: var(--r-md); font-size: 13.5px; font-weight: 700; box-shadow: var(--shadow-pop); animation: tin .25s ease; max-width: 360px; }
+    .toast .tdot { width: 9px; height: 9px; border-radius: 50%; background: #4ADE80; flex-shrink: 0; }
+    @keyframes tin { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    @media (max-width: 760px) {
+      .dash-kpis { grid-template-columns: repeat(2, 1fr) !important; }
+      .tallies { gap: 6px; }
+      .tally   { padding: 6px 10px; min-width: 52px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="fs-page fs-wrap-xl">
+    <div class="page-head" style="display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:18px;">
+      <div>
+        <h1 style="font-size:26px;font-weight:800;letter-spacing:-0.02em;line-height:1.1;margin:0;">Attendance</h1>
+        <p style="color:var(--muted);margin-top:6px;font-size:14px;font-weight:500;max-width:560px;margin-bottom:0;">Track submission across classes and mark the roster. Missing submissions are flagged for follow-up.</p>
+      </div>
+      <button class="fs-btn fs-btn-secondary" onclick="exportAttendance()" style="white-space:nowrap;margin-top:4px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 11l4 4 4-4M5 21h14"/></svg>
+        Export
+      </button>
+    </div>
+
+    <div class="dash-kpis" style="grid-template-columns:repeat(4,1fr);">
+      <div class="dk"><div class="dv" id="kRate">—</div><div class="dl">Submission rate</div></div>
+      <div class="dk" id="kMissingCard"><div class="dv" id="kMissing">—</div><div class="dl">Classes missing</div></div>
+      <div class="dk" id="kFlaggedCard"><div class="dv" id="kFlagged">0</div><div class="dl">Flagged · multi-session</div></div>
+      <div class="dk warn"><div class="dv" id="kOnTime">—</div><div class="dl">On-time rate</div></div>
+    </div>
+
+    <div class="toolbar2">
+      <select class="fselect" id="sessionSel"><option>Loading…</option></select>
+      <select class="fselect" id="batchSel"><option>All batches</option></select>
+      <select class="fselect" id="fellowSel">
+        <option>All fellowships</option>
+        <option>Central East</option>
+        <option>Central South</option>
+        <option>West</option>
+      </select>
+    </div>
+
+    <div class="att">
+      <div>
+        <div class="clabel" id="clabel">Loading…</div>
+        <div class="clist" id="clist"><div style="color:var(--muted);padding:20px 4px;font-size:13px;">Loading classes…</div></div>
+      </div>
+      <div class="panel" id="roster"><div class="roster-empty">Select a class to view the roster</div></div>
+    </div>
+  </main>
+
+  <div id="toasts"></div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/config-helper.js"></script>
+  <script src="../js/admin-shell.js?v=20260518"></script>
+  <script type="module">
+    import { supabase as db } from '../auth/auth-client.js';
+
+    var classes = [];
+    var selId   = null;
+    var $ = function (id) { return document.getElementById(id); };
+
+    function initials(n) {
+      return (n || '').split(/\s+/).slice(0, 2).map(function (w) { return w[0] || ''; }).join('').toUpperCase();
+    }
+    function counts(c) {
+      var p = 0, l = 0, a = 0, m = 0;
+      (c.roster || []).forEach(function (s) {
+        if (s.status === 'present') p++;
+        else if (s.status === 'late') l++;
+        else if (s.status === 'absent') a++;
+        else m++;
+      });
+      return { p: p, l: l, a: a, m: m, total: (c.roster || []).length };
+    }
+    function statusOf(c) {
+      if (c.submitted) return 'ok';
+      var cc = counts(c);
+      return cc.m === cc.total ? 'miss' : 'part';
+    }
+    function toast(t) {
+      var el = document.createElement('div');
+      el.className = 'toast';
+      el.innerHTML = '<span class="tdot"></span>' + t;
+      $('toasts').appendChild(el);
+      setTimeout(function () {
+        el.style.transition = 'opacity .3s, transform .3s';
+        el.style.opacity = '0'; el.style.transform = 'translateY(8px)';
+        setTimeout(function () { el.remove(); }, 300);
+      }, 2600);
+    }
+
+    function renderKpis() {
+      var miss = classes.filter(function (c) { return !c.submitted; }).length;
+      var fl   = classes.filter(function (c) { return c.flagSessions && c.flagSessions.length > 1; }).length;
+      var rate = classes.length ? Math.round((classes.length - miss) / classes.length * 100) : 0;
+      var totalS  = classes.reduce(function (s, c) { return s + (c.roster || []).length; }, 0);
+      var onTimeS = classes.reduce(function (s, c) { return s + (c.roster || []).filter(function (r) { return r.status === 'present'; }).length; }, 0);
+      $('kRate').textContent    = classes.length ? rate + '%' : '—';
+      $('kMissing').textContent = miss;
+      $('kFlagged').textContent = fl;
+      $('kOnTime').textContent  = totalS ? Math.round(onTimeS / totalS * 100) + '%' : '—';
+      $('kMissingCard').className = 'dk' + (miss > 0 ? ' danger' : '');
+      $('kFlaggedCard').className = 'dk' + (fl > 0    ? ' danger' : '');
+    }
+
+    function renderList() {
+      var today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+      $('clabel').textContent = classes.length + ' class' + (classes.length !== 1 ? 'es' : '') + ' · ' + today;
+      $('clist').innerHTML = classes.map(function (c) {
+        var st      = statusOf(c);
+        var cc      = counts(c);
+        var label   = st === 'ok' ? '✓' : st === 'miss' ? '!' : '½';
+        var pct     = (c.submitted && cc.total) ? Math.round((cc.p + cc.l) / cc.total * 100) + '%' : '—';
+        var stTxt   = st === 'ok' ? 'Submitted' : st === 'miss' ? 'Missing' : 'In progress';
+        var flagged = c.flagSessions && c.flagSessions.length > 1;
+        var sessChip = '<span style="font-size:10px;font-weight:800;color:var(--primary);background:var(--soft-purple);border-radius:var(--r-full);padding:1px 7px;">S' + c.session + '</span>';
+        var flagChip = flagged ? '<span style="font-size:10px;font-weight:800;color:var(--danger);background:var(--danger-bg);border-radius:var(--r-full);padding:1px 7px;display:inline-flex;align-items:center;gap:3px;">🚩 ' + c.flagSessions.length + '</span>' : '';
+        return '<div class="cl' + (c.id === selId ? ' sel' : '') + '" data-id="' + c.id + '">' +
+          '<div class="cl-ic ' + st + '">' + label + '</div>' +
+          '<div class="cl-main"><b>' + c.loc + '</b><div class="m">' + c.time + ' · ' + c.teacher + '</div>' +
+          '<div style="display:flex;gap:5px;margin-top:6px;">' + sessChip + flagChip + '</div></div>' +
+          '<div class="cl-right"><div class="pct">' + pct + '</div><div class="m" style="font-size:10.5px;color:var(--muted);font-weight:700;">' + stTxt + '</div></div></div>';
+      }).join('');
+      renderRoster();
+    }
+
+    function renderRoster() {
+      var c  = classes.find(function (x) { return x.id === selId; });
+      var el = $('roster');
+      if (!c) { el.innerHTML = '<div class="roster-empty">Select a class to view the roster</div>'; return; }
+      var cc      = counts(c);
+      var flagged  = c.flagSessions && c.flagSessions.length > 1;
+      var sessLine = flagged ? 'Sessions ' + c.flagSessions.join(', ') + ' · submitted together' : 'Session ' + c.session;
+      el.innerHTML =
+        '<div class="rhead"><div>' +
+          '<div class="ti">' + c.loc + '</div>' +
+          '<div class="sub">' + c.time + ' · ' + c.teacher + ' · ' + cc.total + ' student' + (cc.total !== 1 ? 's' : '') + '</div>' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;">' +
+            '<span style="font-size:11px;font-weight:800;color:var(--primary);background:var(--soft-purple);border-radius:var(--r-full);padding:2px 10px;">' + sessLine + '</span>' +
+            (flagged ? '<span style="font-size:11px;font-weight:800;color:var(--danger);background:var(--danger-bg);border-radius:var(--r-full);padding:2px 10px;display:inline-flex;align-items:center;gap:4px;">🚩 Flagged · multi-session</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="tallies">' +
+          '<div class="tally p"><div class="n" id="tP">' + cc.p + '</div><div class="l">Present</div></div>' +
+          '<div class="tally l8"><div class="n" id="tL">' + cc.l + '</div><div class="l">Late</div></div>' +
+          '<div class="tally a"><div class="n" id="tA">' + cc.a + '</div><div class="l">Absent</div></div>' +
+        '</div></div>' +
+        '<div>' + c.roster.map(function (s, i) {
+          return '<div class="rrow">' +
+            '<div class="ravi">' + initials(s.name) + '</div>' +
+            '<div class="rname"><b>' + s.name + '</b></div>' +
+            '<div class="segatt" data-i="' + i + '">' +
+              '<button data-s="present" class="' + (s.status === 'present' ? 'on-p' : '') + '">Present</button>' +
+              '<button data-s="late"    class="' + (s.status === 'late'    ? 'on-l' : '') + '">Late</button>' +
+              '<button data-s="absent"  class="' + (s.status === 'absent'  ? 'on-a' : '') + '">Absent</button>' +
+            '</div></div>';
+        }).join('') + '</div>' +
+        '<div class="rfoot">' +
+          '<span class="note">' + (c.submitted ? 'Submitted · you can update and re-submit.' : cc.m + ' of ' + cc.total + ' still unmarked.') + '</span>' +
+          '<button id="markAllBtn" style="margin-left:auto;height:40px;padding:0 16px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;">Mark all present</button>' +
+          '<button class="rbtn" id="submitBtn">' +
+            '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"/></svg>' +
+            (c.submitted ? 'Update attendance' : 'Submit attendance') +
+          '</button></div>';
+    }
+
+    function populateFilters() {
+      var batches = [];
+      classes.forEach(function (c) { if (c.session && batches.indexOf(c.session) < 0) batches.push(c.session); });
+      $('batchSel').innerHTML = '<option value="">All batches</option>' +
+        batches.map(function (b) { return '<option value="' + b + '">Batch ' + b + '</option>'; }).join('');
+      var now = new Date();
+      var sessions = [0, 7, 14].map(function (d) {
+        var dt = new Date(now - d * 86400000);
+        return dt.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+      });
+      $('sessionSel').innerHTML = sessions.map(function (s, i) {
+        return '<option' + (i === 0 ? ' selected' : '') + '>' + s + '</option>';
+      }).join('');
+    }
+
+    function demoClasses() {
+      return [
+        { id:1, time:'Sun · 10:00 AM', loc:'CE · Downtown',      teacher:'J. Musa',    session:'4b', flagSessions:[],          submitted:true,
+          roster:[{name:'Hannah Lawal',status:'present'},{name:'Isaac Mensah',status:'present'},{name:'John Musa',status:'late'},{name:'Faith Udo',status:'present'},{name:'Caleb Thomas',status:'absent'},{name:'Joy Eke',status:'present'}] },
+        { id:2, time:'Sun · 4:00 PM',  loc:'CE · Uptown',        teacher:'F. Udo',     session:'4b', flagSessions:[],          submitted:true,
+          roster:[{name:'Daniel Okoro',status:'present'},{name:'Ruth Bello',status:'present'},{name:'Esther Ade',status:'present'},{name:'Samuel Eze',status:'late'},{name:'Grace Adeyemi',status:'present'}] },
+        { id:3, time:'Sun · 10:00 AM', loc:'CSGA · Scarborough', teacher:'E. Ade',     session:'4b', flagSessions:[],          submitted:false,
+          roster:[{name:'Peter Nwosu',status:null},{name:'Mary Johnson',status:null},{name:'Blessing Obi',status:null},{name:'David Eke',status:null},{name:'Sarah Ade',status:null}] },
+        { id:4, time:'Sun · 4:00 PM',  loc:'CSGB · Markham',    teacher:'S. Eze',     session:'4b', flagSessions:['4a','4b'], submitted:true,
+          roster:[{name:'Naomi Bassey',status:'present'},{name:'Paul Inyang',status:'present'},{name:'Lydia Etim',status:'absent'}] },
+        { id:5, time:'Sun · 10:00 AM', loc:'WS · Brampton',      teacher:'K. Obi',     session:'4b', flagSessions:[],          submitted:false,
+          roster:[{name:'Joy Eke',status:null},{name:'Caleb Thomas',status:null},{name:'Ruth Bello',status:null},{name:'Mark Ojo',status:null}] },
+        { id:6, time:'Sun · 4:00 PM',  loc:'WS · Mississauga',   teacher:'P. Okafor',  session:'4b', flagSessions:[],          submitted:true,
+          roster:[{name:'Stephen Ade',status:'present'},{name:'Mercy John',status:'present'},{name:'Tessy Bello',status:'present'},{name:'Bola Smith',status:'late'}] },
+        { id:7, time:'Sun · 10:00 AM', loc:'CE · East',           teacher:'D. Afolabi', session:'4b', flagSessions:['3','4a','4b'], submitted:true,
+          roster:[{name:'Gift Ojo',status:'present'},{name:'Comfort Bassey',status:'present'},{name:'Emeka Nwoke',status:'present'},{name:'Rita Sam',status:'late'},{name:'Tony Bello',status:'present'}] }
+      ];
+    }
+
+    async function loadData() {
+      try {
+        var res = await db
+          .from('teacher_availability')
+          .select('id, subgroup_id, day, time_slot, batch_id, teachers(full_name)')
+          .eq('status', 'Active')
+          .order('subgroup_id')
+          .limit(50);
+        if (res.error) throw res.error;
+
+        var logRes = await db
+          .from('attendance_log')
+          .select('subgroup_id, student_id, present, students(full_name)')
+          .limit(500);
+
+        var rmap = {};
+        (logRes.data || []).forEach(function (r) {
+          var key = r.subgroup_id;
+          if (!rmap[key]) rmap[key] = [];
+          rmap[key].push({
+            name: (r.students && r.students.full_name) || r.student_id,
+            student_id: r.student_id,
+            status: r.present === true ? 'present' : r.present === false ? 'absent' : null
+          });
+        });
+
+        classes = (res.data || []).map(function (a) {
+          var time = '—';
+          if (a.time_slot) {
+            try { time = new Date('1970-01-01T' + a.time_slot).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }); } catch (_) {}
+          }
+          return {
+            id: a.id,
+            time: (a.day || 'Sun') + ' · ' + time,
+            loc: a.subgroup_id || '—',
+            teacher: (a.teachers && a.teachers.full_name) || '—',
+            session: a.batch_id || '—',
+            flagSessions: [],
+            submitted: false,
+            roster: rmap[a.subgroup_id] || []
+          };
+        });
+        if (!classes.length) throw new Error('no data');
+      } catch (_) {
+        classes = demoClasses();
+      }
+      if (classes.length) selId = classes[0].id;
+      populateFilters();
+      renderKpis();
+      renderList();
+    }
+
+    /* ── Events ──────────────────────────────────────────── */
+    $('clist').addEventListener('click', function (e) {
+      var it = e.target.closest('.cl');
+      if (!it) return;
+      selId = Number(it.dataset.id);
+      renderList();
+    });
+
+    $('roster').addEventListener('click', function (e) {
+      var seg = e.target.closest('.segatt');
+      var btn = e.target.closest('button[data-s]');
+      if (seg && btn) {
+        var c = classes.find(function (x) { return x.id === selId; });
+        if (!c) return;
+        c.roster[Number(seg.dataset.i)].status = btn.dataset.s;
+        renderRoster();
+        return;
+      }
+      if (e.target.closest('#markAllBtn')) {
+        var cm = classes.find(function (x) { return x.id === selId; });
+        if (!cm) return;
+        cm.roster.forEach(function (s) { if (!s.status) s.status = 'present'; });
+        renderRoster();
+        return;
+      }
+      if (e.target.closest('#submitBtn')) {
+        var c2 = classes.find(function (x) { return x.id === selId; });
+        if (!c2) return;
+        var cc = counts(c2);
+        if (cc.m === cc.total) { toast('Mark at least one student first.'); return; }
+        c2.submitted = true;
+        renderKpis();
+        renderList();
+        toast(c2.loc + ' attendance submitted (' + cc.p + ' present, ' + cc.a + ' absent).');
+      }
+    });
+
+    window.exportAttendance = function () { toast('Export coming soon.'); };
+
+    loadData();
+  </script>
+</body>
+</html>

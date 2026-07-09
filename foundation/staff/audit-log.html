@@ -3,75 +3,409 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Rock Solid - Audit Logs</title>
+  <title>Rock Solid - Audit Log</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../ui/premium-theme.css" />
-  <link rel="stylesheet" href="../ui/components.css" />
-  <link rel="stylesheet" href="../ui/layout.css" />
   <link rel="stylesheet" href="../ui/admin-shell.css" />
-  <link rel='stylesheet' href='../ui/primitives.css' />
+  <link rel="stylesheet" href="../ui/primitives.css" />
   <style>
-        .fs-page { max-width: 1240px; }
-    .hero-title { margin: 0; font-size: clamp(1.6rem, 3.2vw, 2.2rem); }
-    .hero-sub { margin-top: 6px; }
-    .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+    :root {
+      --line: #e8e0f2;
+      --shadow-soft: 0 8px 24px rgba(47, 31, 87, 0.06);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Manrope", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(820px 360px at 100% -8%, rgba(244, 190, 65, 0.08), transparent 65%),
+        radial-gradient(760px 360px at 0% -8%, rgba(76, 42, 146, 0.07), transparent 66%),
+        var(--bg);
+    }
+    .canvas { padding: 10px 8px 28px; }
+    .page-head { margin-bottom: 22px; }
+    .page-head h1 {
+      margin: 0 0 8px;
+      font-size: clamp(2rem, 3vw, 3rem);
+      line-height: 1;
+      letter-spacing: -0.04em;
+      font-weight: 800;
+      color: #1b1530;
+    }
+    .page-head p {
+      margin: 0 0 14px;
+      max-width: 820px;
+      font-size: 15px;
+      line-height: 1.5;
+      color: #6f6885;
+    }
+    .trust-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: #e9f8ed;
+      color: #14924f;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .trust-pill .lock {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(20, 146, 79, 0.12);
+      font-size: 11px;
+    }
+    .filter-bar {
+      display: grid;
+      grid-template-columns: minmax(240px, 1.7fr) repeat(3, minmax(180px, 0.82fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .field { position: relative; }
+    .field-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #8a84a1;
+      pointer-events: none;
+      font-size: 16px;
+    }
+    .field input,
+    .field select {
+      width: 100%;
+      height: 46px;
+      padding: 0 16px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.82);
+      color: #1b1530;
+      font: inherit;
+      font-size: 14px;
+      box-shadow: 0 1px 0 rgba(255,255,255,0.45) inset;
+    }
+    .field.search input { padding-left: 46px; }
+    .field input:focus,
+    .field select:focus {
+      outline: none;
+      border-color: rgba(76, 42, 146, 0.35);
+      box-shadow: 0 0 0 4px rgba(76, 42, 146, 0.08);
+    }
+    .table-shell {
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.86);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(8px);
+    }
     .table-wrap { overflow: auto; }
-    table { width: 100%; border-collapse: collapse; min-width: 980px; }
-    th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
-    th { color: var(--color-text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; background: var(--surface-2); }
-    .chip { display: inline-flex; padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; border: 1px solid var(--border); }
-    .chip.ok { background: var(--success-soft); color: #1b6b3d; }
-    .chip.warn { background: #fff4db; color: #8a5600; }
-    .chip.bad { background: var(--danger-soft); color: #a33131; }
-    .chip.info { background: var(--soft-lavender); color: var(--primary); }
-    .details { color: var(--color-text-muted); max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .state { padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--color-text-muted); }
+    table {
+      width: 100%;
+      min-width: 1080px;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+    thead th {
+      padding: 18px 18px 16px;
+      text-align: left;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #756f8d;
+      background: rgba(255,255,255,0.62);
+      border-bottom: 1px solid var(--line);
+      font-weight: 800;
+    }
+    tbody td {
+      padding: 16px 18px;
+      border-bottom: 1px solid #ece5f4;
+      vertical-align: middle;
+      font-size: 14px;
+      color: #1b1530;
+      background: rgba(255,255,255,0.9);
+    }
+    tbody tr:last-child td { border-bottom: 0; }
+    .actor {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 800;
+      color: #5a36a6;
+      background: #efe8ff;
+      flex-shrink: 0;
+    }
+    .avatar.system {
+      color: #fff;
+      background: #2d2748;
+    }
+    .actor-name {
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.15;
+    }
+    .actor-sub {
+      margin-top: 4px;
+      font-size: 13px;
+      color: #6f6885;
+    }
+    .action-text {
+      font-size: 15px;
+      font-weight: 600;
+      color: #1f1735;
+    }
+    .entity-link {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      color: #5a36a6;
+      font-weight: 700;
+    }
+    .time-text {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      color: #6d6783;
+      white-space: nowrap;
+    }
+    .category-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 120px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .cat-attendance { background: #fff2d8; color: #d87a00; }
+    .cat-batch { background: #e7ebff; color: #4857c8; }
+    .cat-registration { background: #efe6ff; color: #7836c9; }
+    .cat-roles { background: #ffe9e4; color: #d55d38; }
+    .cat-sync { background: #ffe6ea; color: #eb3b4b; }
+    .cat-comms { background: #e6f7e7; color: #14a254; }
+    .cat-admin { background: #f1edf8; color: #746b88; }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .status-success { background: #e6f7e7; color: #14924f; }
+    .status-error { background: #ffe7e9; color: #df3648; }
+    .status-pending { background: #fff3de; color: #d37b0b; }
+    .status-neutral { background: #f1edf8; color: #746b88; }
+    .expand-cell {
+      width: 40px;
+      text-align: center;
+    }
+    .expand-btn {
+      width: 28px;
+      height: 28px;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      color: #7f7796;
+      font-size: 24px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .detail-row td {
+      padding: 0;
+      background: #faf8fd;
+    }
+    .detail-inner {
+      display: none;
+      padding: 18px 22px 20px;
+      border-top: 1px solid #efe8f7;
+    }
+    .detail-row.open .detail-inner { display: block; }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 8px 14px;
+      margin-bottom: 14px;
+      font-size: 13px;
+    }
+    .detail-key {
+      color: #7f7796;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 11px;
+    }
+    .detail-json {
+      margin: 0;
+      padding: 14px;
+      border: 1px solid #ece5f4;
+      border-radius: 16px;
+      background: #fff;
+      font-size: 12px;
+      line-height: 1.55;
+      overflow: auto;
+      color: #2f2647;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .table-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 16px 18px;
+      border-top: 1px solid var(--line);
+      background: rgba(255,255,255,0.72);
+    }
+    .foot-meta {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+      color: #756f8d;
+      font-size: 13px;
+    }
+    .count-strong {
+      color: #1b1530;
+      font-weight: 800;
+      font-size: 14px;
+    }
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .btn {
+      height: 42px;
+      padding: 0 16px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: #2d2548;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn.primary {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+      box-shadow: 0 10px 22px rgba(76, 42, 146, 0.18);
+    }
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: default;
+      box-shadow: none;
+    }
+    .state {
+      padding: 26px 24px;
+      text-align: center;
+      color: #6f6885;
+      font-size: 14px;
+      background: rgba(255,255,255,0.8);
+    }
+    .hidden { display: none !important; }
+    @media (max-width: 1180px) {
+      .filter-bar { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 760px) {
+      .canvas { padding-inline: 0; }
+      .page-head h1 { font-size: 2.2rem; }
+      .filter-bar { grid-template-columns: 1fr; }
+      .table-foot { flex-direction: column; align-items: stretch; }
+      .btn-row { justify-content: space-between; }
+    }
   </style>
 </head>
 <body>
-  <main class="fs-page">
-    <section class="hero">
-      <h1 class="hero-title">Audit Logs</h1>
-      <p class="hero-sub">Search and review operational changes across admin actions and system writes.</p>
-    </section>
+  <main class="main">
+    <div class="canvas">
+      <section class="page-head">
+        <h1>Audit log</h1>
+        <p>An immutable, time-stamped record of every administrative action taken in RockSolid.</p>
+        <div class="trust-pill"><span class="lock">🔒</span><span>Append-only · tamper-evident</span></div>
+      </section>
 
-    <section class="card">
-      <div class="filters fs-action-bar">
-        <input id="actionFilter" class="fs-input" placeholder="Action" aria-label="Filter by action" />
-        <input id="statusFilter" class="fs-input" placeholder="Status" aria-label="Filter by status" />
-        <input id="actorFilter" class="fs-input" placeholder="Actor email/name" aria-label="Filter by actor" />
-        <input id="fromDate" class="fs-input" type="date" aria-label="From date" />
-        <input id="toDate" class="fs-input" type="date" aria-label="To date" />
-        <button id="resetFilters" class="fs-btn fs-btn fs-btn-secondary">Reset</button>
-      </div>
-    </section>
+      <section class="filter-bar" aria-label="Filters">
+        <label class="field search">
+          <span class="field-icon">⌕</span>
+          <input id="searchFilter" type="search" placeholder="Search actor, action or entity..." />
+        </label>
+        <label class="field">
+          <select id="categoryFilter">
+            <option value="">All categories</option>
+          </select>
+        </label>
+        <label class="field">
+          <select id="actorFilter">
+            <option value="">All actors</option>
+          </select>
+        </label>
+        <label class="field">
+          <select id="rangeFilter">
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
+            <option value="all">All time</option>
+          </select>
+        </label>
+      </section>
 
-    <section class="card">
-      <div class="fs-row" style="margin-bottom:10px;">
-        <strong id="countLabel">0 records</strong>
-        <span class="spacer"></span>
-        <button id="refreshBtn" class="fs-btn fs-btn fs-btn-primary primary">Refresh</button>
-      </div>
-      <div id="state" class="state">Loading audit logs...</div>
-      <div id="tableWrap" class="table-wrap fs-table-wrap hidden">
-        <table class="fs-table">
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Action</th>
-              <th>Actor</th>
-              <th>Entity</th>
-              <th>Entity ID</th>
-              <th>Status</th>
-              <th>Details</th>
-            </tr>
-          </thead>
-          <tbody id="rows"></tbody>
-        </table>
-      </div>
-    </section>
+      <section class="table-shell">
+        <div id="state" class="state">Loading audit logs...</div>
+        <div id="tableWrap" class="table-wrap hidden">
+          <table>
+            <thead>
+              <tr>
+                <th>Actor</th>
+                <th>Action</th>
+                <th>Entity</th>
+                <th>Category</th>
+                <th>When</th>
+                <th>Status</th>
+                <th class="expand-cell"></th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="table-foot">
+          <div class="foot-meta">
+            <span id="countLabel" class="count-strong">0 records</span>
+            <span id="pageInfo"></span>
+          </div>
+          <div class="btn-row">
+            <button id="resetFilters" class="btn">Reset</button>
+            <button id="prevBtn" class="btn" disabled>Prev</button>
+            <button id="nextBtn" class="btn" disabled>Next</button>
+            <button id="refreshBtn" class="btn primary">Refresh</button>
+          </div>
+        </div>
+      </section>
+    </div>
   </main>
 
   <script src="../js/config.js"></script>
@@ -80,29 +414,63 @@
   <script type="module">
     import { supabase, getCurrentProfile, isSuperadmin } from "../auth/auth-client.js";
 
-    const state = { rows: [], filtered: [], missingTables: [] };
+    const PAGE_SIZE = 25;
+    const pg = { page: 0, total: 0 };
+    const state = { loadedRows: [] };
     const $ = (id) => document.getElementById(id);
 
-    const isMissingTable = (error) => {
-      const msg = String(error?.message || "").toLowerCase();
-      return error?.code === "42P01" || msg.includes("does not exist") || msg.includes("relation");
-    };
+    const categoryDefinitions = [
+      { key: "attendance", label: "Attendance", cls: "cat-attendance" },
+      { key: "batch", label: "Batch/Class", cls: "cat-batch" },
+      { key: "registration", label: "Registration", cls: "cat-registration" },
+      { key: "roles", label: "Roles", cls: "cat-roles" },
+      { key: "sync", label: "Sync", cls: "cat-sync" },
+      { key: "comms", label: "Comms", cls: "cat-comms" },
+      { key: "admin", label: "Admin", cls: "cat-admin" }
+    ];
 
-    const fmtTime = (value) => {
+    function esc(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+    }
+
+    function pick(obj, keys) {
+      return keys.map((key) => obj?.[key]).find((value) => value !== null && value !== undefined && value !== "") || "";
+    }
+
+    function classifyCategory(action) {
+      const text = String(action || "").toUpperCase();
+      if (text.includes("ATTEND")) return categoryDefinitions[0];
+      if (text.includes("BATCH") || text.includes("CLASS")) return categoryDefinitions[1];
+      if (text.includes("REGISTR") || text.includes("ENROLL")) return categoryDefinitions[2];
+      if (text.includes("ROLE") || text.includes("PERM") || text.includes("AUTH")) return categoryDefinitions[3];
+      if (text.includes("SYNC") || text.includes("MOODLE") || text.includes("MAILCHIMP")) return categoryDefinitions[4];
+      if (text.includes("EMAIL") || text.includes("CAMPAIGN") || text.includes("MESSAGE") || text.includes("NOTIFY") || text.includes("COMM")) return categoryDefinitions[5];
+      return categoryDefinitions[6];
+    }
+
+    function formatTime(value) {
       if (!value) return "-";
       const date = new Date(value);
-      return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
-    };
+      if (Number.isNaN(date.getTime())) return String(value);
+      return date.toLocaleString("en-CA", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).replace(",", " ·");
+    }
 
-    const chipClass = (value) => {
-      const v = String(value || "").toLowerCase();
-      if (v.includes("fail") || v.includes("error")) return "bad";
-      if (v.includes("pending") || v.includes("wait")) return "warn";
-      if (v.includes("ok") || v.includes("success") || v.includes("done")) return "ok";
-      return "info";
-    };
+    function avatarLabel(actor) {
+      const input = String(actor || "").trim();
+      if (!input) return "?";
+      const parts = input.split("@")[0].replace(/[._-]/g, " ").trim().split(/\s+/);
+      return (parts.map((part) => part[0]).join("").slice(0, 2) || input[0]).toUpperCase();
+    }
 
-    const pick = (obj, keys) => keys.map((k) => obj?.[k]).find((v) => v !== null && v !== undefined && v !== "") || "";
+    function statusChip(status) {
+      const text = String(status || "unknown");
+      const lower = text.toLowerCase();
+      let cls = "status-neutral";
+      if (lower.includes("success") || lower.includes("ok")) cls = "status-success";
+      else if (lower.includes("error") || lower.includes("fail")) cls = "status-error";
+      else if (lower.includes("pending") || lower.includes("wait")) cls = "status-pending";
+      return `<span class="status-pill ${cls}">${esc(text)}</span>`;
+    }
 
     function setState(message) {
       $("state").textContent = message;
@@ -129,122 +497,164 @@
       return profile;
     }
 
+    function buildQuery() {
+      const search = $("searchFilter").value.trim();
+      const actor = $("actorFilter").value.trim();
+      const range = $("rangeFilter").value;
+
+      let query = supabase.from("audit_logs").select("*", { count: "exact" });
+
+      if (search) {
+        query = query.or(`action.ilike.%${search}%,actor_email.ilike.%${search}%,entity_id.ilike.%${search}%,entity_type.ilike.%${search}%`);
+      }
+      if (actor) {
+        query = query.eq("actor_email", actor);
+      }
+      if (range !== "all") {
+        const days = Number(range || 7);
+        const from = new Date(Date.now() - days * 86400000).toISOString();
+        query = query.gte("created_at", from);
+      }
+      return query.order("created_at", { ascending: false });
+    }
+
+    function filterByCategory(rows) {
+      const category = $("categoryFilter").value;
+      if (!category) return rows;
+      return rows.filter((row) => classifyCategory(pick(row, ["action", "event", "type"])).key === category);
+    }
+
+    function populateFilterOptions(rows) {
+      const actors = [...new Set(rows.map((row) => pick(row, ["actor_email", "actor", "changed_by", "created_by"])).filter(Boolean))].sort();
+      const currentActor = $("actorFilter").value;
+      $("actorFilter").innerHTML = `<option value="">All actors</option>` + actors.map((actor) => `<option value="${esc(actor)}">${esc(actor === "@system" ? "System" : actor)}</option>`).join("");
+      if (actors.includes(currentActor)) $("actorFilter").value = currentActor;
+
+      const currentCategory = $("categoryFilter").value;
+      $("categoryFilter").innerHTML = `<option value="">All categories</option>` + categoryDefinitions.map((item) => `<option value="${item.key}">${item.label}</option>`).join("");
+      $("categoryFilter").value = currentCategory;
+    }
+
     async function loadAuditLogs() {
       setState("Loading audit logs...");
-      state.missingTables = [];
-      const { data, error } = await supabase.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(500);
+      const from = pg.page * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+      const { data, count, error } = await buildQuery().range(from, to);
+
       if (error) {
-        if (isMissingTable(error)) {
-          state.missingTables.push("audit_logs");
-          state.rows = [];
-          applyFilters();
-          return;
-        }
         setState(`Could not load audit logs: ${error.message}`);
-        return;
-      }
-      state.rows = data || [];
-      applyFilters();
-    }
-
-    function inDateRange(row, fromDate, toDate) {
-      const ts = pick(row, ["created_at", "logged_at", "inserted_at", "timestamp"]);
-      if (!ts) return true;
-      const d = new Date(ts);
-      if (Number.isNaN(d.getTime())) return true;
-      if (fromDate) {
-        const from = new Date(fromDate + "T00:00:00");
-        if (d < from) return false;
-      }
-      if (toDate) {
-        const to = new Date(toDate + "T23:59:59");
-        if (d > to) return false;
-      }
-      return true;
-    }
-
-    function applyFilters() {
-      const action = $("actionFilter").value.trim().toLowerCase();
-      const status = $("statusFilter").value.trim().toLowerCase();
-      const actor = $("actorFilter").value.trim().toLowerCase();
-      const fromDate = $("fromDate").value;
-      const toDate = $("toDate").value;
-
-      state.filtered = state.rows.filter((row) => {
-        const actionVal = String(pick(row, ["action", "event", "type"]) || "").toLowerCase();
-        const statusVal = String(pick(row, ["status", "result", "outcome"]) || "").toLowerCase();
-        const actorVal = String(pick(row, ["actor", "actor_email", "changed_by", "created_by", "user_email"]) || "").toLowerCase().replace("@system", "");
-
-        if (action && !actionVal.includes(action)) return false;
-        if (status && !statusVal.includes(status)) return false;
-        if (actor && !actorVal.includes(actor)) return false;
-        if (!inDateRange(row, fromDate, toDate)) return false;
-        return true;
-      });
-
-      renderRows();
-    }
-
-    function renderRows() {
-      if (state.missingTables.length) {
-        setState("Missing table: audit_logs. Add migration for audit logging before using this page.");
         $("countLabel").textContent = "0 records";
         return;
       }
 
-      if (!state.filtered.length) {
+      const rawRows = data || [];
+      const visibleRows = filterByCategory(rawRows);
+      state.loadedRows = visibleRows;
+      pg.total = count ?? visibleRows.length;
+
+      populateFilterOptions(rawRows);
+      renderRows(visibleRows);
+    }
+
+    function renderRows(rows) {
+      if (!rows.length) {
         setState("No audit records match the current filters.");
         $("countLabel").textContent = "0 records";
+        updatePager();
         return;
       }
 
-      const rowsHtml = state.filtered.map((row) => {
-        const when = pick(row, ["created_at", "logged_at", "inserted_at", "timestamp"]);
+      $("rows").innerHTML = rows.map((row, index) => {
         const action = pick(row, ["action", "event", "type"]) || "-";
-        const actorRaw = pick(row, ["actor", "actor_email", "changed_by", "created_by", "user_email"]) || "-";
-        const actor = actorRaw.endsWith("@system")
-          ? actorRaw.replace("@system", " (system)")
-          : actorRaw;
-        const entity = pick(row, ["entity_type", "target_type", "resource_type"]) || "-";
+        const actorRaw = pick(row, ["actor_email", "actor", "changed_by", "created_by", "user_email"]) || "system";
+        const actorIsSystem = actorRaw.toLowerCase() === "system" || actorRaw.toLowerCase().endsWith("@system");
+        const actorLabel = actorIsSystem ? "System" : actorRaw;
         const entityId = pick(row, ["entity_id", "target_id", "resource_id"]) || "-";
-        const status = pick(row, ["status", "result", "outcome"]) || "-";
+        const entityType = pick(row, ["entity_type", "target_type", "resource_type"]) || "-";
+        const when = pick(row, ["created_at", "logged_at", "inserted_at", "timestamp"]);
         const details = pick(row, ["details", "payload", "meta", "notes"]);
-        const detailsText = typeof details === "string" ? details : JSON.stringify(details || {}, null, 0);
+        const detailText = typeof details === "string" ? details : JSON.stringify(details || {}, null, 2);
+        const category = classifyCategory(action);
+        const status = pick(row, ["status", "result", "outcome"]) || "success";
 
         return `
           <tr>
-            <td>${fmtTime(when)}</td>
-            <td>${action}</td>
-            <td>${actor}</td>
-            <td>${entity}</td>
-            <td>${entityId}</td>
-            <td><span class="fs-badge ${chipClass(status)}">${status}</span></td>
-            <td class="details" title="${detailsText}">${detailsText}</td>
+            <td>
+              <div class="actor">
+                <div class="avatar ${actorIsSystem ? "system" : ""}">${esc(avatarLabel(actorLabel))}</div>
+                <div>
+                  <div class="actor-name">${esc(actorLabel)}</div>
+                  <div class="actor-sub">${esc(entityType)}</div>
+                </div>
+              </div>
+            </td>
+            <td><div class="action-text">${esc(action).replace(/_/g, " ").toLowerCase()}</div></td>
+            <td><span class="entity-link">${esc(entityId)}</span></td>
+            <td><span class="category-pill ${category.cls}">${esc(category.label)}</span></td>
+            <td><span class="time-text">${esc(formatTime(when))}</span></td>
+            <td>${statusChip(status)}</td>
+            <td class="expand-cell"><button class="expand-btn" data-expand="${index}" aria-label="Expand row">›</button></td>
+          </tr>
+          <tr class="detail-row" id="detail-${index}">
+            <td colspan="7">
+              <div class="detail-inner">
+                <div class="detail-grid">
+                  <div class="detail-key">Actor</div><div>${esc(actorLabel)}</div>
+                  <div class="detail-key">Action</div><div>${esc(action)}</div>
+                  <div class="detail-key">Entity</div><div>${esc(entityType)} / ${esc(entityId)}</div>
+                  <div class="detail-key">When</div><div>${esc(formatTime(when))}</div>
+                </div>
+                <pre class="detail-json">${esc(detailText)}</pre>
+              </div>
+            </td>
           </tr>
         `;
       }).join("");
 
-      $("rows").innerHTML = rowsHtml;
-      $("countLabel").textContent = `${state.filtered.length} record${state.filtered.length === 1 ? "" : "s"}`;
+      $("countLabel").textContent = `${pg.total.toLocaleString()} records`;
+      updatePager();
       showTable();
+
+      $("rows").querySelectorAll("[data-expand]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const idx = button.dataset.expand;
+          const row = document.getElementById(`detail-${idx}`);
+          if (!row) return;
+          const open = row.classList.toggle("open");
+          button.textContent = open ? "‹" : "›";
+        });
+      });
+    }
+
+    function updatePager() {
+      const totalPages = Math.max(1, Math.ceil(pg.total / PAGE_SIZE));
+      $("pageInfo").textContent = pg.total ? `Page ${pg.page + 1} of ${totalPages}` : "";
+      $("prevBtn").disabled = pg.page === 0;
+      $("nextBtn").disabled = (pg.page + 1) * PAGE_SIZE >= pg.total;
+    }
+
+    function resetPage() {
+      pg.page = 0;
     }
 
     function wireEvents() {
-      ["actionFilter", "statusFilter", "actorFilter", "fromDate", "toDate"].forEach((id) => {
-        $(id).addEventListener("input", applyFilters);
-        $(id).addEventListener("change", applyFilters);
+      ["searchFilter", "categoryFilter", "actorFilter", "rangeFilter"].forEach((id) => {
+        $(id).addEventListener("input", () => { resetPage(); loadAuditLogs(); });
+        $(id).addEventListener("change", () => { resetPage(); loadAuditLogs(); });
       });
 
       $("resetFilters").addEventListener("click", () => {
-        $("actionFilter").value = "";
-        $("statusFilter").value = "";
+        $("searchFilter").value = "";
+        $("categoryFilter").value = "";
         $("actorFilter").value = "";
-        $("fromDate").value = "";
-        $("toDate").value = "";
-        applyFilters();
+        $("rangeFilter").value = "7";
+        resetPage();
+        loadAuditLogs();
       });
 
-      $("refreshBtn").addEventListener("click", loadAuditLogs);
+      $("refreshBtn").addEventListener("click", () => { resetPage(); loadAuditLogs(); });
+      $("prevBtn").addEventListener("click", () => { if (pg.page > 0) { pg.page -= 1; loadAuditLogs(); } });
+      $("nextBtn").addEventListener("click", () => { pg.page += 1; loadAuditLogs(); });
     }
 
     async function init() {
@@ -256,7 +666,7 @@
         title: "Rock Solid Admin",
         profileName: profile.full_name || profile.email || "Admin",
         role: profile.role,
-        breadcrumbs: [{ label: "Admin", href: "dashboards.html" }, "Audit Logs"],
+        breadcrumbs: [{ label: "Home", href: "dashboards.html" }, "Audit log"]
       });
 
       wireEvents();
@@ -265,15 +675,5 @@
 
     init();
   </script>
-  <script>
-    window.FSAdminShell && window.FSAdminShell.mount({ active: "audit", pageTitle: "Audit Log" });
-  </script>
 </body>
 </html>
-
-
-
-
-
-
-

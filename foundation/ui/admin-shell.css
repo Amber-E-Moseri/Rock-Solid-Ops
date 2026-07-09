@@ -13,6 +13,7 @@ body.fs-shell-mounted {
   grid-template-rows: auto minmax(0, 1fr);
   background: var(--bg);
   color: var(--text);
+  transition: grid-template-columns 0.18s ease;
 }
 
 body.fs-shell-mounted * {
@@ -34,6 +35,7 @@ body.fs-shell-mounted .sidebar {
   background: var(--surface);
   border-right: 1px solid var(--border);
   z-index: 220;
+  transition: width 0.18s ease, min-width 0.18s ease;
 }
 
 body.fs-shell-mounted .sb-logo {
@@ -41,6 +43,29 @@ body.fs-shell-mounted .sb-logo {
   align-items: center;
   gap: 10px;
   padding: 14px 12px 12px;
+  cursor: pointer;
+}
+
+body.fs-shell-mounted .sb-collapse-btn {
+  margin-left: auto;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+body.fs-shell-mounted .sb-collapse-btn:hover {
+  background: var(--soft-lavender, rgba(76, 42, 146, 0.08));
+  color: var(--navy, var(--color-primary));
+  border-color: color-mix(in srgb, var(--navy, var(--color-primary)) 18%, var(--border));
 }
 
 body.fs-shell-mounted .sb-mark {
@@ -62,6 +87,7 @@ body.fs-shell-mounted .sb-name {
   font-weight: 800;
   color: var(--text);
   line-height: 1.2;
+  transition: opacity 0.15s ease;
 }
 
 body.fs-shell-mounted .sb-sub {
@@ -69,6 +95,7 @@ body.fs-shell-mounted .sb-sub {
   color: var(--muted);
   margin-top: 2px;
   line-height: 1.2;
+  transition: opacity 0.15s ease;
 }
 
 body.fs-shell-mounted .sb-nav {
@@ -83,6 +110,7 @@ body.fs-shell-mounted .sb-label {
   text-transform: uppercase;
   padding: 16px 8px 4px;
   margin-top: 4px;
+  transition: opacity 0.15s ease, max-height 0.15s ease, padding 0.15s ease, margin 0.15s ease;
 }
 
 body.fs-shell-mounted .sb-link {
@@ -96,6 +124,8 @@ body.fs-shell-mounted .sb-link {
   font-size: 13px;
   font-weight: 500;
   transition: background 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 body.fs-shell-mounted .sb-link:hover {
@@ -137,12 +167,14 @@ body.fs-shell-mounted .sb-badge {
   padding: 1px 6px;
   min-width: 18px;
   text-align: center;
+  transition: opacity 0.15s ease;
 }
 
 body.fs-shell-mounted .sb-footer {
   margin-top: auto;
   border-top: 1px solid var(--border);
   padding: 12px 8px;
+  transition: padding 0.15s ease;
 }
 
 body.fs-shell-mounted .topbar {
@@ -235,6 +267,14 @@ body.fs-shell-mounted .main {
   overflow-y: auto;
   padding: var(--space-6);
   animation: fs-fadein 0.15s ease-in;
+  transition: padding 0.18s ease;
+}
+
+body.fs-shell-mounted .fs-content {
+  grid-column: 2;
+  grid-row: 2;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 @keyframes fs-fadein {
@@ -261,11 +301,25 @@ body.fs-shell-mounted.fs-shell-collapsed .sb-logo {
   padding-right: 0;
 }
 
+body.fs-shell-mounted.fs-shell-collapsed .sb-collapse-btn {
+  margin-left: 0;
+  position: absolute;
+  top: 14px;
+  right: 12px;
+}
+
 body.fs-shell-mounted.fs-shell-collapsed .sb-logo > div:last-child,
 body.fs-shell-mounted.fs-shell-collapsed .sb-label,
+body.fs-shell-mounted.fs-shell-collapsed .sb-link > span:not(.sb-icon),
 body.fs-shell-mounted.fs-shell-collapsed .sb-link .sb-badge,
-body.fs-shell-mounted.fs-shell-collapsed .sb-link {
-  font-size: 0;
+body.fs-shell-mounted.fs-shell-collapsed .sb-footer .sb-link > span:not(.sb-icon) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+body.fs-shell-mounted.fs-shell-collapsed .sb-logo > button {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 body.fs-shell-mounted.fs-shell-collapsed .sb-link {
@@ -279,10 +333,36 @@ body.fs-shell-mounted.fs-shell-collapsed .sb-link .sb-icon {
   font-size: 10px;
 }
 
+body.fs-shell-mounted.fs-shell-collapsed .sb-label {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-top: 0;
+  overflow: hidden;
+}
+
+body.fs-shell-mounted.fs-shell-collapsed .sb-footer {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
 body.fs-shell-mounted.fs-shell-collapsed .user-chip {
   display: none;
 }
 
+/* Desktop layout: remain at 240px sidebar down to 1024px */
+@media (max-width: 1024px) {
+  /* For tablets and smaller desktop, sidebar remains visible but main content may adjust */
+  body.fs-shell-mounted {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+  
+  body.fs-shell-mounted .main {
+    padding: var(--space-4);
+  }
+}
+
+/* Mobile drawer: only below 768px */
 @media (max-width: 768px) {
   body.fs-shell-mounted {
     grid-template-columns: 1fr;
@@ -345,12 +425,17 @@ body.fs-shell-mounted.fs-shell-collapsed .user-chip {
     margin: 0;
   }
 
+  /* Show hamburger only on mobile */
   body.fs-shell-mounted .ham {
-    display: none !important;
+    display: inline-flex !important;
   }
 
   body.fs-shell-mounted .btn-out,
   body.fs-shell-mounted .user-chip {
+    display: none;
+  }
+
+  body.fs-shell-mounted .sb-collapse-btn {
     display: none;
   }
 

@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -32,7 +32,7 @@
       padding: 12px 14px;
     }
     .summary-label { font-size: 11px; color: var(--fs-text-muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
-    .summary-value { margin-top: 6px; font-size: 26px; font-weight: 800; color: var(--color-primary); }
+    .summary-value { margin-top: 6px; font-size: 26px; font-weight: 800; color: var(--primary); }
     .toolbar { margin-top: 12px; display:flex; justify-content:flex-end; }
     .tbl-outer { margin-top: 12px; overflow:auto; }
     table { width: 100%; border-collapse: collapse; background:#fff; }
@@ -206,7 +206,7 @@
       const classOptionId = String(a.class_option_id || "");
       const classInfo = state.classMap.get(classOptionId);
       const classLabel = classInfo
-        ? `${classOptionId} · ${String(classInfo.day || "")} ${String(classInfo.class_time || "")}`.trim()
+        ? `${classOptionId} Â· ${String(classInfo.day || "")} ${String(classInfo.class_time || "")}`.trim()
         : (classOptionId || "-");
       return `
         <tr>
@@ -316,5 +316,6 @@
 <script src="../js/admin-shell.js?v=20260518"></script>
 </body>
 </html>
+
 
 

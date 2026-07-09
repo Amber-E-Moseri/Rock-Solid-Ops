@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
@@ -14,31 +14,31 @@
   <link rel="stylesheet" href="../ui/primitives.css" />
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: "Manrope", sans-serif; color: var(--color-text-primary); background: var(--color-bg); min-height: 100dvh; }
+    body { margin: 0; font-family: "Manrope", sans-serif; color: var(--text); background: var(--bg); min-height: 100dvh; }
     .tab-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: var(--space-3); }
-    .tab { border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text-primary); border-radius: var(--radius-md); padding: var(--space-1) var(--space-3); font: 600 var(--fs-meta)/1.4 inherit; cursor: pointer; transition: background 120ms; }
-    .tab.active { background: var(--color-primary); color: var(--color-primary-fg); border-color: var(--color-primary); }
-    .tab:hover:not(.active) { background: var(--color-surface-raised); }
-    .summary-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-4); box-shadow: var(--shadow-raised); }
-    .summary-label { font-size: var(--fs-label); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
-    .summary-value { font-size: 26px; font-weight: 800; color: var(--color-text-primary); line-height: 1.1; margin-top: var(--space-1); }
+    .tab { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: var(--radius-md); padding: var(--space-1) var(--space-3); font: 600 var(--fs-meta)/1.4 inherit; cursor: pointer; transition: background 120ms; }
+    .tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .tab:hover:not(.active) { background: var(--surface-2); }
+    .summary-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-4); box-shadow: var(--shadow-raised); }
+    .summary-label { font-size: var(--fs-label); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+    .summary-value { font-size: 26px; font-weight: 800; color: var(--text); line-height: 1.1; margin-top: var(--space-1); }
     .scenario-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--radius-full); font-size: var(--fs-badge); font-weight: 700; }
-    .scenario-never-started { background: var(--color-info-bg); color: var(--color-info-fg); }
-    .scenario-dropped-off   { background: var(--color-warning-bg); color: var(--color-warning-fg); }
-    .scenario-final-notice  { background: var(--color-danger-bg); color: var(--color-danger-fg); }
+    .scenario-never-started { background: var(--info-bg); color: var(--info); }
+    .scenario-dropped-off   { background: var(--warn-bg); color: var(--warn); }
+    .scenario-final-notice  { background: var(--danger-bg); color: var(--danger); }
     .scenario-moodle-no-login { background: #ede9fe; color: #5b21b6; }
-    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-1) var(--space-3); font: 500 var(--fs-meta)/1.4 inherit; background: var(--color-surface); color: var(--color-text-primary); cursor: pointer; white-space: nowrap; }
-    .btn:hover { background: var(--color-surface-raised); }
-    .btn-primary { background: var(--color-primary); color: var(--color-primary-fg); border-color: var(--color-primary); }
-    .btn-success { background: var(--color-success-bg); color: var(--color-success-fg); border-color: color-mix(in srgb,var(--color-success-fg) 30%,transparent); }
-    .btn-danger  { background: var(--color-danger-bg); color: var(--color-danger-fg); border-color: color-mix(in srgb,var(--color-danger-fg) 30%,transparent); }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-1) var(--space-3); font: 500 var(--fs-meta)/1.4 inherit; background: var(--surface); color: var(--text); cursor: pointer; white-space: nowrap; }
+    .btn:hover { background: var(--surface-2); }
+    .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .btn-success { background: var(--success-bg); color: var(--success); border-color: color-mix(in srgb,var(--success) 30%,transparent); }
+    .btn-danger  { background: var(--danger-bg); color: var(--danger); border-color: color-mix(in srgb,var(--danger) 30%,transparent); }
     .actions { display: flex; gap: 4px; flex-wrap: wrap; }
-    .msg { padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-raised); font-size: var(--fs-body); }
-    .msg.error   { border-color: color-mix(in srgb,var(--color-danger-fg) 30%,transparent); background: var(--color-danger-bg); color: var(--color-danger-fg); }
-    .msg.success { border-color: color-mix(in srgb,var(--color-success-fg) 30%,transparent); background: var(--color-success-bg); color: var(--color-success-fg); }
+    .msg { padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); font-size: var(--fs-body); }
+    .msg.error   { border-color: color-mix(in srgb,var(--danger) 30%,transparent); background: var(--danger-bg); color: var(--danger); }
+    .msg.success { border-color: color-mix(in srgb,var(--success) 30%,transparent); background: var(--success-bg); color: var(--success); }
     @media (max-width: 900px) { .fs-table-wrap { display: none; } .mobile-cards { display: grid !important; } }
     .mobile-cards { display: none; gap: var(--space-2); }
-    .mobile-card { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3); background: var(--color-surface); }
+    .mobile-card { border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-3); background: var(--surface); }
   </style>
 </head>
 <body>
@@ -197,7 +197,7 @@
         const dayAgo = log.email_sent_at ? daysSince(log.email_sent_at) : null;
         const attDays = stu?._last_att_date ? daysSince(stu._last_att_date) : null;
         return `<tr>
-          <td><strong>${esc(log._name || log.student_email)}</strong><div style="font-size:12px;color:var(--color-text-muted)">${esc(log.student_email)}</div></td>
+          <td><strong>${esc(log._name || log.student_email)}</strong><div style="font-size:12px;color:var(--muted)">${esc(log.student_email)}</div></td>
           <td>${esc(stu?.fellowship_code || "-")}</td>
           <td>${esc(stu?._class_label || "-")}</td>
           <td>${scenarioBadge(log.scenario)}</td>
@@ -217,10 +217,10 @@
         const stu = state.students.find((s) => (s.email || "").toLowerCase() === (log.student_email || "").toLowerCase());
         return `<article class="mobile-card">
           <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
-            <div><strong>${esc(log._name || log.student_email)}</strong><div style="font-size:12px;color:var(--color-text-muted)">${esc(log.student_email)}</div></div>
+            <div><strong>${esc(log._name || log.student_email)}</strong><div style="font-size:12px;color:var(--muted)">${esc(log.student_email)}</div></div>
             ${scenarioBadge(log.scenario)}
           </div>
-          <div style="margin-top:6px;font-size:12px;color:var(--color-text-muted)">${esc(stu?.fellowship_code || "-")} · ${esc(stu?._class_label || "No class")}</div>
+          <div style="margin-top:6px;font-size:12px;color:var(--muted)">${esc(stu?.fellowship_code || "-")} Â· ${esc(stu?._class_label || "No class")}</div>
           <div class="actions" style="margin-top:8px">
             <button class="fs-btn btn-success" data-action="responded" data-email="${esc(log.student_email)}" data-batch="${esc(log.batch_id || "")}">Responded</button>
             <button class="fs-btn btn-danger"  data-action="withdrawn"  data-email="${esc(log.student_email)}" data-batch="${esc(log.batch_id || "")}">Withdraw</button>
@@ -247,7 +247,7 @@
           entity_id: stu?.student_id || email, actor_email: state.profile?.email || null,
           status: "SUCCESS", details: { email, batch_id: batchId }, created_at: now,
         });
-        showFlash(`${email} marked as responded — status restored to Active.`);
+        showFlash(`${email} marked as responded â€” status restored to Active.`);
       }
 
       if (action === "withdrawn") {
@@ -270,8 +270,8 @@
         const firstName = String(stu?.full_name || email).split(/\s+/)[0];
         const templateKey = scenario === "dropped_off" ? "engagement_dropped_off" : "engagement_never_started";
         const subject = scenario === "dropped_off"
-          ? `We miss you at Rock Solid — ${firstName}`
-          : `We saved your spot at Rock Solid — ${firstName}`;
+          ? `We miss you at Rock Solid â€” ${firstName}`
+          : `We saved your spot at Rock Solid â€” ${firstName}`;
         const { error } = await supabase.from("email_queue").insert({
           recipient_email: email,
           recipient_name: stu?.full_name || "",
@@ -285,7 +285,7 @@
             teacher_name:    stu?.teacher_name || "your teacher",
             moodle_url:      "https://rocksolid.lwcanada.org/",
             last_attended_date: stu?._last_att_date ? fmt(stu._last_att_date) : "not yet",
-            sessions_missed: "—",
+            sessions_missed: "â€”",
           },
         });
         if (error) { showFlash(`Email queue failed: ${error.message}`, "error"); return; }
@@ -369,7 +369,7 @@
     async function boot() {
       if (!window.FS_CONFIG?.SUPABASE_URL) {
         window.FSAdminShell?.mount({ active: "atrisk", pageTitle: "At Risk Students", profileName: "Not connected" });
-        showFlash("⚠ Not connected — open via live server with config.js", "error");
+        showFlash("âš  Not connected â€” open via live server with config.js", "error");
         return;
       }
       const auth = await requireAuth(["admin", "superadmin", "principal", "pastor", "subgroup_admin", "regional_secretary"]);
@@ -387,5 +387,6 @@
   </script>
 </body>
 </html>
+
 
 

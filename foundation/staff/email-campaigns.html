@@ -4,11 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Rock Solid - Email Campaigns</title>
-
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../ui/premium-theme.css" />
+<link rel="stylesheet" href="../ui/components.css" />
+<link rel="stylesheet" href="../ui/layout.css" />
+<link rel="stylesheet" href="../ui/admin-shell.css" />
+<link rel="stylesheet" href="../ui/primitives.css" />
 <style>
-:root{--navy:var(--color-primary);--gold:var(--color-warning);--bg:var(--color-bg);--border:var(--color-border);--text:var(--color-text-primary);--muted:var(--color-text-muted);--success:var(--color-success-fg);--success-bg:var(--color-success-bg);--danger:var(--color-danger-fg);--danger-bg:var(--color-danger-bg);--warn:var(--color-warning-fg);--warn-bg:var(--color-warning-bg);--info:var(--color-info-fg);--info-bg:var(--color-info-bg)}
+/* design-system tokens loaded via premium-theme.css */
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Manrope",system-ui,sans-serif;font-size:14px}
 main{max-width:1180px;margin:0 auto;padding:28px 24px 60px}
 .card{background:white;border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:18px;box-shadow:0 8px 28px rgba(76,42,146,.06)}
 .card h2{font-size:16px;color:var(--navy);margin:0 0 14px}
@@ -16,10 +23,11 @@ main{max-width:1180px;margin:0 auto;padding:28px 24px 60px}
 button,.btn{border:0;border-radius:9px;padding:10px 15px;font-weight:700;cursor:pointer;background:var(--navy);color:white;text-decoration:none;display:inline-block}
 button.secondary{background:white;color:var(--text);border:1px solid var(--border)}
 input,select,textarea{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font:inherit;background:white}
-label{font-size:12px;font-weight:700;color:var(--color-text-muted);display:block;margin-bottom:6px}
+textarea{resize:vertical;min-height:90px}
+label{font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:6px}
 .table-wrap{overflow:auto}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;background:#f8f6ff;color:var(--color-text-muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding:10px 12px;white-space:nowrap}
+th{text-align:left;background:#f8f6ff;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding:10px 12px;white-space:nowrap}
 td{border-top:1px solid var(--border);padding:10px 12px;vertical-align:top}
 tr:hover td{background:#faf9ff}
 .badge{display:inline-block;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:700}
@@ -27,10 +35,38 @@ tr:hover td{background:#faf9ff}
 .bad{background:var(--danger-bg);color:var(--danger)}
 .wait{background:var(--warn-bg);color:var(--warn)}
 .info{background:var(--info-bg);color:var(--info)}
-.muted{color:var(--color-text-muted)}
+.muted{color:var(--muted)}
 .error{background:var(--danger-bg);border:1px solid #fca5a5;color:var(--danger);padding:12px;border-radius:10px;margin:10px 0}
 .actions{display:flex;gap:7px;flex-wrap:wrap}
-.small{font-size:12px;color:var(--color-text-muted)}
+.small{font-size:12px;color:var(--muted)}
+
+/* ── Modals ─────────────────────────────────────────────────── */
+.cmp-modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
+  z-index:4000;align-items:center;justify-content:center;padding:16px;
+}
+.cmp-modal{
+  background:white;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.25);
+  width:100%;max-width:680px;max-height:90vh;overflow-y:auto;padding:28px;
+  position:relative;
+}
+.cmp-modal.wide{max-width:860px}
+.cmp-modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.cmp-modal-header h3{margin:0;font-size:18px;color:var(--navy)}
+.cmp-modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);padding:0;line-height:1}
+.cmp-field{margin-bottom:14px}
+.cmp-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.cmp-tags-box{
+  border:1px solid var(--border);border-radius:10px;padding:10px;
+  max-height:160px;overflow-y:auto;background:white;
+}
+.cmp-modal-footer{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+.cmp-modal-footer .err{color:var(--danger);font-size:12px;flex:1}
+.cmp-recipient-count{font-size:12px;color:var(--muted);margin-top:6px}
+/* Preview modal */
+.cmp-preview-frame{width:100%;height:500px;border:1px solid var(--border);border-radius:10px;margin-top:12px}
+.cmp-preview-text{white-space:pre-wrap;font-size:13px;background:#f8f6ff;border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:12px;max-height:500px;overflow-y:auto}
+.cmp-meta{font-size:13px;color:var(--muted);margin-bottom:4px}
 </style>
   <link rel="stylesheet" href="../ui/tokens.css" />
   <link rel="stylesheet" href="../ui/premium-theme.css" />
@@ -42,6 +78,22 @@ tr:hover td{background:#faf9ff}
 
 <main class="fs-content">
 
+<!-- ── Campaign Drafts ─────────────────────────────────────── -->
+<section class="card">
+  <div class="actions" style="justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <h2 style="margin:0;">Email Campaigns</h2>
+    <button class="fs-btn" id="cmpNewBtn">+ New Campaign</button>
+  </div>
+
+  <div id="cmpList"><div class="muted" style="padding:12px 0">Loading…</div></div>
+
+  <p class="small" style="margin-top:12px;">
+    Campaigns are queued server-side — the Resend API key is never exposed to the browser.
+    The edge function processes the queue on its cron interval.
+  </p>
+</section>
+
+<!-- ── Queue Email (single) ───────────────────────────────── -->
 <section class="card">
   <h2>Queue Email</h2>
 
@@ -72,12 +124,13 @@ tr:hover td{background:#faf9ff}
   </div>
 
   <p class="small" style="margin-top:12px;">
-    This queues the email only. Mailchimp sending will later be handled by the Edge Function.
+    This queues the email only. Sending is handled by the Edge Function.
   </p>
 
   <button class="fs-btn fs-btn-secondary" onclick="queueEmail()">Queue Email</button>
 </section>
 
+<!-- ── Email Queue table ────────────────────────────────────── -->
 <section class="card">
   <div class="actions" style="justify-content:space-between;align-items:center;margin-bottom:12px;">
     <h2 style="margin:0;">Email Queue</h2>
@@ -92,11 +145,85 @@ tr:hover td{background:#faf9ff}
 
 </main>
 
+<!-- ── Campaign Composer Modal ──────────────────────────────── -->
+<div class="cmp-modal-overlay" id="cmpModal">
+  <div class="cmp-modal">
+    <div class="cmp-modal-header">
+      <h3 id="cmpModalTitle">New Campaign</h3>
+      <button class="cmp-modal-close" id="cmpModalClose" aria-label="Close">&times;</button>
+    </div>
+
+    <div class="cmp-field">
+      <label>Campaign Title (internal)</label>
+      <input id="cmpTitle" placeholder="e.g. May 2026 Welcome">
+    </div>
+
+    <div class="cmp-field">
+      <label>Subject Line</label>
+      <input id="cmpSubject" placeholder="e.g. Welcome to Rock Solid Foundation">
+    </div>
+
+    <div class="cmp-field">
+      <label>Plain Text Body</label>
+      <textarea id="cmpBodyText" rows="5" placeholder="Plain text version of the email…"></textarea>
+    </div>
+
+    <div class="cmp-field">
+      <label>HTML Body (optional)</label>
+      <textarea id="cmpBodyHtml" rows="6" placeholder="<p>Your HTML email content…</p>"></textarea>
+      <div style="margin-top:6px;">
+        <button type="button" class="fs-btn fs-btn-secondary" id="cmpPreviewHtmlBtn" style="font-size:12px;padding:6px 11px;">
+          Preview HTML
+        </button>
+      </div>
+    </div>
+
+    <div class="cmp-field">
+      <label>Recipient Campuses / Fellowships (select to target all students in these campuses)</label>
+      <div class="cmp-tags-box" id="cmpTagList">
+        <div class="muted" style="font-size:12px">Loading campuses…</div>
+      </div>
+    </div>
+
+    <div class="cmp-field">
+      <label>Individual Recipients (email addresses, comma-separated)</label>
+      <textarea id="cmpIndividuals" rows="3" placeholder="alice@example.com, bob@example.com"></textarea>
+    </div>
+
+    <div>
+      <button type="button" class="fs-btn fs-btn-secondary" id="cmpPreviewRecipientsBtn" style="font-size:12px;padding:6px 11px;">
+        Preview Recipient Count
+      </button>
+      <div class="cmp-recipient-count" id="cmpRecipientCount"></div>
+    </div>
+
+    <div class="cmp-modal-footer">
+      <button class="fs-btn" id="cmpSaveBtn">Save Draft</button>
+      <button class="fs-btn fs-btn-secondary" id="cmpModalClose2" onclick="document.getElementById('cmpModal').style.display='none'">Cancel</button>
+      <span class="err" id="cmpSaveErr"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ── HTML Preview Modal ────────────────────────────────────── -->
+<div class="cmp-modal-overlay" id="cmpPreviewModal">
+  <div class="cmp-modal wide">
+    <div class="cmp-modal-header">
+      <h3 id="cmpPreviewTitle">Preview</h3>
+      <button class="cmp-modal-close" id="cmpPreviewModalClose" aria-label="Close">&times;</button>
+    </div>
+    <div class="cmp-meta">Subject: <strong id="cmpPreviewSubject"></strong></div>
+    <iframe class="cmp-preview-frame" id="cmpPreviewFrame" sandbox="allow-same-origin" title="Email preview"></iframe>
+    <pre class="cmp-preview-text" id="cmpPreviewText" style="display:none"></pre>
+  </div>
+</div>
+
 <script src="../js/config.js"></script>
 <script src="../js/config-helper.js"></script>
 <script src="../js/direct-email-modal.js"></script>
 <script type="module">
 import { supabase, requireAuth, isAdmin, isRegionalSecretary } from "../auth/auth-client.js";
+import { initCampaigns } from "../js/email-campaigns.js";
 
 const auth = await requireAuth(["superadmin", "admin"]);
 if (!auth || !(isAdmin(auth.profile?.role) || isRegionalSecretary(auth.profile?.role))) {
@@ -106,15 +233,13 @@ if (!auth || !(isAdmin(auth.profile?.role) || isRegionalSecretary(auth.profile?.
 const db = supabase;
 window.FSDirectEmail?.init({ supabase, senderEmail: auth?.profile?.email || "" });
 
+await initCampaigns(db, { profile: auth?.profile });
+
 const $ = id => document.getElementById(id);
 
 function esc(v){
   return String(v ?? "").replace(/[&<>'"]/g, c => ({
-    "&":"&amp;",
-    "<":"&lt;",
-    ">":"&gt;",
-    "'":"&#39;",
-    '"':"&quot;"
+    "&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"
   }[c]));
 }
 
@@ -126,108 +251,68 @@ function fmt(v){
 
 function badge(s){
   const x = String(s || "").toLowerCase();
-
   const cls =
-    x.includes("fail") || x.includes("error")
-      ? "bad"
-      : x.includes("pending") || x.includes("queue")
-        ? "wait"
-        : x.includes("sent") || x.includes("complete")
-          ? "ok"
-          : "info";
-
-  const map = { ok: "fs-badge-success", bad: "fs-badge-danger", wait: "fs-badge-warning", info: "fs-badge-info" }; return `<span class="fs-badge ${map[cls] || "fs-badge-neutral"}">${esc(s || "--")}</span>`;
-}
-
-async function signOut(){
-  if (db?.auth) await db.auth.signOut();
-  location.href = "/foundation/auth/login.html";
+    x.includes("fail") || x.includes("error")  ? "bad"
+    : x.includes("pending") || x.includes("queue") ? "wait"
+    : x.includes("sent") || x.includes("complete")  ? "ok"
+    : "info";
+  const map = { ok:"fs-badge-success", bad:"fs-badge-danger", wait:"fs-badge-warning", info:"fs-badge-info" };
+  return `<span class="fs-badge ${map[cls] || "fs-badge-neutral"}">${esc(s || "--")}</span>`;
 }
 
 function rowsToTable(headers, rows){
   return `
     <div class="table-wrap fs-table-wrap">
       <table class="fs-table">
-        <thead>
-          <tr>${headers.map(h => `<th>${esc(h)}</th>`).join("")}</tr>
-        </thead>
+        <thead><tr>${headers.map(h=>`<th>${esc(h)}</th>`).join("")}</tr></thead>
         <tbody>
-          ${
-            rows.length
-              ? rows.join("")
-              : `<tr><td colspan="${headers.length}" class="muted">No records found.</td></tr>`
-          }
+          ${rows.length
+            ? rows.join("")
+            : `<tr><td colspan="${headers.length}" class="muted">No records found.</td></tr>`}
         </tbody>
       </table>
-    </div>
-  `;
+    </div>`;
 }
 
 function showErr(id, e){
-  $(id).innerHTML =
-    `<div class="fs-banner fs-banner-danger">${esc(e.message || e)}</div>`;
+  $(id).innerHTML = `<div class="fs-banner fs-banner-danger">${esc(e.message || e)}</div>`;
 }
 
 async function queueEmail(){
-  if (!db) {
-    showErr("emails", "Supabase client is not available.");
-    return;
-  }
+  if (!db) { showErr("emails","Supabase client is not available."); return; }
   const recipient_email = $("recipientEmail").value.trim();
-  const recipient_name = $("recipientName").value.trim();
-  const template_key = $("templateKey").value;
-  const subject = $("subject").value.trim();
+  const recipient_name  = $("recipientName").value.trim();
+  const template_key    = $("templateKey").value;
+  const subject         = $("subject").value.trim();
 
   if(!recipient_email || !template_key){
     alert("Recipient email and template are required.");
     return;
   }
 
-  const { error } = await db
-    .from("email_queue")
-    .insert({
-      recipient_email,
-      recipient_name,
-      template_key,
-      subject,
-      status: "Pending",
-      payload: {
-        recipient_email,
-        recipient_name,
-        template_key,
-        subject
-      }
-    });
+  const { error } = await db.from("email_queue").insert({
+    recipient_email, recipient_name, template_key, subject,
+    status: "Pending",
+    payload: { recipient_email, recipient_name, template_key, subject }
+  });
 
-  if(error){
-    alert(error.message);
-    return;
-  }
-
+  if(error){ alert(error.message); return; }
   alert("Email queued.");
-
   $("recipientEmail").value = "";
-  $("recipientName").value = "";
-  $("subject").value = "";
-
+  $("recipientName").value  = "";
+  $("subject").value        = "";
   loadEmails();
 }
 
-function openDirectEmailModal() {
-  if (!window.FSDirectEmail?.open) {
-    alert("Direct email modal is not available.");
-    return;
-  }
+function openDirectEmailModal(){
+  if (!window.FSDirectEmail?.open){ alert("Direct email modal is not available."); return; }
   window.FSDirectEmail.open({ bulk: true });
 }
 
 async function loadEmails(){
   const el = $("emails");
   el.innerHTML = "Loading...";
-  if (!db) {
-    showErr("emails", "Supabase client is not available.");
-    return;
-  }
+  if (!db){ showErr("emails","Supabase client is not available."); return; }
 
   try{
     const { data, error } = await db
@@ -239,27 +324,27 @@ async function loadEmails(){
     if(error) throw error;
 
     el.innerHTML = rowsToTable(
-      ["Created", "Recipient", "Name", "Template", "Subject", "Status", "Error"],
-      (data || []).map(row => `
+      ["Created","Recipient","Name","Template","Subject","Campaign","Status","Error"],
+      (data||[]).map(row=>`
         <tr>
           <td>${fmt(row.created_at)}</td>
           <td>${esc(row.recipient_email)}</td>
-          <td>${esc(row.recipient_name || "--")}</td>
+          <td>${esc(row.recipient_name||"--")}</td>
           <td>${esc(row.template_key)}</td>
-          <td>${esc(row.subject || "--")}</td>
+          <td>${esc(row.subject||"--")}</td>
+          <td>${esc(row.campaign_id ? row.campaign_id.slice(0,8)+"…" : "--")}</td>
           <td>${badge(row.status)}</td>
-          <td>${esc(row.error_message || "--")}</td>
+          <td>${esc(row.error_message||"--")}</td>
         </tr>
       `)
     );
-
-  } catch(e){
-    showErr("emails", e);
-  }
+  } catch(e){ showErr("emails",e); }
 }
 
 loadEmails();
+window.queueEmail          = queueEmail;
 window.openDirectEmailModal = openDirectEmailModal;
+window.loadEmails          = loadEmails;
 </script>
 
   <script src="../ui/premium-shell.js"></script>
@@ -269,12 +354,3 @@ window.openDirectEmailModal = openDirectEmailModal;
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-

@@ -9,46 +9,183 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
   <style>
-    :root { --bg:#f5f5f7; --surface:#fff; --text:#1a1a2e; --muted:#6b7280; --line:#e5e7eb; --secondary:#4C2A92; --danger:#C8102E; --ok:#16a34a; --shadow-sm:0 2px 8px rgba(0,0,0,.08); --shadow-md:0 4px 16px rgba(0,0,0,.12); }
-    [data-theme="dark"] { --bg:#0f1220; --surface:#171a2b; --text:#eef0ff; --muted:#a7aec9; --line:#2f3550; --shadow-sm:0 2px 10px rgba(0,0,0,.35); --shadow-md:0 6px 20px rgba(0,0,0,.45); }
-    *{box-sizing:border-box} body{margin:0;font-family:"Manrope",sans-serif;color:var(--text);background:var(--bg)}
-    .topbar{position:sticky;top:0;z-index:100;height:56px;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 16px}
-    .brand{display:flex;align-items:center;gap:10px;min-width:0}.brand-logo{height:32px}.brand-title{margin:0;font-size:16px;font-weight:800;line-height:1.1}.brand-sub{margin:0;font-size:12px;color:var(--muted)}.viewing-as{margin:2px 0 0;font-size:12px;color:var(--muted);display:none}
-    .top-tools{display:flex;align-items:center;gap:8px}.tool-input,.tool-btn,.tool-select{border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:8px;font:600 13px/1.2 "Manrope",sans-serif;padding:9px 10px}.tool-input{width:260px}.tool-select{min-width:160px}.tool-btn{cursor:pointer}.tool-btn:hover{box-shadow:var(--shadow-sm)}
-    .mobile-tools-toggle{display:none;border:0;background:transparent;color:var(--text);font-size:22px;cursor:pointer}
-    .mobile-menu{display:none;position:absolute;top:56px;right:8px;width:min(320px,calc(100vw - 16px));background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px;box-shadow:var(--shadow-md);z-index:120}
-    .mobile-menu.open{display:grid;gap:8px}
-    .page{max-width:1180px;margin:0 auto;padding:14px 16px 28px}.toolbar{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-bottom:10px}
-    .search-results{display:none;margin-bottom:10px;border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:var(--shadow-sm)}.search-results.open{display:block}
-    .search-item{border-top:1px solid var(--line);padding:10px;display:flex;justify-content:space-between;gap:8px}.search-item:first-child{border-top:0}
-    .search-meta{margin-top:3px;font-size:12px;color:var(--muted)}.role-badge{border-radius:999px;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;margin-right:6px}
-    .crumb{margin:0 0 10px;color:var(--muted);font-size:13px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-    .back-link{color:var(--muted);text-decoration:none;font-size:13px;margin-bottom:8px;display:inline-block}
-    .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-    .role-card{border:1px solid var(--line);border-left:4px solid var(--secondary);border-radius:12px;background:var(--surface);box-shadow:var(--shadow-sm);padding:14px;display:grid;gap:12px}
-    .role-card:hover{box-shadow:var(--shadow-md)}.role-head{display:flex;gap:10px;align-items:flex-start}
-    .role-icon{width:40px;height:40px;font-size:24px;display:grid;place-items:center;flex-shrink:0}.role-name{margin:0;font-size:16px;font-weight:800;color:var(--text)}.role-desc{margin:3px 0 0;font-size:13px;color:var(--muted)}
-    .role-btn{width:100%;border:0;border-radius:8px;color:#fff;font:700 13px/1.2 "Manrope",sans-serif;padding:10px;cursor:pointer}
-    .hidden{display:none!important}.guide-top{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-sm);padding:14px;margin-bottom:12px}
-    .guide-head-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-    .role-pill{border-radius:999px;color:#fff;padding:7px 10px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:8px}.progress{color:var(--muted);font-size:13px;font-weight:700}
-    .tabs-wrap{background:#f3f4f6;border-radius:8px;padding:4px;overflow-x:auto}.tabs{display:flex;gap:6px;min-width:max-content}
-    .tab-btn{border:1px solid transparent;border-radius:8px;background:transparent;color:var(--text);padding:9px 12px;font:500 14px/1.2 "Manrope",sans-serif;cursor:pointer;white-space:nowrap}
-    .tab-btn.active{background:#fff;border-color:var(--line);box-shadow:0 1px 4px rgba(0,0,0,.08)}
-    .content-card{background:var(--surface);border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:16px;border:1px solid var(--line)}
-    .section-title{margin:0 0 8px;font-size:18px}.muted{color:var(--muted);font-size:13px}.grid{display:grid;gap:10px}.item{border:1px solid var(--line);border-radius:12px;padding:12px}.item h4{margin:0 0 6px;font-size:14px}.item p{margin:0;font-size:13px;color:var(--muted)}
-    .acc{display:grid;gap:10px}.acc-item{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}.acc-item.open{border-left:4px solid var(--secondary)}
-    .acc-head{width:100%;border:0;background:transparent;color:inherit;min-height:44px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;font:700 14px/1.2 "Manrope",sans-serif;cursor:pointer}
-    .acc-left{display:flex;gap:8px;align-items:center;text-align:left}.chev{transition:transform .2s ease}.acc-item.open .chev{transform:rotate(90deg)}
-    .acc-body{max-height:0;overflow:hidden;transition:max-height .25s ease;border-top:1px solid transparent}.acc-item.open .acc-body{border-top-color:var(--line)}.acc-inner{padding:10px 12px 12px}
-    .steps{list-style:none;margin:0;padding:0;display:grid;gap:8px}.steps li{display:flex;gap:10px;align-items:flex-start;font-size:13px}.steps input{margin-top:2px;transform:scale(1.1);accent-color:var(--secondary)}
-    .n{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:999px;background:var(--secondary);color:#fff;font-size:11px;font-weight:700;margin-right:5px;flex-shrink:0}.step-complete .n{background:var(--ok)}
-    .table-wrap{overflow-x:auto}.fs-table{width:100%;border-collapse:collapse;font-size:13px}.fs-table th,.fs-table td{border:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}.fs-table th{background:#f9fafb}
-    .status-badge{display:inline-block;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700}.status-assigned{background:#dcfce7;color:#166534}.status-pending{background:#fef3c7;color:#92400e}.status-waitlisted{background:#dbeafe;color:#1e3a8a}.status-duplicate{background:#e5e7eb;color:#374151}
-    .trouble{border:1px solid var(--line);border-left:4px solid var(--danger);border-radius:12px;padding:12px;background:var(--surface)}.trouble h4{margin:0 0 6px;font-size:14px}.cause{color:var(--muted);font-style:italic}
-    @media (max-width:1024px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
-    @media (max-width:768px){.top-tools{display:none}.mobile-tools-toggle{display:block}.toolbar{grid-template-columns:1fr}.cards{grid-template-columns:1fr}.content-card{padding:16px}}
-    @media print{.topbar,.toolbar,.tabs-wrap,.search-results,#landingView .role-btn,.back-link{display:none!important}body{background:#fff;color:#111}.page{max-width:none;padding:0}.content-card,.guide-top,.acc-item,.trouble{box-shadow:none!important}.acc-body{max-height:none!important;border-top-color:#ccc!important}}
+    /* ── Tokens ─────────────────────────────────────────────── */
+    :root {
+      --primary: #4C2A92;
+      --primary-hover: #7d62c8;
+      --bg: #f8f5ee;
+      --surface: #fff;
+      --surface-2: #faf7f2;
+      --text: #1a1a2e;
+      --text-2: #374151;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --border-2: #ede9e1;
+      --danger: #C8102E;
+      --danger-bg: rgba(200,16,46,.07);
+      --ok: #16a34a;
+      --shadow-soft: 0 2px 8px rgba(0,0,0,.07);
+      --shadow: 0 4px 16px rgba(0,0,0,.12);
+      --shadow-pop: 0 8px 28px rgba(0,0,0,.14);
+      --r-md: 10px;
+      --r-lg: 14px;
+      --r-full: 9999px;
+      --soft-purple: rgba(76,42,146,.10);
+    }
+    [data-theme="dark"] {
+      --bg: #0f1220;
+      --surface: #171a2b;
+      --surface-2: #1e2236;
+      --text: #eef0ff;
+      --text-2: #c3c9e0;
+      --muted: #8892b0;
+      --border: #2f3550;
+      --border-2: #252b42;
+      --soft-purple: rgba(125,98,200,.18);
+      --shadow-soft: 0 2px 10px rgba(0,0,0,.35);
+      --shadow: 0 6px 20px rgba(0,0,0,.45);
+    }
+
+    /* ── Reset ───────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; font-family: "Manrope", sans-serif; color: var(--text); background: var(--bg); }
+
+    /* ── Topbar ──────────────────────────────────────────────── */
+    .topbar { position: sticky; top: 0; z-index: 100; height: 56px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 18px; box-shadow: var(--shadow-soft); }
+    .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .brand-logo { height: 32px; }
+    .brand-title { margin: 0; font-size: 16px; font-weight: 800; line-height: 1.1; }
+    .brand-sub { margin: 0; font-size: 12px; color: var(--muted); }
+    #viewingAs { margin: 2px 0 0; font-size: 12px; color: var(--muted); display: none; }
+    .top-tools { display: flex; align-items: center; gap: 8px; }
+    .tool-input, .tool-btn, .tool-select { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: var(--r-md); font: 600 13px/1.2 "Manrope", sans-serif; padding: 8px 11px; }
+    .tool-input { width: 220px; }
+    .tool-select { min-width: 150px; }
+    .tool-btn { cursor: pointer; transition: box-shadow .12s; }
+    .tool-btn:hover { box-shadow: var(--shadow-soft); }
+    .mobile-tools-toggle { display: none; border: 0; background: transparent; color: var(--text); font-size: 22px; cursor: pointer; }
+    .mobile-menu { display: none; position: absolute; top: 56px; right: 10px; width: min(320px, calc(100vw - 20px)); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 12px; box-shadow: var(--shadow-pop); z-index: 120; }
+    .mobile-menu.open { display: grid; gap: 8px; }
+
+    /* ── Hero ────────────────────────────────────────────────── */
+    .hero { background: linear-gradient(135deg, #44267F, #2A2440); border-radius: var(--r-lg); padding: 32px 30px 30px; color: #fff; position: relative; overflow: hidden; margin-bottom: 24px; }
+    .hero::after { content: ''; position: absolute; right: -40px; top: -40px; width: 200px; height: 200px; border-radius: 50%; background: rgba(255,255,255,.07); pointer-events: none; }
+    .hero h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 6px; position: relative; z-index: 1; }
+    .hero p { font-size: 14px; opacity: .82; margin: 0 0 20px; position: relative; z-index: 1; max-width: 520px; font-weight: 500; line-height: 1.5; }
+    .hero-search { position: relative; z-index: 1; max-width: 520px; display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 16px; border-radius: var(--r-md); background: rgba(255,255,255,.95); }
+    .hero-search svg { width: 18px; height: 18px; stroke: var(--muted); stroke-width: 1.9; fill: none; flex-shrink: 0; }
+    #searchInput { border: 0; outline: 0; background: transparent; font-family: inherit; font-size: 14px; font-weight: 500; color: var(--text); width: 100%; }
+
+    /* ── Page chrome ─────────────────────────────────────────── */
+    .page { max-width: 1180px; margin: 0 auto; padding: 16px 18px 48px; }
+    .action-bar { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 12px; }
+    .hidden { display: none !important; }
+
+    /* ── Section title ───────────────────────────────────────── */
+    .sec-title { font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 13px; }
+
+    /* ── Search results ──────────────────────────────────────── */
+    .search-results { display: none; margin-bottom: 14px; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-soft); }
+    .search-results.open { display: block; }
+    .search-item { border-top: 1px solid var(--border); padding: 11px 16px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .search-item:first-child { border-top: 0; }
+    .search-meta { margin-top: 3px; font-size: 12px; color: var(--muted); }
+    .role-badge { border-radius: var(--r-full); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; margin-right: 6px; }
+
+    /* ── Breadcrumb & back ───────────────────────────────────── */
+    .crumb { margin: 0 0 12px; color: var(--muted); font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .back-link { color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 600; margin-bottom: 10px; display: inline-flex; align-items: center; gap: 4px; transition: color .12s; }
+    .back-link:hover { color: var(--primary); }
+    .muted { color: var(--muted); font-size: 13.5px; font-weight: 500; }
+
+    /* ── Role cards (landing) ────────────────────────────────── */
+    #landingNote { font-size: 13px; font-weight: 600; color: var(--muted); margin: 0 0 14px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px; }
+    .role-card { background: var(--surface); border: 1px solid var(--border); border-left-width: 4px; border-radius: var(--r-lg); padding: 18px; box-shadow: var(--shadow-soft); display: grid; gap: 12px; cursor: pointer; transition: transform .14s, box-shadow .18s; }
+    .role-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+    .role-head { display: flex; gap: 12px; align-items: flex-start; }
+    .role-icon { width: 40px; height: 40px; font-size: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 11px; background: var(--soft-purple); }
+    .role-name { margin: 0; font-size: 16px; font-weight: 800; color: var(--text); }
+    .role-desc { margin: 3px 0 0; font-size: 13px; color: var(--muted); font-weight: 500; line-height: 1.4; }
+    .role-btn { width: 100%; border: 0; border-radius: var(--r-md); color: #fff; font: 700 13px/1.2 "Manrope", sans-serif; padding: 10px; cursor: pointer; transition: opacity .12s, box-shadow .12s; }
+    .role-btn:hover { opacity: .9; box-shadow: 0 4px 14px rgba(76,42,146,.25); }
+
+    /* ── Guide view ──────────────────────────────────────────── */
+    .guide-top { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-soft); padding: 16px; margin-bottom: 14px; }
+    .guide-head-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+    .role-pill { border-radius: var(--r-full); color: #fff; padding: 7px 12px; font-size: 12.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; }
+    .progress { color: var(--muted); font-size: 13px; font-weight: 700; }
+
+    /* ── Tabs ────────────────────────────────────────────────── */
+    .tabs-wrap { background: color-mix(in srgb, var(--border) 60%, transparent); border-radius: var(--r-md); padding: 4px; overflow-x: auto; }
+    .tabs { display: flex; gap: 4px; min-width: max-content; }
+    .tab-btn { border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text); padding: 9px 14px; font: 600 13.5px/1.2 "Manrope", sans-serif; cursor: pointer; white-space: nowrap; transition: background .12s, box-shadow .12s; }
+    .tab-btn.active { background: var(--surface); border-color: var(--border); box-shadow: 0 1px 4px rgba(0,0,0,.08); color: var(--primary); font-weight: 800; }
+
+    /* ── Tab content cards ───────────────────────────────────── */
+    .content-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 24px; box-shadow: var(--shadow-soft); margin-bottom: 16px; }
+    .section-title { margin: 0 0 8px; font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
+    .grid { display: grid; gap: 10px; }
+    .item { border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--surface-2); }
+    .item h4 { margin: 0 0 6px; font-size: 14px; font-weight: 800; }
+    .item p { margin: 0; font-size: 13px; color: var(--muted); font-weight: 500; }
+
+    /* ── Accordion (tasks) ───────────────────────────────────── */
+    .acc { display: grid; gap: 10px; }
+    .acc-item { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; }
+    .acc-item.open { border-left: 4px solid var(--primary); }
+    .acc-head { width: 100%; border: 0; background: transparent; color: inherit; min-height: 44px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; font: 700 14px/1.2 "Manrope", sans-serif; cursor: pointer; transition: background .12s; }
+    .acc-head:hover { background: var(--surface-2); }
+    .acc-left { display: flex; gap: 8px; align-items: center; text-align: left; }
+    .chev { transition: transform .2s ease; flex-shrink: 0; }
+    .acc-item.open .chev { transform: rotate(90deg); }
+    .acc-body { max-height: 0; overflow: hidden; transition: max-height .25s ease; border-top: 1px solid transparent; }
+    .acc-item.open .acc-body { border-top-color: var(--border); }
+    .acc-inner { padding: 10px 14px 14px; }
+    .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .steps li { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; font-weight: 600; color: var(--text-2); }
+    .steps input { margin-top: 2px; transform: scale(1.1); accent-color: var(--primary); cursor: pointer; }
+    .n { display: inline-flex; place-items: center; justify-content: center; width: 20px; height: 20px; border-radius: var(--r-full); background: var(--primary); color: #fff; font-size: 11px; font-weight: 800; margin-right: 4px; flex-shrink: 0; }
+    .step-complete .n { background: var(--ok); }
+
+    /* ── Table ───────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; border-radius: var(--r-md); border: 1px solid var(--border); }
+    .fs-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .fs-table th, .fs-table td { border-bottom: 1px solid var(--border); padding: 9px 12px; text-align: left; vertical-align: top; }
+    .fs-table tr:last-child td { border-bottom: 0; }
+    .fs-table th { background: var(--surface-2); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+
+    /* ── Status badges ───────────────────────────────────────── */
+    .status-badge { display: inline-block; border-radius: var(--r-full); padding: 3px 10px; font-size: 11px; font-weight: 700; }
+    .status-assigned  { background: #dcfce7; color: #166534; }
+    .status-pending   { background: #fef3c7; color: #92400e; }
+    .status-waitlisted{ background: #dbeafe; color: #1e3a8a; }
+    .status-duplicate { background: #e5e7eb; color: #374151; }
+
+    /* ── Troubleshooting ─────────────────────────────────────── */
+    .trouble { border: 1px solid var(--border); border-left: 4px solid var(--danger); border-radius: 12px; padding: 14px; background: var(--surface); }
+    .trouble h4 { margin: 0 0 8px; font-size: 14px; font-weight: 800; }
+    .cause { color: var(--muted); font-style: italic; }
+
+    /* ── Print ───────────────────────────────────────────────── */
+    @media print {
+      .topbar, .action-bar, .tabs-wrap, .search-results, #landingView .role-btn, .back-link { display: none !important; }
+      body { background: #fff; color: #111; }
+      .page { max-width: none; padding: 0; }
+      .content-card, .guide-top, .acc-item, .trouble { box-shadow: none !important; }
+      .acc-body { max-height: none !important; border-top-color: #ccc !important; }
+    }
+
+    /* ── Responsive ──────────────────────────────────────────── */
+    @media (max-width: 900px) { .cards { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 640px) {
+      .top-tools { display: none; }
+      .mobile-tools-toggle { display: block; }
+      .cards { grid-template-columns: 1fr; }
+      .content-card { padding: 16px; }
+      .hero { padding: 24px 20px; }
+      .hero h1 { font-size: 22px; }
+    }
   </style>
 </head>
 <body>
@@ -75,19 +212,36 @@
       <button id="mobilePrintBtn" class="tool-btn" type="button">Print</button>
     </div>
   </header>
+
   <div class="page">
-    <div class="toolbar">
-      <input id="searchInput" class="tool-input" type="search" placeholder="Search tasks across all roles" style="width:100%" />
-      <button id="clearSearch" class="tool-btn" type="button">Clear</button>
+
+    <!-- ── Hero ─────────────────────────────────────────────── -->
+    <div class="hero">
+      <h1>How can we help?</h1>
+      <p>Guides and step-by-step tasks for every role in Foundation School operations.</p>
+      <div class="hero-search">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+        <input id="searchInput" type="search" placeholder="Search tasks across all roles…" autocomplete="off" />
+      </div>
+    </div>
+
+    <!-- ── Action bar ─────────────────────────────────────────── -->
+    <div class="action-bar">
+      <button id="clearSearch" class="tool-btn" type="button">Clear search</button>
       <button id="homeBtn" class="tool-btn" type="button">Home</button>
     </div>
+
     <section id="searchResults" class="search-results"></section>
     <a id="backToRoles" class="back-link hidden" href="#">&larr; Back to roles</a>
     <nav id="breadcrumb" class="crumb"></nav>
+
+    <!-- ── Landing view ──────────────────────────────────────── -->
     <section id="landingView">
-      <p id="landingNote" class="muted" style="margin:0 0 10px;">Select your role to view guide</p>
+      <p id="landingNote" class="muted" style="margin:0 0 14px">Select your role to view guide</p>
       <div class="cards" id="roleCards"></div>
     </section>
+
+    <!-- ── Guide view ────────────────────────────────────────── -->
     <section id="guideView" class="hidden">
       <div class="guide-top">
         <div class="guide-head-row">
@@ -98,7 +252,9 @@
       </div>
       <div id="tabContent"></div>
     </section>
+
   </div>
+
   <script src="../js/config.js"></script>
   <script src="../js/config-helper.js"></script>
   <script type="module">

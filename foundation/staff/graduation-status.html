@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="../ui/primitives.css" />
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: "Manrope", sans-serif; color: var(--color-text-primary); background: var(--color-bg); min-height: 100dvh; }
+    body { margin: 0; font-family: "Manrope", sans-serif; color: var(--text); background: var(--bg); min-height: 100dvh; }
     .gate-icon { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: 12px; font-weight: 700; flex-shrink: 0; }
     .gate-icon.pass { background: #dcfce7; color: #166534; }
     .gate-icon.fail { background: #fee2e2; color: #991b1b; }
@@ -24,14 +24,14 @@
     .badge-not        { background: #fee2e2; color: #991b1b; }
     .badge-override   { background: #ede9fe; color: #5b21b6; }
     .badge-unevaluated { background: #f3f4f6; color: #6b7280; }
-    .msg { padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-raised); font-size: var(--fs-body); }
-    .msg.error   { border-color: color-mix(in srgb,var(--color-danger-fg) 30%,transparent); background: var(--color-danger-bg); color: var(--color-danger-fg); }
-    .msg.success { border-color: color-mix(in srgb,var(--color-success-fg) 30%,transparent); background: var(--color-success-bg); color: var(--color-success-fg); }
+    .msg { padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); font-size: var(--fs-body); }
+    .msg.error   { border-color: color-mix(in srgb,var(--danger) 30%,transparent); background: var(--danger-bg); color: var(--danger); }
+    .msg.success { border-color: color-mix(in srgb,var(--success) 30%,transparent); background: var(--success-bg); color: var(--success); }
     .modal-overlay { position: fixed; inset: 0; background: rgba(11,8,19,.45); z-index: 900; display: none; align-items: center; justify-content: center; }
     .modal-overlay.open { display: flex; }
-    .modal { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5); width: min(480px, 94vw); box-shadow: var(--shadow-overlay); }
+    .modal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-5); width: min(480px, 94vw); box-shadow: var(--shadow-overlay); }
     .modal h2 { margin: 0 0 var(--space-3); font-size: 16px; font-weight: 800; }
-    .form-label { font-size: 12px; font-weight: 600; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: var(--space-1); display: block; }
+    .form-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: var(--space-1); display: block; }
     .form-row { margin-bottom: var(--space-3); }
     @media (max-width: 768px) {
       #tableBody td:first-child > div:first-child {
@@ -193,7 +193,7 @@
       $("emptyState").style.display = "none";
       $("tableWrap").style.display = "";
       $("evaluateBatchBtn").disabled = !_isAdmin;
-      $("tableBody").innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--color-text-muted)">Loading…</td></tr>`;
+      $("tableBody").innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">Loading…</td></tr>`;
       flash("");
 
       // Fetch applicants + eligibility in one joined query
@@ -269,7 +269,7 @@
 
     function renderTable(rows) {
       if (!rows.length) {
-        $("tableBody").innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--color-text-muted)">No students match current filters.</td></tr>`;
+        $("tableBody").innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">No students match current filters.</td></tr>`;
         return;
       }
 
@@ -284,14 +284,14 @@
         return `<tr>
           <td>
             <div style="font-weight:600;font-size:13px">${esc(r.full_name || "—")}</div>
-            <div style="font-size:11px;color:var(--color-text-muted)">${esc(r.email || "")}</div>
+            <div style="font-size:11px;color:var(--muted)">${esc(r.email || "")}</div>
           </td>
           <td class="text-center">${ge ? gateIcon(ge.gate1_attendance) : "—"}</td>
           <td class="text-center">${ge ? gateIcon(ge.gate2_moodle_complete) : "—"}</td>
           <td class="text-center">${ge ? gateIcon(ge.gate3_milestones_met) : "—"}</td>
           <td class="text-center">${ge ? gateIcon(ge.gate4_exam_passed) : "—"}</td>
           <td>${eligibilityBadge(ge)}</td>
-          <td style="font-size:12px;color:var(--color-text-muted)">${ge ? fmt(ge.last_evaluated_at) : "—"}</td>
+          <td style="font-size:12px;color:var(--muted)">${ge ? fmt(ge.last_evaluated_at) : "—"}</td>
           <td>${actions}</td>
         </tr>`;
       }).join("");

@@ -37,7 +37,7 @@ function reportMissingConfig(keys) {
 export const CONFIG = readRuntimeConfig();
 const BYPASS_ROLE = (
   window.FS_CONFIG?.BYPASS_ROLE &&
-  (window.location.hostname === "localhost" || window.location.hostname.includes("127.0.0.1") || window.FS_CONFIG?.ENV === "dev")
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
 ) ? String(window.FS_CONFIG.BYPASS_ROLE).trim().toLowerCase() : "";
 if (BYPASS_ROLE) {
   console.warn("[auth-client] BYPASS_ROLE active — all role checks bypassed. Dev only.");
@@ -80,7 +80,7 @@ if (typeof window !== "undefined") {
 
 // Canonical landing URLs (relative to /foundation).
 export const TEACHER_LANDING_PATH = "teacher/index.html";
-export const ADMIN_LANDING_PATH = "staff/admin-dashboard.html";
+export const ADMIN_LANDING_PATH = "staff/admin-portal.html";
 
 export async function getSessionOrNull() {
   const { data } = await supabase.auth.getSession();
@@ -252,12 +252,39 @@ async function selectFirstWorkingMaybeSingle({ table, matchers, projections, sta
   return { data: null, error: lastError };
 }
 
+// Short-lived per-tab cache of the resolved profile so every page navigation
+// doesn't pay the profiles-table round trips again. Only canonical
+// profiles-table results are cached (never the metadata fallback, so a
+// transient failure can't pin a downgraded role).
+const PROFILE_CACHE_KEY = "fs_profile_cache_v1";
+const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
+
+function readCachedProfile(userId) {
+  try {
+    const entry = JSON.parse(sessionStorage.getItem(PROFILE_CACHE_KEY) || "null");
+    if (!entry || entry.user_id !== userId) return null;
+    if (Date.now() - entry.ts > PROFILE_CACHE_TTL_MS) return null;
+    return entry.profile || null;
+  } catch { return null; }
+}
+
+function writeCachedProfile(userId, profile) {
+  try {
+    sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ user_id: userId, ts: Date.now(), profile }));
+  } catch { /* storage unavailable — cache is best-effort */ }
+}
+
+function clearCachedProfile() {
+  try { sessionStorage.removeItem(PROFILE_CACHE_KEY); } catch { /* ignore */ }
+}
+
 /**
  * Returns the canonical profile for the current user.
  *
  * Resolution order:
- *   1. profiles table (canonical)  - keyed by user_id = auth user UUID
- *   2. Auth user metadata fallback - role: "user", active: true
+ *   1. sessionStorage cache (5-minute TTL, per tab)
+ *   2. profiles table (canonical)  - keyed by user_id = auth user UUID
+ *   3. Auth user metadata fallback - role: "user", active: true
  *
  * Throws only on auth errors (JWT expired / no session).
  * Returns null if no user is signed in.
@@ -268,6 +295,9 @@ export async function getCurrentProfile() {
 
   const user = userData?.user;
   if (!user) return null;
+
+  const cached = readCachedProfile(user.id);
+  if (cached) return cached;
 
   const profilesResult = await selectFirstWorkingMaybeSingle({
     table: "profiles",
@@ -282,10 +312,12 @@ export async function getCurrentProfile() {
   });
 
   if (profilesResult.data) {
-    return normalizeProfileRecord("profiles", profilesResult.data, user, {
+    const profile = normalizeProfileRecord("profiles", profilesResult.data, user, {
       defaultRole: "user",
       defaultActive: true,
     });
+    writeCachedProfile(user.id, profile);
+    return profile;
   }
   if (profilesResult.error && !isMissingTableError(profilesResult.error)) {
     warnAuthResolution("profiles lookup exhausted projections", profilesResult.error, { user_id: user.id });
@@ -449,6 +481,7 @@ export async function requireAuth(allowedRoles = []) {
 
 supabase.auth.onAuthStateChange((event) => {
   if (event === "SIGNED_OUT" || event === "TOKEN_REFRESH_FAILED") {
+    clearCachedProfile();
     redirectToLogin();
   }
 });

@@ -2,10 +2,10 @@ import { submitAvailability } from "./availabilityApi.js";
 import { supabase, getSessionOrNull, getCurrentProfile } from "../auth/auth-client.js";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const SLOTS = [
-  "6:00 AM", "7:00 AM", "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
-  "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM", "6:00 PM", "7:00 PM", "8:00 PM", "9:00 PM", "10:00 PM",
-];
+const DISPLAY_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const GRID_START_MIN = 6 * 60; // 6:00 AM
+const GRID_END_MIN = 22 * 60; // 10:00 PM
+const SLOT_SIZE_OPTIONS = [15, 30, 60];
 const TZ_OPTIONS = [
   "America/Toronto",
   "America/Vancouver",
@@ -16,6 +16,16 @@ const TZ_OPTIONS = [
   "America/Regina",
   "UTC",
 ];
+const TZ_LABELS = {
+  "America/Toronto": "Toronto",
+  "America/Vancouver": "Vancouver",
+  "America/Edmonton": "Edmonton",
+  "America/Winnipeg": "Winnipeg",
+  "America/Halifax": "Halifax",
+  "America/St_Johns": "St. John's",
+  "America/Regina": "Regina",
+  UTC: "UTC",
+};
 const SUBGROUP_LABELS = {
   CESGA: "Prairies (MB / SK)",
   CESGB: "Atlantic Canada",
@@ -30,6 +40,33 @@ function esc(v) {
 }
 function slotKey(day, time) { return `${day}__${time}`; }
 function splitKey(key) { const [day, time] = String(key || "").split("__"); return { day, time }; }
+
+function minutesToLabel(total) {
+  const h = Math.floor(total / 60);
+  const mi = total % 60;
+  const ap = h >= 12 ? "PM" : "AM";
+  let hh = h % 12;
+  if (hh === 0) hh = 12;
+  return `${hh}:${String(mi).padStart(2, "0")} ${ap}`;
+}
+function buildSlotStarts(slotMinutes) {
+  const out = [];
+  for (let m = GRID_START_MIN; m <= GRID_END_MIN; m += slotMinutes) out.push(m);
+  return out;
+}
+function tzAbbrev(tz, when) {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "short" }).formatToParts(when || new Date());
+    return (parts.find((p) => p.type === "timeZoneName") || {}).value || "";
+  } catch {
+    return "";
+  }
+}
+function tzDisplayLabel(tz) {
+  const city = TZ_LABELS[tz] || String(tz || "").split("/").pop().replace(/_/g, " ");
+  const abbr = tzAbbrev(tz);
+  return abbr ? `${city} (${abbr})` : city;
+}
 
 function formatBatchRange(startDate, endDate) {
   const fmt = (d) => d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "-";
@@ -111,13 +148,17 @@ export async function mountTeacherAvailability(containerId) {
     campuses: [],
     selectedCampusCodes: new Set(),
     activeCampusCode: "",
+    defaultCampusCode: "",
     slotSet: new Set(),
+    slotMinutes: 30,
+    slotStarts: [],
     search: "",
     teacherTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Toronto",
     batches: [],
     batchId: "",
     submitting: false,
   };
+  state.slotStarts = buildSlotStarts(state.slotMinutes);
 
   const session = await getSessionOrNull();
   if (!session) {
@@ -170,9 +211,15 @@ export async function mountTeacherAvailability(containerId) {
     timezone: String(r.timezone || "").trim() || "America/Toronto",
   })).filter((r) => r.code);
 
+  let preferredCampus = null;
   if (state.teacherRecord?.subgroup_id) {
-    const preferred = state.campuses.find((c) => c.subgroupID === state.teacherRecord.subgroup_id);
-    if (preferred) state.teacherTimezone = preferred.timezone || state.teacherTimezone;
+    preferredCampus = state.campuses.find((c) => c.subgroupID === state.teacherRecord.subgroup_id) || null;
+    if (preferredCampus) state.teacherTimezone = preferredCampus.timezone || state.teacherTimezone;
+  }
+  state.defaultCampusCode = (preferredCampus || state.campuses[0] || {}).code || "";
+  if (state.defaultCampusCode) {
+    state.selectedCampusCodes.add(state.defaultCampusCode);
+    state.activeCampusCode = state.defaultCampusCode;
   }
 
   root.innerHTML = `
@@ -196,6 +243,8 @@ export async function mountTeacherAvailability(containerId) {
       .ta-pill.active { background:#4C2A92; color:#fff; border-color:#4C2A92; }
       .ta-badge { margin-left:6px; border-radius:999px; padding:1px 7px; font-size:11px; font-weight:700; background:rgba(0,0,0,.08); }
       .ta-pill.active .ta-badge { background:rgba(255,255,255,.2); color:#fff; }
+      .ta-default-tag { font-size:9px; opacity:.85; margin-left:4px; text-transform:uppercase; letter-spacing:.04em; }
+      .ta-more-campuses-summary { cursor:pointer; font-weight:700; color:#4C2A92; font-size:13px; }
       .ta-group-head { font-size:16px; font-weight:800; margin:0 0 6px; padding-left:10px; border-left:4px solid #4C2A92; }
       .ta-group-head.ce { border-left-color:#4C2A92; }
       .ta-group-head.cs { border-left-color:#C8102E; }
@@ -210,14 +259,35 @@ export async function mountTeacherAvailability(containerId) {
         background-size:16px 16px; background-repeat:no-repeat;
       }
       #taCampusSearch { width:100%; border:1px solid #e5e7eb; border-radius:8px; padding:10px 12px 10px 36px; }
-      .ta-days { display:grid; grid-template-columns:80px repeat(7,1fr); background:var(--color-bg,#faf8ff); border-bottom:1px solid var(--color-border,#e6dcff); }
+      .ta-grid-toolbar { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; padding-bottom:12px; border-bottom:1px solid var(--fs-border); margin-bottom:10px; }
+      .ta-grid-toolbar-left { display:flex; align-items:center; gap:8px; font-weight:800; color:#19152d; font-size:15px; }
+      .ta-grid-toolbar-right { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+      .ta-grid-toolbar-right > span { display:flex; align-items:center; gap:6px; }
+      .ta-grid-toolbar-right label { font-size:12px; font-weight:700; color:var(--fs-text-muted); }
+      .ta-grid-toolbar-right select { border:1px solid #e5e7eb; border-radius:8px; padding:6px 10px; font-size:13px; }
+      .ta-grid-note { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--fs-text-muted); margin-bottom:10px; }
+      .ta-grid-note strong { color:#19152d; }
+      .ta-icon-cal, .ta-icon-clock { display:inline-block; width:16px; height:16px; vertical-align:-3px; opacity:.6; background-repeat:no-repeat; background-size:16px 16px; }
+      .ta-icon-cal { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E"); }
+      .ta-icon-clock { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpolyline points='12 6 12 12 16 14'/%3E%3C/svg%3E"); }
+      .ta-grid-scroll { max-height:460px; overflow-y:auto; border:1px solid var(--color-border,#e6dcff); border-radius:10px; }
+      .ta-days { display:grid; grid-template-columns:72px repeat(7,1fr); background:var(--color-bg,#faf8ff); border-bottom:1px solid var(--color-border,#e6dcff); position:sticky; top:0; z-index:1; }
       .ta-days div { padding:7px; text-align:center; font-size:11px; font-weight:700; border-left:1px solid var(--color-border,#e6dcff); }
-      .ta-days div:first-child { border-left:0; text-align:left; color:var(--color-text-secondary,#6b7280); }
-      .ta-slot { display:grid; grid-template-columns:80px repeat(7,1fr); border-bottom:1px solid var(--color-border,#e6dcff); }
-      .ta-time { padding:8px; background:var(--color-bg,#faf8ff); font-size:11px; color:var(--color-text-secondary,#6b7280); font-weight:600; }
-      .ta-cell { min-height:38px; border-left:1px solid var(--color-border,#e6dcff); display:flex; align-items:center; justify-content:center; cursor:pointer; user-select:none; font-size:12px; }
-      .ta-cell:hover { background:var(--soft-lavender,#f3ecff); }
-      .ta-cell.on { background:#f3e8ff; color:#5b21b6; font-weight:700; }
+      .ta-days div:first-child { border-left:0; }
+      .ta-row { display:grid; grid-template-columns:72px repeat(7,1fr); }
+      .ta-time { padding:2px 8px; font-size:10.5px; color:var(--color-text-secondary,#9b94b3); text-align:right; line-height:22px; }
+      .ta-time-hour { color:#19152d; font-weight:700; font-size:11px; }
+      .ta-cell { min-height:22px; border-left:1px solid var(--color-border,#f1ecff); border-top:1px solid var(--color-border,#f6f2ff); cursor:pointer; user-select:none; touch-action:none; margin:0 2px; }
+      .ta-cell:hover { background:#f6f2ff; }
+      .ta-cell.on { background:#4C2A92; border-color:#4C2A92; }
+      .ta-cell.on.pos-start { border-radius:8px 8px 0 0; }
+      .ta-cell.on.pos-end { border-radius:0 0 8px 8px; }
+      .ta-cell.on.pos-single { border-radius:8px; }
+      .ta-day-ranges { margin-top:14px; border-top:1px solid var(--fs-border); padding-top:10px; }
+      .ta-day-range-row { display:flex; align-items:baseline; gap:10px; padding:5px 2px; font-size:13px; }
+      .ta-day-range-label { width:90px; font-weight:800; flex-shrink:0; }
+      .ta-range-chip { display:inline-block; background:#f3ecff; color:#4C2A92; border-radius:999px; padding:2px 10px; margin:0 4px 4px 0; font-size:12px; font-weight:700; }
+      .ta-range-empty { color:var(--fs-text-muted); }
       .ta-bottom { display:flex; justify-content:space-between; align-items:center; }
       .ta-summary { position: sticky; top: 86px; align-self:start; }
       .ta-save-btn { width:100%; background:#4C2A92; border-color:#4C2A92; color:#fff; border-radius:8px; padding:14px; font-weight:700; min-height:46px; }
@@ -237,7 +307,6 @@ export async function mountTeacherAvailability(containerId) {
             <div><label class="fs-label">Teacher</label><input class="fs-input" id="taTeacher" disabled /></div>
             <div><label class="fs-label">Email</label><input class="fs-input" id="taEmail" disabled /></div>
             <div><label class="fs-label">Batch</label><select id="batchSelect" class="fs-select"></select></div>
-            <div><label class="fs-label">Timezone</label><select id="taTimezone" class="fs-select"></select></div>
           </div>
           <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--fs-border);">
             <label style="display:flex;align-items:center;gap:8px;">
@@ -249,18 +318,20 @@ export async function mountTeacherAvailability(containerId) {
               <select id="taOtherTeacherSelect" class="fs-select"></select>
             </div>
           </div>
-          <div style="margin-top:12px;">
-            <label class="fs-label">Search Campus</label>
-            <div class="ta-search-wrap">
-              <input id="taCampusSearch" class="fs-input" placeholder="Search campus..." />
-            </div>
-          </div>
           <div class="ta-card" style="margin-top:12px;padding:16px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <strong>Campuses</strong><span id="taCampusMeta" class="fs-muted"></span>
-          </div>
-          <div id="taCampusGroups" style="margin-top:8px;"></div>
-          <div class="fs-muted" style="margin-top:8px;">You are selecting availability in your own timezone. Selected times are converted per campus timezone.</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <strong>Campus</strong><span id="taCampusMeta" class="fs-muted"></span>
+            </div>
+            <div id="taDefaultCampusWrap" style="margin-top:10px;"></div>
+            <details id="taMoreCampuses" style="margin-top:10px;">
+              <summary class="ta-more-campuses-summary">Add other campuses</summary>
+              <div style="margin-top:10px;">
+                <label class="fs-label">Search Campus</label>
+                <div class="ta-search-wrap"><input id="taCampusSearch" class="fs-input" placeholder="Search campus..." /></div>
+                <div id="taCampusGroups" style="margin-top:8px;"></div>
+              </div>
+            </details>
+            <div class="fs-muted" style="margin-top:8px;">You are selecting availability in your own timezone. Selected times are converted per campus timezone.</div>
           </div>
           <div class="ta-mobile-save">
             <button id="taReviewMobile" class="fs-btn ta-save-btn" disabled>Review &amp; Submit</button>
@@ -275,10 +346,21 @@ export async function mountTeacherAvailability(containerId) {
     </section>
 
     <section class="ta-card" style="margin-bottom:12px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <strong id="taGridTitle">Weekly Grid</strong><span id="taGridTz" class="fs-muted"></span>
+      <div class="ta-grid-toolbar">
+        <div class="ta-grid-toolbar-left"><span class="ta-icon-cal"></span><span>Click or drag to select your free time</span></div>
+        <div class="ta-grid-toolbar-right">
+          <span><label for="taTimezone">Time zone</label><select id="taTimezone" class="fs-select"></select></span>
+          <span><label for="taSlotSize">Slot</label><select id="taSlotSize" class="fs-select">
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+            <option value="60">60 min</option>
+          </select></span>
+          <button id="taClearAll" type="button" class="fs-btn fs-btn-secondary fs-btn-sm">Clear all</button>
+        </div>
       </div>
-      <div id="taGridWrap"></div>
+      <div class="ta-grid-note"><span class="ta-icon-clock"></span><span>Times shown in <strong id="taGridTzLabel"></strong> <span id="taGridTzNote" class="fs-muted"></span></span></div>
+      <div id="taGridWrap" class="ta-grid-scroll"></div>
+      <div id="taDayRanges" class="ta-day-ranges"></div>
     </section>
 
     <dialog id="taModal" class="fs-card" style="max-width:680px;width:92%;">
@@ -301,15 +383,19 @@ export async function mountTeacherAvailability(containerId) {
   const emailDisplay = root.querySelector("#taEmail");
   const batchSel = root.querySelector("#batchSelect");
   const tzSel = root.querySelector("#taTimezone");
+  const slotSel = root.querySelector("#taSlotSize");
+  const clearAllBtn = root.querySelector("#taClearAll");
   const campusSearch = root.querySelector("#taCampusSearch");
   const otherTeacherToggle = root.querySelector("#taOtherTeacherToggle");
   const otherTeacherWrap = root.querySelector("#taOtherTeacherWrap");
   const otherTeacherSelect = root.querySelector("#taOtherTeacherSelect");
   const campusMeta = root.querySelector("#taCampusMeta");
   const campusGroups = root.querySelector("#taCampusGroups");
-  const gridTitle = root.querySelector("#taGridTitle");
-  const gridTz = root.querySelector("#taGridTz");
+  const defaultCampusWrap = root.querySelector("#taDefaultCampusWrap");
+  const gridTzLabel = root.querySelector("#taGridTzLabel");
+  const gridTzNote = root.querySelector("#taGridTzNote");
   const gridWrap = root.querySelector("#taGridWrap");
+  const dayRangesEl = root.querySelector("#taDayRanges");
   const sumTotal = root.querySelector("#taSumTotal");
   const summary = root.querySelector("#taSummary");
   const reviewBtnDesk = root.querySelector("#taReviewDesk");
@@ -363,6 +449,7 @@ export async function mountTeacherAvailability(containerId) {
     tzSel.appendChild(opt);
   }
   tzSel.value = state.teacherTimezone;
+  slotSel.value = String(state.slotMinutes);
 
   function groupedCampuses() {
     const q = state.search.toLowerCase();
@@ -391,6 +478,40 @@ export async function mountTeacherAvailability(containerId) {
     return state.slotSet.size;
   }
 
+  function campusPillHTML(c, isDefault) {
+    const active = state.selectedCampusCodes.has(c.code);
+    return `<button type="button" class="fs-btn fs-btn-secondary fs-btn-sm ta-pill ${active ? "active" : ""}" data-campus="${esc(c.code)}">${esc(c.code)}${isDefault ? ` <span class="ta-default-tag">default</span>` : ""}<span class="ta-badge">${campusSlotCount(c.code)}</span></button>`;
+  }
+
+  function bindCampusPillClick(btn) {
+    btn.addEventListener("click", () => {
+      const code = btn.getAttribute("data-campus");
+      if (!code) return;
+      if (state.selectedCampusCodes.has(code)) {
+        state.selectedCampusCodes.delete(code);
+        if (state.activeCampusCode === code) state.activeCampusCode = [...state.selectedCampusCodes][0] || "";
+      } else {
+        state.selectedCampusCodes.add(code);
+        state.activeCampusCode = code;
+      }
+      renderAll();
+    });
+  }
+
+  function renderDefaultCampus() {
+    if (!state.defaultCampusCode) {
+      defaultCampusWrap.innerHTML = `<span class="fs-muted">No default campus available.</span>`;
+      return;
+    }
+    const c = state.campuses.find((x) => x.code === state.defaultCampusCode);
+    if (!c) {
+      defaultCampusWrap.innerHTML = "";
+      return;
+    }
+    defaultCampusWrap.innerHTML = campusPillHTML(c, true);
+    defaultCampusWrap.querySelectorAll("[data-campus]").forEach((btn) => bindCampusPillClick(btn));
+  }
+
   function renderCampusGroups() {
     const { filteredCount, ordered } = groupedCampuses();
     campusGroups.innerHTML = ordered.map(([groupKey, subMap]) => {
@@ -403,10 +524,7 @@ export async function mountTeacherAvailability(containerId) {
             <div style="margin-top:6px;">
               <div class="ta-subgroup">${esc(sg)}${SUBGROUP_LABELS[sg] ? ` - ${esc(SUBGROUP_LABELS[sg])}` : ""}</div>
               <div class="ta-pill-wrap" style="margin-top:6px;">
-                ${campuses.map((c) => {
-                  const active = state.selectedCampusCodes.has(c.code);
-                  return `<button type="button" class="fs-btn fs-btn-secondary fs-btn-sm ta-pill ${active ? "active" : ""}" data-campus="${esc(c.code)}">${esc(c.code)}<span class="ta-badge">${campusSlotCount(c.code)}</span></button>`;
-                }).join("")}
+                ${campuses.map((c) => campusPillHTML(c, c.code === state.defaultCampusCode)).join("")}
               </div>
             </div>
           `).join("")}
@@ -416,62 +534,141 @@ export async function mountTeacherAvailability(containerId) {
 
     campusMeta.textContent = `${state.selectedCampusCodes.size} selected - Showing ${filteredCount} active fellowships`;
 
-    campusGroups.querySelectorAll("[data-campus]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const code = btn.getAttribute("data-campus");
-        if (!code) return;
-        if (state.selectedCampusCodes.has(code)) {
-          state.selectedCampusCodes.delete(code);
-          if (state.activeCampusCode === code) state.activeCampusCode = [...state.selectedCampusCodes][0] || "";
-        } else {
-          state.selectedCampusCodes.add(code);
-          state.activeCampusCode = code;
-        }
-        renderAll();
-      });
-    });
+    campusGroups.querySelectorAll("[data-campus]").forEach((btn) => bindCampusPillClick(btn));
   }
 
-  function selectedCampusLabel() {
-    const selected = state.campuses.filter((c) => state.selectedCampusCodes.has(c.code));
-    if (!selected.length) return "Weekly Grid";
-    if (selected.length === 1) return `${selected[0].code} - ${selected[0].campusName}`;
-    return `${selected.length} campuses selected`;
+  function computeRunPositions(day) {
+    const selected = state.slotStarts.filter((m) => state.slotSet.has(slotKey(day, minutesToLabel(m))));
+    const set = new Set(selected);
+    const pos = {};
+    selected.forEach((m) => {
+      const label = minutesToLabel(m);
+      const hasPrev = set.has(m - state.slotMinutes);
+      const hasNext = set.has(m + state.slotMinutes);
+      pos[label] = hasPrev && hasNext ? "mid" : hasPrev ? "end" : hasNext ? "start" : "single";
+    });
+    return pos;
   }
 
   function renderGrid() {
-    gridTitle.textContent = selectedCampusLabel();
-    gridTz.textContent = `Grid shown in teacher timezone: ${state.teacherTimezone || "(select timezone)"}`;
+    state.slotStarts = buildSlotStarts(state.slotMinutes);
+    gridTzLabel.textContent = tzDisplayLabel(state.teacherTimezone);
+    const defaultCampus = state.campuses.find((c) => c.code === state.defaultCampusCode);
+    if (defaultCampus) {
+      gridTzNote.textContent = state.teacherTimezone === defaultCampus.timezone
+        ? `— same as ${defaultCampus.code} time.`
+        : `— will be converted for ${defaultCampus.code}.`;
+    } else {
+      gridTzNote.textContent = "";
+    }
 
     if (!state.activeCampusCode) {
       gridWrap.innerHTML = `<div class="fs-muted" style="padding:8px;">Select at least one campus.</div>`;
       return;
     }
 
-    let html = `<div class="ta-days"><div>Time</div>${DAYS.map((d) => `<div>${esc(d.slice(0, 3))}</div>`).join("")}</div>`;
-    SLOTS.forEach((time) => {
-      html += `<div class="ta-slot"><div class="ta-time">${esc(time)}</div>`;
-      DAYS.forEach((day) => {
-        const key = slotKey(day, time);
+    const posMaps = {};
+    DISPLAY_DAYS.forEach((day) => { posMaps[day] = computeRunPositions(day); });
+
+    let html = `<div class="ta-days"><div></div>${DISPLAY_DAYS.map((d) => `<div>${esc(d.slice(0, 3))}</div>`).join("")}</div>`;
+    state.slotStarts.forEach((startMin) => {
+      const label = minutesToLabel(startMin);
+      const isHour = startMin % 60 === 0;
+      html += `<div class="ta-row">`;
+      html += `<div class="ta-time ${isHour ? "ta-time-hour" : ""}">${esc(label)}</div>`;
+      DISPLAY_DAYS.forEach((day) => {
+        const key = slotKey(day, label);
         const on = state.slotSet.has(key);
-        html += `<div class="ta-cell ${on ? "on" : ""}" data-day="${esc(day)}" data-time="${esc(time)}">${on ? "Selected" : ""}</div>`;
+        const pos = on ? posMaps[day][label] : "";
+        html += `<div class="ta-cell ${on ? "on" : ""} ${pos ? "pos-" + pos : ""}" data-day="${esc(day)}" data-label="${esc(label)}"></div>`;
       });
       html += `</div>`;
     });
     gridWrap.innerHTML = html;
-
-    gridWrap.querySelectorAll(".ta-cell").forEach((cell) => {
-      cell.addEventListener("click", () => {
-        const day = cell.getAttribute("data-day");
-        const time = cell.getAttribute("data-time");
-        const key = slotKey(day, time);
-        if (state.slotSet.has(key)) state.slotSet.delete(key); else state.slotSet.add(key);
-        renderAll();
-      });
-    });
   }
 
-function convertedCampusSlots(campus) {
+  let dragState = null;
+  function startDrag(day, minuteStart) {
+    const key = slotKey(day, minutesToLabel(minuteStart));
+    const mode = state.slotSet.has(key) ? "remove" : "add";
+    dragState = { day, anchorMin: minuteStart, mode, baseline: new Set(state.slotSet) };
+    applyDrag(minuteStart);
+  }
+  function applyDrag(currentMin) {
+    if (!dragState) return;
+    const { day, anchorMin, mode, baseline } = dragState;
+    const lo = Math.min(anchorMin, currentMin);
+    const hi = Math.max(anchorMin, currentMin);
+    const next = new Set(baseline);
+    for (let m = lo; m <= hi; m += state.slotMinutes) {
+      const key = slotKey(day, minutesToLabel(m));
+      if (mode === "add") next.add(key); else next.delete(key);
+    }
+    state.slotSet = next;
+    renderGrid();
+  }
+  function endDrag() {
+    if (!dragState) return;
+    dragState = null;
+    renderAll();
+  }
+
+  gridWrap.addEventListener("pointerdown", (e) => {
+    const cell = e.target.closest(".ta-cell");
+    if (!cell) return;
+    e.preventDefault();
+    const day = cell.getAttribute("data-day");
+    const label = cell.getAttribute("data-label");
+    const t = parseTime12h(label);
+    if (!day || !t) return;
+    startDrag(day, t.h * 60 + t.mi);
+    try { gridWrap.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+  });
+  gridWrap.addEventListener("pointermove", (e) => {
+    if (!dragState) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const cell = el && el.closest ? el.closest(".ta-cell") : null;
+    if (!cell || cell.getAttribute("data-day") !== dragState.day) return;
+    const t = parseTime12h(cell.getAttribute("data-label"));
+    if (!t) return;
+    applyDrag(t.h * 60 + t.mi);
+  });
+  window.addEventListener("pointerup", endDrag);
+  window.addEventListener("pointercancel", endDrag);
+
+  function computeDayRangeTexts() {
+    const out = {};
+    DISPLAY_DAYS.forEach((day) => {
+      const selected = state.slotStarts
+        .filter((m) => state.slotSet.has(slotKey(day, minutesToLabel(m))))
+        .sort((a, b) => a - b);
+      const runs = [];
+      let runStart = null;
+      let prevM = null;
+      selected.forEach((m) => {
+        if (runStart === null) { runStart = m; prevM = m; return; }
+        if (m === prevM + state.slotMinutes) { prevM = m; return; }
+        runs.push([runStart, prevM]);
+        runStart = m; prevM = m;
+      });
+      if (runStart !== null) runs.push([runStart, prevM]);
+      out[day] = runs.map(([s, e]) => `${minutesToLabel(s)} – ${minutesToLabel(e + state.slotMinutes)}`);
+    });
+    return out;
+  }
+
+  function renderDayRanges() {
+    const ranges = computeDayRangeTexts();
+    dayRangesEl.innerHTML = DISPLAY_DAYS.map((day) => {
+      const items = ranges[day] || [];
+      const valuesHtml = items.length
+        ? items.map((r) => `<span class="ta-range-chip">${esc(r)}</span>`).join("")
+        : `<span class="ta-range-empty">—</span>`;
+      return `<div class="ta-day-range-row"><span class="ta-day-range-label">${esc(day)}</span><span class="ta-day-range-values">${valuesHtml}</span></div>`;
+    }).join("");
+  }
+
+  function convertedCampusSlots(campus) {
     const batch = selectedBatch(state);
     const start = batch?.start_date ? new Date(batch.start_date) : new Date();
     const month = { year: start.getFullYear(), monthIndex: start.getMonth() + 1 };
@@ -533,7 +730,9 @@ function convertedCampusSlots(campus) {
       (p.selectedCampusCodes || []).forEach((code) => {
         const campus = state.campuses.find((c) => c.code === code);
         if (!campus) return;
-        const month = selectedMonth(state, months);
+        const batch = selectedBatch(state);
+        const start = batch?.start_date ? new Date(batch.start_date) : new Date();
+        const month = { year: start.getFullYear(), monthIndex: start.getMonth() + 1 };
         const conv = convertTeacherSlotToCampus({ day: p.teacherDay, time: p.teacherTime }, state.teacherTimezone, campus.timezone, month);
         if (!byCampus[code]) byCampus[code] = { campusName: campus.campusName, timezone: campus.timezone, items: [] };
         byCampus[code].items.push(`${conv.campusDay.slice(0, 3)} ${conv.campusTime}`);
@@ -579,8 +778,10 @@ function convertedCampusSlots(campus) {
   }
 
   function renderAll() {
+    renderDefaultCampus();
     renderCampusGroups();
     renderGrid();
+    renderDayRanges();
     renderSummary();
     renderFooter();
   }
@@ -595,6 +796,15 @@ function convertedCampusSlots(campus) {
   });
   tzSel.addEventListener("change", () => {
     state.teacherTimezone = tzSel.value;
+    renderAll();
+  });
+  slotSel.addEventListener("change", () => {
+    state.slotMinutes = Number(slotSel.value) || 30;
+    state.slotSet = new Set();
+    renderAll();
+  });
+  clearAllBtn.addEventListener("click", () => {
+    state.slotSet = new Set();
     renderAll();
   });
   otherTeacherToggle.addEventListener("change", () => {

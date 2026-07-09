@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -9,13 +9,13 @@
   <script src="../../js/config.js"></script>
   <script src="../../js/config-helper.js"></script>
   <style>
-    body { margin: 0; background: #f5f5f7; color: var(--color-text-primary); font-family: "Manrope", system-ui, sans-serif; }
+    body { margin: 0; background: #f5f5f7; color: var(--text); font-family: "Manrope", system-ui, sans-serif; }
     .wrap { padding: 16px; max-width: 1100px; margin: 0 auto; display: grid; gap: 14px; }
     .card { background: #fff; border: 1px solid #e6e7ee; border-radius: 12px; box-shadow: 0 4px 20px rgba(20, 16, 38, 0.06); padding: 16px; }
     .header h1 { margin: 0; font-size: 28px; line-height: 1.15; }
-    .header p { margin: 6px 0 0; color: var(--color-text-muted); }
+    .header p { margin: 6px 0 0; color: var(--muted); }
     .kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-    .kpi .k { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-muted); font-weight: 700; }
+    .kpi .k { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
     .kpi .v { font-size: 2rem; font-weight: 800; margin-top: 6px; color: #4C2A92; line-height: 1; }
     .kpi .v.ok { color: #15803d; }
     .kpi .v.warn { color: #b45309; }
@@ -23,25 +23,25 @@
     .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
     .sec-title { margin: 0 0 10px; font-size: 16px; font-weight: 800; }
-    .muted { color: var(--color-text-muted); font-size: 13px; }
+    .muted { color: var(--muted); font-size: 13px; }
     .row-list { display: grid; gap: 8px; }
     .row-item { border: 1px solid #ececf2; border-left: 4px solid #f59e0b; border-radius: 10px; padding: 10px; }
     .row-item.high { border-left-color: #C8102E; background: #fff5f5; }
     .row-item.never { border-left-color: #b45309; background: #fff8e1; }
     .name { font-weight: 700; }
-    .meta { font-size: 12px; color: var(--color-text-muted); margin-top: 2px; }
+    .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
     .pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
     .pill.bad { background: #fee2e2; color: #991b1b; }
     .pill.warn { background: #fef3c7; color: #92400e; }
     .pill.ok { background: #dcfce7; color: #166534; }
     .quick-links { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
-    .quick-link { min-height: 44px; display: flex; align-items: center; justify-content: center; border: 1px solid #dddff0; border-radius: 10px; text-decoration: none; color: var(--color-text-primary); font-weight: 700; background: #fff; }
+    .quick-link { min-height: 44px; display: flex; align-items: center; justify-content: center; border: 1px solid #dddff0; border-radius: 10px; text-decoration: none; color: var(--text); font-weight: 700; background: #fff; }
     .quick-link.primary { background: #4C2A92; border-color: #4C2A92; color: #fff; }
     .quick-link:hover { background: #f5f0ff; color: #4C2A92; }
     .quick-link.primary:hover { background: #3d2176; color: #fff; }
     .skeleton { height: 16px; border-radius: 8px; background: linear-gradient(90deg, #f0f1f5 0%, #f8f8fb 50%, #f0f1f5 100%); background-size: 200% 100%; animation: pulse 1.1s linear infinite; }
     .hidden { display: none !important; }
-    .empty { border: 1px dashed #d7d8e2; border-radius: 10px; padding: 12px; color: var(--color-text-muted); font-size: 13px; }
+    .empty { border: 1px dashed #d7d8e2; border-radius: 10px; padding: 12px; color: var(--muted); font-size: 13px; }
     @keyframes pulse { from { background-position: 200% 0; } to { background-position: -200% 0; } }
     @media (max-width: 980px) { .kpis, .two-col, .three-col, .quick-links { grid-template-columns: 1fr; } }
   </style>
@@ -406,3 +406,4 @@
   </script>
 </body>
 </html>
+
