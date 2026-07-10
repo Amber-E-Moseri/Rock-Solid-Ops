@@ -166,35 +166,35 @@ async function resolveAssignee(
 ) {
   if (subgroupId) {
     const { data } = await db
-      .from("clickup_admin_mappings")
-      .select("clickup_user_id")
+      .from("rocksolid_admin_mappings")
+      .select("nexus_user_id")
       .eq("active", true)
       .eq("group_id", groupId)
       .eq("subgroup_id", subgroupId)
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (data?.clickup_user_id) return String(data.clickup_user_id);
+    if (data?.nexus_user_id) return String(data.nexus_user_id);
   }
 
   if (groupId) {
     const { data } = await db
-      .from("clickup_admin_mappings")
-      .select("clickup_user_id")
+      .from("rocksolid_admin_mappings")
+      .select("nexus_user_id")
       .eq("active", true)
       .eq("group_id", groupId)
       .is("subgroup_id", null)
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (data?.clickup_user_id) return String(data.clickup_user_id);
+    if (data?.nexus_user_id) return String(data.nexus_user_id);
   }
 
   return fallbackAssigneeId || "";
 }
 
 type Watcher = {
-  clickup_user_id: string;
+  nexus_user_id: string;
   watcher_name: string;
 };
 
@@ -202,36 +202,9 @@ async function resolveWatchers(
   db: ReturnType<typeof createClient>,
   groupId: string,
   subgroupId: string,
-) {
-  if (!groupId) return [] as Watcher[];
-
-  if (subgroupId) {
-    const { data: subgroupRows } = await db
-      .from("clickup_admin_watchers")
-      .select("clickup_user_id,watcher_name")
-      .eq("active", true)
-      .eq("group_id", groupId)
-      .eq("subgroup_id", subgroupId)
-      .order("updated_at", { ascending: false });
-    if ((subgroupRows || []).length > 0) {
-      return (subgroupRows || []).map((w) => ({
-        clickup_user_id: String(w.clickup_user_id || "").trim(),
-        watcher_name: String(w.watcher_name || "").trim(),
-      })).filter((w) => w.clickup_user_id);
-    }
-  }
-
-  const { data: groupRows } = await db
-    .from("clickup_admin_watchers")
-    .select("clickup_user_id,watcher_name")
-    .eq("active", true)
-    .eq("group_id", groupId)
-    .is("subgroup_id", null)
-    .order("updated_at", { ascending: false });
-  return (groupRows || []).map((w) => ({
-    clickup_user_id: String(w.clickup_user_id || "").trim(),
-    watcher_name: String(w.watcher_name || "").trim(),
-  })).filter((w) => w.clickup_user_id);
+): Promise<Watcher[]> {
+  // Watchers not yet supported in Nexus integration
+  return [] as Watcher[];
 }
 
 function buildDedupeKey(type: RequestType, payload: MissedClassPayload | EscalationPayload) {
@@ -308,9 +281,9 @@ function buildTask(
   };
 }
 
-async function createClickUpTaskWithBackoff(
+async function createNexusTaskWithBackoff(
+  nexusUrl: string,
   apiKey: string,
-  listId: string,
   body: Record<string, unknown>,
 ) {
   let attempt = 0;
@@ -318,11 +291,11 @@ async function createClickUpTaskWithBackoff(
 
   while (attempt < 5) {
     attempt += 1;
-    const res = await fetch(`https://api.clickup.com/api/v2/list/${listId}/task`, {
+    const res = await fetch(`${nexusUrl}/tasks`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: apiKey,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(body),
     });
@@ -330,7 +303,7 @@ async function createClickUpTaskWithBackoff(
     if (res.ok) return await res.json();
 
     const text = await res.text();
-    lastError = `ClickUp task create failed (${res.status}): ${text}`;
+    lastError = `Nexus task create failed (${res.status}): ${text}`;
     const shouldRetry = res.status === 429 || res.status >= 500;
     if (!shouldRetry) break;
 
@@ -338,42 +311,23 @@ async function createClickUpTaskWithBackoff(
     await sleep(waitMs);
   }
 
-  throw new Error(lastError || "ClickUp task create failed");
-}
-
-async function addWatcherComment(
-  apiKey: string,
-  taskId: string,
-  watcher: Watcher,
-) {
-  const text = `Watcher: ${watcher.watcher_name || "Unspecified"} (ClickUp ID ${watcher.clickup_user_id})`;
-  const res = await fetch(`https://api.clickup.com/api/v2/task/${taskId}/comment`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: apiKey,
-    },
-    body: JSON.stringify({ comment_text: text }),
-  });
-  if (!res.ok) {
-    const message = await res.text();
-    throw new Error(`Watcher comment failed (${res.status}): ${message}`);
-  }
+  throw new Error(lastError || "Nexus task create failed");
 }
 
 async function updateSourceTaskId(
   db: ReturnType<typeof createClient>,
   type: RequestType,
   payload: MissedClassPayload | EscalationPayload,
-  clickupTaskId: string,
+  nexusTaskId: string,
 ) {
   if (type === "escalation") {
     const p = payload as EscalationPayload;
+    // clickup_task_id column retained on these tables for backwards compat
     if (p.source === "moodle_enrollment_sync" && p.source_id) {
-      await db.from("moodle_enrollment_sync").update({ clickup_task_id: clickupTaskId }).eq("id", p.source_id);
+      await db.from("moodle_enrollment_sync").update({ clickup_task_id: nexusTaskId }).eq("id", p.source_id);
     }
     if (p.source === "applicants" && p.source_id) {
-      await db.from("applicants").update({ clickup_task_id: clickupTaskId }).eq("id", p.source_id);
+      await db.from("applicants").update({ clickup_task_id: nexusTaskId }).eq("id", p.source_id);
     }
     return;
   }
@@ -394,9 +348,10 @@ Deno.serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-  const CLICKUP_API_KEY = Deno.env.get("CLICKUP_API_KEY") || "";
-  const CLICKUP_LIST_ID = Deno.env.get("CLICKUP_LIST_ID") || "";
-  const CLICKUP_DEFAULT_ASSIGNEE_ID = Deno.env.get("CLICKUP_DEFAULT_ASSIGNEE_ID") || "";
+  const NEXUS_API_URL = Deno.env.get("NEXUS_API_URL") || "";
+  const NEXUS_API_KEY = Deno.env.get("NEXUS_API_KEY") || "";
+  const NEXUS_LIST_ID = "35cc9695-d49e-4584-8b60-2091c29d3f95";
+  const NEXUS_SPACE_ID = "2aee687a-4dad-447b-ad6b-1e0239a6beb6";
 
   if (!SUPABASE_URL || !SERVICE_KEY) return json({ ok: false, error: "Missing Supabase env" }, 500);
 
@@ -422,21 +377,21 @@ Deno.serve(async (req) => {
       : normalizeText((payload as EscalationPayload).source_id);
 
     const existing = await db
-      .from("clickup_task_links")
-      .select("id,clickup_task_id,status")
+      .from("rocksolid_task_links")
+      .select("id,nexus_task_id,status")
       .eq("dedupe_key", dedupeKey)
       .maybeSingle();
 
-    if (existing.data?.clickup_task_id) {
+    if (existing.data?.nexus_task_id) {
       return json({
         ok: true,
         dedupe_key: dedupeKey,
-        clickup_task_id: existing.data.clickup_task_id,
+        nexus_task_id: existing.data.nexus_task_id,
         reused: true,
       });
     }
 
-    await db.from("clickup_task_links").upsert(
+    await db.from("rocksolid_task_links").upsert(
       {
         source_type: sourceType,
         source_id: sourceId || "unknown",
@@ -446,13 +401,13 @@ Deno.serve(async (req) => {
       { onConflict: "dedupe_key" },
     );
 
-    if (!CLICKUP_API_KEY || !CLICKUP_LIST_ID) {
-      const msg = "ClickUp secrets are not configured";
+    if (!NEXUS_API_URL || !NEXUS_API_KEY) {
+      const msg = "Nexus API secrets are not configured";
       await db
-        .from("clickup_task_links")
+        .from("rocksolid_task_links")
         .update({ status: "FAILED", error_message: msg, updated_at: new Date().toISOString() })
         .eq("dedupe_key", dedupeKey);
-      await logAudit(db, "CLICKUP_TASK_FAILED", "FAILED", auth.actorEmail || "system", sourceType, sourceId || dedupeKey, {
+      await logAudit(db, "NEXUS_TASK_FAILED", "FAILED", auth.actorEmail || "system", sourceType, sourceId || dedupeKey, {
         dedupe_key: dedupeKey,
         error: msg,
       });
@@ -461,80 +416,56 @@ Deno.serve(async (req) => {
 
     const groupId = normalizeText((payload as MissedClassPayload).group_id || (payload as EscalationPayload).group_id);
     const subgroupId = normalizeText((payload as MissedClassPayload).subgroup_id || (payload as EscalationPayload).subgroup_id);
-    const assigneeId = await resolveAssignee(db, groupId, subgroupId, CLICKUP_DEFAULT_ASSIGNEE_ID);
-    const watchers = await resolveWatchers(db, groupId, subgroupId);
+    const assigneeId = await resolveAssignee(db, groupId, subgroupId, "");
 
-    const taskBody = buildTask(type, payload, assigneeId);
+    const taskBody = { ...buildTask(type, payload, assigneeId), list_id: NEXUS_LIST_ID, space_id: NEXUS_SPACE_ID };
     let created: Record<string, unknown> = {};
     try {
-      created = await createClickUpTaskWithBackoff(CLICKUP_API_KEY, CLICKUP_LIST_ID, taskBody);
+      created = await createNexusTaskWithBackoff(NEXUS_API_URL, NEXUS_API_KEY, taskBody);
     } catch (createErr) {
       const errMsg = createErr instanceof Error ? createErr.message : String(createErr);
       await db
-        .from("clickup_task_links")
+        .from("rocksolid_task_links")
         .update({
           status: "FAILED",
           error_message: errMsg,
           updated_at: new Date().toISOString(),
         })
         .eq("dedupe_key", dedupeKey);
-      await logAudit(db, "CLICKUP_TASK_FAILED", "FAILED", auth.actorEmail || "system", sourceType, sourceId || dedupeKey, {
+      await logAudit(db, "NEXUS_TASK_FAILED", "FAILED", auth.actorEmail || "system", sourceType, sourceId || dedupeKey, {
         dedupe_key: dedupeKey,
         error: errMsg,
       });
       return json({ ok: false, dedupe_key: dedupeKey, error: errMsg, non_fatal: true });
     }
-    const clickupTaskId = normalizeText(created?.id);
+    const nexusTaskId = normalizeText(created?.id);
 
     await db
-      .from("clickup_task_links")
+      .from("rocksolid_task_links")
       .update({
-        clickup_task_id: clickupTaskId || null,
+        nexus_task_id: nexusTaskId || null,
         status: "CREATED",
         error_message: null,
         updated_at: new Date().toISOString(),
       })
       .eq("dedupe_key", dedupeKey);
 
-    if (clickupTaskId) {
-      await updateSourceTaskId(db, type, payload, clickupTaskId);
+    if (nexusTaskId) {
+      await updateSourceTaskId(db, type, payload, nexusTaskId);
     }
 
-    await logAudit(db, "CLICKUP_TASK_CREATED", "SUCCESS", auth.actorEmail || "system", sourceType, sourceId || dedupeKey, {
+    await logAudit(db, "NEXUS_TASK_CREATED", "SUCCESS", auth.actorEmail || "system", sourceType, sourceId || dedupeKey, {
       dedupe_key: dedupeKey,
-      clickup_task_id: clickupTaskId,
+      nexus_task_id: nexusTaskId,
       type,
       assignee_id: assigneeId || null,
       due_date: toIsoDate(new Date(Number(taskBody.due_date || Date.now()))),
     });
 
-    if (clickupTaskId && !existing.data?.clickup_task_id && existing.data?.status !== "CREATED") {
-      for (const watcher of watchers) {
-        try {
-          await addWatcherComment(CLICKUP_API_KEY, clickupTaskId, watcher);
-          await logAudit(db, "CLICKUP_WATCHER_ADDED", "SUCCESS", auth.actorEmail || "system", sourceType, sourceId || dedupeKey, {
-            dedupe_key: dedupeKey,
-            clickup_task_id: clickupTaskId,
-            watcher_clickup_user_id: watcher.clickup_user_id,
-            watcher_name: watcher.watcher_name || null,
-          });
-        } catch (watcherErr) {
-          const watcherMsg = watcherErr instanceof Error ? watcherErr.message : String(watcherErr);
-          await logAudit(db, "CLICKUP_WATCHER_FAILED", "FAILED", auth.actorEmail || "system", sourceType, sourceId || dedupeKey, {
-            dedupe_key: dedupeKey,
-            clickup_task_id: clickupTaskId,
-            watcher_clickup_user_id: watcher.clickup_user_id,
-            watcher_name: watcher.watcher_name || null,
-            error: watcherMsg,
-          });
-        }
-      }
-    }
-
     return json({
       ok: true,
       dedupe_key: dedupeKey,
-      clickup_task_id: clickupTaskId || null,
+      nexus_task_id: nexusTaskId || null,
       assignee_id: assigneeId || null,
     });
   } catch (error) {

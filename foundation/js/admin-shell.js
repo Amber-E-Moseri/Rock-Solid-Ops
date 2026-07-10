@@ -50,7 +50,7 @@
     teachers:           `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
     trace:              `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
     fellowships:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
-    clickupmanagement:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`,
+    nexusmapping:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`,
     failedsyncs:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>`,
     health:             `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
     moodlesettings:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M4.93 19.07l1.41-1.41M19.07 19.07l-1.41-1.41M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>`,
@@ -127,7 +127,7 @@
         { key: "teachers", label: "Teachers", href: "teacher-management.html", icon: "TM", roles: OPERATIONAL_ROLES },
         { key: "trace", label: "Operational Trace", href: "operational-trace.html", icon: "OT", roles: ["admin", "superadmin", "regional_secretary"] },
         { key: "fellowships", label: "Fellowships", href: "fellowship-management.html", icon: "FG", roles: SYSTEM_ADMIN_ROLES },
-        { key: "clickupmanagement", label: "ClickUp Management", href: "clickup-management.html", icon: "AM", roles: SYSTEM_ADMIN_ROLES },
+        { key: "nexusmapping", label: "Nexus Mapping", href: "rocksolid-management.html", icon: "NX", roles: SYSTEM_ADMIN_ROLES },
         { key: "failedsyncs", label: "Failed Syncs", href: "failed-sync-retry-center.html", icon: "FS", roles: SYSTEM_ADMIN_ROLES },
         { key: "health", label: "System Health", href: "system-health.html", icon: "SH", roles: SYSTEM_ADMIN_ROLES },
         { key: "moodlesettings", label: "Moodle Settings", href: "moodle-settings.html", icon: "MD", roles: SYSTEM_ADMIN_ROLES },
@@ -150,7 +150,7 @@
     "moodlesettings",
     "audit",
     "milestones",
-    "clickupmanagement",
+    "nexusmapping",
     "adminactivity",
     "roleaudit",
   ]);
@@ -302,8 +302,9 @@
     if (p.includes("moodle-settings")) return "moodlesettings";
     if (p.includes("audit-log")) return "audit";
     if (p.includes("milestones-admin")) return "milestones";
-    if (p.includes("clickup-management")) return "clickupmanagement";
-    if (p.includes("admin-management")) return "clickupmanagement";
+    if (p.includes("rocksolid-management")) return "nexusmapping";
+    if (p.includes("clickup-management")) return "nexusmapping";
+    if (p.includes("admin-management")) return "nexusmapping";
     if (p.includes("data-exports")) return "dataexports";
     if (p.includes("baptism-report")) return "baptismreport";
     if (p.includes("reports")) return "reports";

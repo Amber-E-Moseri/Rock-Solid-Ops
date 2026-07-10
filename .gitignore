@@ -7,6 +7,7 @@ foundation/js/runtime-config*.js
 .env
 .env.local
 .env.*.local
+!.env.example
 
 # Local Netlify folder
 .netlify
