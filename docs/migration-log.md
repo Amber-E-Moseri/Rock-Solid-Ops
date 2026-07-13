@@ -973,3 +973,72 @@ PWA brief, not yet built) ships. Not a defect in this pipeline, just a dependenc
    anywhere in the codebase (Phase B).
 
 None of the above were fixed in this brief — audit only, per scope.
+
+---
+
+## 2026-07-13 — Email Pipeline Audit ADDENDUM: Mailchimp was missed entirely (read-only)
+
+Correction to the entry directly above, not a rewrite (per this log's append-only rule).
+The original pass audited the Resend/`email_queue` pipeline only. `ai/constraints.md`'s
+MAILCHIMP RULES section explicitly scopes Mailchimp as "notification layer / onboarding
+layer / campaign layer" — that's a second, real notification channel this brief should have
+covered and didn't on the first pass. Re-audited now; still read-only, still no changes.
+
+### WHAT MAILCHIMP ACTUALLY DOES HERE
+
+- **One-way contact sync only — no campaign sending happens in this codebase.**
+  `supabase/functions/mailchimp-sync/index.ts` does a single `PUT` to
+  `lists/{audience}/members/{md5(email)}`, upserting the contact with merge fields
+  (`FNAME`, `LNAME`, `PHONE`, `CAMPUS`, `FELLOWCODE`, `TEMPLATE`) and `status_if_new:
+  "subscribed"`. It never calls Mailchimp's campaign-send API. `foundation/docs/SYSTEM_OVERVIEW.md:206`
+  confirms this framing: "Syncs student data to Mailchimp audience." So actual marketing/
+  campaign composition and sending, if it happens, happens **inside the Mailchimp product
+  itself**, outside this repo — which also means Mailchimp's own native unsubscribe/
+  compliance handling applies to whatever gets sent from there. That's a materially
+  different (better) compliance picture than the homegrown `email_campaigns` table audited
+  in the entry above, which has no unsubscribe mechanism at all.
+- **This sharpens, rather than resolves, the Phase B finding on `email_campaigns`:** there
+  are now two parallel bulk-send surfaces — Mailchimp (external, presumably has its own
+  legally-compliant unsubscribe) and the homegrown `email_campaigns`/`email_queue`/
+  `email-sender` path (in-repo, audited above, confirmed no opt-out). Anyone composing a
+  fellowship-wide blast has a choice between a compliant channel and a non-compliant one
+  that produces the same visible outcome (a bulk email lands in inboxes). That's worth
+  surfacing to whoever owns campaign practice, since the existence of the compliant path
+  doesn't stop someone from using the other one.
+- **Trigger point:** `registration-processor/index.ts:633` calls `triggerMailchimpSync()`
+  as `void triggerMailchimpSync({...})` — fire-and-forget, not awaited, and only on the
+  branch where a `templateKey` was resolved (i.e., only for registrations that also queue a
+  transactional email). Registration itself never fails or blocks on a Mailchimp outcome,
+  which is correct per constraints.md ("Mailchimp is NOT... registration source of truth").
+- **Failure visibility: worse than the Resend path, and the retry-center UI is misleading
+  about it.** On a failed Mailchimp `PUT`, `mailchimp-sync` writes one `audit_logs` row
+  (`MAILCHIMP_CONTACT_SYNC_FAILED`) and returns a 502 — but since the caller never awaits
+  it (`void`), that response is discarded and nothing else happens. Grepped every writer to
+  `failed_syncs` (the table the Retry Center reads for non-email/non-Moodle failures):
+  only `moodle-sync`, `retry-worker`, and `teacher-portal-api/_actions/approve-availability.ts`
+  write to it — **`mailchimp-sync` never does.** Yet
+  `foundation/js/failed-sync-retry-center.js:59` derives its "Mailchimp" badge/counter
+  (`kMailchimp`) from `failed_syncs` rows whose `sync_type`/`source_table`/`provider` field
+  contains "mailchimp" — a state that can never occur, because nothing ever writes it. The
+  Retry Center's Mailchimp counter will always read zero regardless of actual Mailchimp
+  failure volume; a broken contact sync is visible only to someone reading `audit_logs`
+  directly, and there's no retry path for it at all (not even a manual one) — a failed sync
+  is simply lost until the next registration for that same applicant happens to retrigger it.
+- **Auth posture differs from the rest of the pipeline, and is unclear from the config
+  alone.** `supabase/functions/mailchimp-sync/` has no `config.toml` of its own, and there is
+  no `[functions.mailchimp-sync]` block in the top-level `supabase/config.toml` — every other
+  function in this pipeline (`email-sender`, `notification-batch-processor`, `retry-worker`,
+  `registration-processor`, etc.) has an explicit `verify_jwt` entry, almost all `false`.
+  Whether `mailchimp-sync` deploys with the platform default (which may differ from the rest
+  of the pipeline) or inherits something set elsewhere could not be confirmed by grep alone —
+  flagging as an open question rather than asserting either way.
+
+### REVISED FOLLOW-UP LIST (adds to, does not replace, the list in the entry above)
+
+8. Add a `failed_syncs` write (or equivalent) inside `mailchimp-sync` on failure, or stop the
+   Retry Center from advertising a Mailchimp counter that can never populate (Phase C).
+9. Confirm `mailchimp-sync`'s actual deployed `verify_jwt` setting — its config is silent
+   where every sibling function in this pipeline is explicit (Phase D).
+10. Decide whether fellowship-wide blasts should be required to go through Mailchimp (native
+    unsubscribe) rather than `email_campaigns` (none) — currently both are available and
+    produce the same visible outcome with different compliance postures (Phase B).
