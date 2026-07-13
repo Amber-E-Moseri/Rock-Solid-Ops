@@ -1,0 +1,186 @@
+/* ============================================================
+   RSO DESIGN TOKENS — single source of truth
+   Merged from foundation/ui/tokens.css + premium-theme.css
+   ============================================================ */
+
+:root {
+  /* Typography */
+  --fs-page-title:    28px;
+  --fs-section-title: 18px;
+  --fs-table-header:  12px;
+  --fs-body:          14px;
+  --fs-meta:          12px;
+  --fs-label:         11px;
+  --fs-badge:         11px;
+
+  /* Spacing */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-12: 48px;
+
+  /* Border radius */
+  --radius-sm:   6px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   20px;
+  --radius-full: 9999px;
+  /* Legacy aliases used by ported components */
+  --r-sm:   10px;
+  --r-md:   14px;
+  --r-lg:   20px;
+  --r-full: 9999px;
+
+  /* Elevation */
+  --shadow-flat:     none;
+  --shadow-bordered: 0 0 0 1px var(--color-border);
+  --shadow-raised:   0 1px 3px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--color-border);
+  --sh-xs:           0 2px 8px rgba(23, 19, 39, 0.06);
+  --shadow:          0 10px 30px rgba(23, 19, 39, 0.06);
+  --shadow-soft:     0 4px 18px rgba(23, 19, 39, 0.05);
+
+  /* ── Light mode (warm / parchment) ── */
+
+  /* Semantic color roles */
+  --color-bg:             #f8f5ee;
+  --color-surface:        #ffffff;
+  --color-surface-raised: #faf7f2;
+  --color-border:         #e8dfd0;
+  --color-border-strong:  #cfc0ae;
+  --color-text-primary:   #261f35;
+  --color-text-secondary: #4a3d5c;
+  --color-text-muted:     #6f6881;
+  --color-primary:        #4C2A92;
+  --color-primary-hover:  #7d62c8;
+  --color-primary-fg:     #ffffff;
+  --color-success:        #16a34a;
+  --color-success-bg:     #e7f7ec;
+  --color-success-fg:     #14532d;
+  --color-warning:        #d97706;
+  --color-warning-bg:     #fff5df;
+  --color-warning-fg:     #92400e;
+  --color-danger:         #dc2626;
+  --color-danger-bg:      #fde8e8;
+  --color-danger-fg:      #991b1b;
+  --color-info:           #2563eb;
+  --color-info-bg:        #e9eeff;
+  --color-info-fg:        #1e3a8a;
+  --color-neutral:        #6f6881;
+  --color-neutral-bg:     #f2eef9;
+  --color-neutral-fg:     #261f35;
+
+  /* premium-theme.css aliases (used by ported JS / inline styles) */
+  --bg:            #F7F5FB;
+  --surface:       #FFFFFF;
+  --surface-2:     #FCFAFF;
+  --surface-alt:   var(--surface-2);
+  --primary:       #4C2A92;
+  --primary-hover: #5B34B3;
+  --soft-purple:   #EEE8FF;
+  --soft-lavender: #F5F1FF;
+  --gold:          #F4BE41;
+  --amber:         #F4BE41;
+  --amber-d:       #D4A520;
+  --success:       #22C55E;
+  --success-bg:    #E7F7EC;
+  --success-bd:    color-mix(in srgb, var(--success) 35%, var(--success-bg));
+  --warning:       #F59E0B;
+  --warn:          #D97706;
+  --warn-bg:       #FFF3DD;
+  --warn-bd:       color-mix(in srgb, var(--warn) 35%, var(--warn-bg));
+  --danger:        #EF4444;
+  --danger-bg:     #FCEBEB;
+  --danger-bd:     color-mix(in srgb, var(--danger) 35%, var(--danger-bg));
+  --info:          #2563EB;
+  --info-bg:       #E9EEFF;
+  --info-bd:       color-mix(in srgb, var(--info) 35%, var(--info-bg));
+  --text:          #171327;
+  --text-2:        #463D5E;
+  --muted:         #6E6885;
+  --border:        #E9E4F5;
+  --line:          #E9E4F5;
+  --navy:          #3D2A8A;
+  --navy-ghost:    rgba(44, 29, 100, 0.08);
+  --ink:           #1E1535;
+  --soft-lav:      #F5F1FF;
+  --lilacSoft:     #EDE9FA;
+  --brand:         #4C2A92;
+  --success-soft:  #ECFDF3;
+  --success-text:  #276749;
+  --danger-soft:   #FFF0F0;
+  --danger-text:   #8C1F1F;
+}
+
+/* ── Dark mode ── */
+html[data-theme="dark"] {
+  --color-bg:             #0F0B1A;
+  --color-surface:        #171126;
+  --color-surface-raised: #1E1730;
+  --color-border:         rgba(255, 255, 255, 0.08);
+  --color-border-strong:  rgba(255, 255, 255, 0.15);
+  --color-text-primary:   #F8F7FC;
+  --color-text-secondary: #C9C3DC;
+  --color-text-muted:     #A39BB8;
+  --color-primary:        #8B6BFF;
+  --color-primary-hover:  #9B80FF;
+  --color-primary-fg:     #ffffff;
+  --color-success:        #22C55E;
+  --color-success-bg:     #173625;
+  --color-success-fg:     #9be5b5;
+  --color-warning:        #FBBF24;
+  --color-warning-bg:     #3A2800;
+  --color-warning-fg:     #fcd97a;
+  --color-danger:         #F87171;
+  --color-danger-bg:      #3A1010;
+  --color-danger-fg:      #ffb2b2;
+  --color-info:           #60a5fa;
+  --color-info-bg:        #0E1F44;
+  --color-info-fg:        #93c5fd;
+  --color-neutral:        #A39BB8;
+  --color-neutral-bg:     #1E1730;
+  --color-neutral-fg:     #F8F7FC;
+
+  --bg:            #0F0B1A;
+  --surface:       #171126;
+  --surface-2:     #1E1730;
+  --surface-alt:   var(--surface-2);
+  --primary:       #8B6BFF;
+  --primary-hover: #9B80FF;
+  --soft-purple:   #2A2140;
+  --soft-lavender: #241c38;
+  --gold:          #F4BE41;
+  --amber:         #F4BE41;
+  --success:       #22C55E;
+  --success-bg:    #173625;
+  --success-bd:    color-mix(in srgb, var(--success) 35%, var(--success-bg));
+  --warning:       #FBBF24;
+  --warn:          #D97706;
+  --warn-bg:       #3A2800;
+  --warn-bd:       color-mix(in srgb, var(--warn) 35%, var(--warn-bg));
+  --danger:        #F87171;
+  --danger-bg:     #3A1010;
+  --danger-bd:     color-mix(in srgb, var(--danger) 35%, var(--danger-bg));
+  --info:          #60a5fa;
+  --info-bg:       #0E1F44;
+  --info-bd:       color-mix(in srgb, var(--info) 35%, var(--info-bg));
+  --text:          #F8F7FC;
+  --text-2:        #A39BB8;
+  --muted:         #A39BB8;
+  --border:        rgba(255, 255, 255, 0.08);
+  --line:          rgba(255, 255, 255, 0.08);
+  --navy:          #8B6BFF;
+  --navy-ghost:    rgba(139, 107, 255, 0.12);
+  --ink:           #F8F7FC;
+  --soft-lav:      #241c38;
+  --lilacSoft:     #2A2140;
+  --brand:         #8B6BFF;
+  --shadow:        0 14px 34px rgba(0, 0, 0, 0.35);
+  --shadow-soft:   0 6px 22px rgba(0, 0, 0, 0.22);
+  --success-soft:  #173625;
+  --success-text:  #9be5b5;
+  --danger-soft:   #462224;
+  --danger-text:   #ffb2b2;
+}
