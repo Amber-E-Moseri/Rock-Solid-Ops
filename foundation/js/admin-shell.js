@@ -304,7 +304,6 @@
     if (p.includes("milestones-admin")) return "milestones";
     if (p.includes("rocksolid-management")) return "nexusmapping";
     if (p.includes("clickup-management")) return "nexusmapping";
-    if (p.includes("admin-management")) return "nexusmapping";
     if (p.includes("data-exports")) return "dataexports";
     if (p.includes("baptism-report")) return "baptismreport";
     if (p.includes("reports")) return "reports";

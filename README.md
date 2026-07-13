@@ -87,7 +87,7 @@ Backend migration from Google Apps Script + Sheets to Supabase Postgres + Edge F
 | Frontend | Plain HTML / CSS / Vanilla JS |
 | Email delivery | Resend API |
 | LMS sync | Moodle REST Web Services API |
-| Task escalation | ClickUp API |
+| Task escalation | Nexus API (internal project management) |
 | Newsletter sync | Mailchimp API (dormant) |
 | Hosting | Vercel (static frontend) + Supabase (functions) |
 | Design tokens | `tokens.css`, `primitives.css` |
@@ -205,10 +205,13 @@ Pipeline:
 - Worker: `retry-worker`
 - Manual helper: `notification-retry-helper`
 
-### 10. ClickUp Escalation
+### 10. Nexus Escalation
 
-- Function: `clickup-sync`
-- Idempotency via `clickup_task_links`
+- Function: `clickup-sync` (retained name; posts to Nexus, not ClickUp)
+- Creates tasks in Nexus for missed classes and operational escalations
+- Admin-to-Nexus-user mapping: `rocksolid_admin_mappings`
+- Idempotency via `rocksolid_task_links`
+- Mapping UI: `foundation/staff/rocksolid-management.html`
 
 ### 11. Waitlist Processor
 
@@ -285,7 +288,8 @@ Note: current access is primarily role-based; regional data scoping is not globa
 | `attendance-reminder` | Cron | Attendance reminders |
 | `review-checkin` | Cron | REVIEW follow-up |
 | `student-engagement-monitor` | Cron | Engagement monitoring |
-| `clickup-sync` | On-demand | ClickUp escalation |
+| `clickup-sync` | On-demand | Nexus escalation (retained function name) |
+| `nexus-users-search` | On-demand | Nexus user lookup for admin mapping UI |
 | `waitlist-processor` | On-demand | Waitlist evaluation |
 | `class-selection` | On-demand | Class selection token handler |
 | `mailchimp-sync` | Dormant | Not in active use |
@@ -362,9 +366,8 @@ Messaging Phase 1 deploy commands:
 | `RESEND_API_KEY` | Yes | Email delivery |
 | `MOODLE_URL` | Yes | Moodle endpoint |
 | `MOODLE_TOKEN` | Yes | Moodle token |
-| `CLICKUP_API_KEY` | Yes | ClickUp |
-| `CLICKUP_LIST_ID` | Yes | ClickUp list |
-| `CLICKUP_DEFAULT_ASSIGNEE_ID` | Yes | ClickUp fallback assignee |
+| `NEXUS_API_URL` | Yes | Nexus task API base URL |
+| `NEXUS_API_KEY` | Yes | Shared secret with Nexus (also set in Nexus project) |
 | `PHASE2_WEBHOOK_SECRET` | Yes | Phase2 auth |
 | `ATTENDANCE_ADMIN_EMAIL` | Yes | Attendance ops email |
 | `TEACHER_PORTAL_URL` | Yes | Teacher portal link |
@@ -421,6 +424,11 @@ Never:
 `archive/apps-script-legacy/` is read-only historical reference and not part of runtime.
 
 ---
+
+## Latest Updates (July 2026)
+
+- ClickUp integration replaced with internal Nexus project management system. `clickup-sync` function retained its name but now posts to Nexus (`NEXUS_API_URL`/`NEXUS_API_KEY`); tables renamed to `rocksolid_admin_mappings` and `rocksolid_task_links`.
+- New `nexus-users-search` function backs a searchable user picker in the admin mapping UI (`rocksolid-management.html`, not yet committed — uses legacy `fs-*` CSS classes and needs a rebuild against current design tokens before merge).
 
 ## Latest Updates (May 2026)
 

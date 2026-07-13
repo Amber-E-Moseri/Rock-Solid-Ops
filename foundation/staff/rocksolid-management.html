@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rock Solid - Nexus Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../ui/premium-theme.css" />
+  <link rel="stylesheet" href="../ui/admin-shell.css" />
+  <link rel='stylesheet' href='../ui/primitives.css' />
+  <link rel="stylesheet" href="../ui/components.css" />
+  <link rel="stylesheet" href="../ui/layout.css" />
+  <style>
+    :root { --ease: 240ms cubic-bezier(.22,1,.36,1); }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Manrope", system-ui, sans-serif;
+      color: var(--text);
+      background: radial-gradient(900px 460px at 100% -12%, color-mix(in srgb, var(--amber) 14%, transparent), transparent 65%), radial-gradient(760px 380px at -10% -6%, color-mix(in srgb, var(--navy) 10%, transparent), transparent 64%), var(--bg);
+      min-height: 100dvh;
+    }
+    .shell { max-width: 1220px; margin: 0 auto; padding: 24px 18px 72px; }
+    .header {
+      position: sticky; top: 10px; z-index: 30; backdrop-filter: blur(10px);
+      background: color-mix(in srgb, var(--color-surface) 84%, transparent); border: 1px solid var(--border);
+      border-radius: var(--r-xl); box-shadow: var(--sh-xs); display: flex; align-items: center; justify-content: space-between;
+      gap: 14px; padding: 14px 16px; margin-bottom: 14px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .logo { width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(145deg, var(--navy), var(--navy-l)); color: #fff; display: grid; place-items: center; font-weight: 800; }
+    .brand h1 { margin: 0; font-size: clamp(16px,2vw,21px); letter-spacing: -.02em; }
+    .brand p { margin: 2px 0 0; color: var(--color-text-muted); font-size: 12px; }
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+    .btn { border: 1px solid transparent; border-radius: 12px; padding: 10px 14px; font-weight: 700; font-size: 13px; cursor: pointer; transition: transform var(--ease), background var(--ease), border-color var(--ease), box-shadow var(--ease); }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+    .btn-primary { background: var(--navy); color: #fff; box-shadow: var(--sh-xs); }
+    .btn-primary:hover { background: var(--navy-l); }
+    .btn-ghost { background: var(--color-surface); color: var(--text); border-color: var(--border); }
+    .panel { background: var(--color-surface); border: 1px solid var(--border); border-radius: var(--r-xl); box-shadow: var(--sh-xs); overflow: hidden; }
+    .toolbar {
+      display: grid; grid-template-columns: minmax(230px, 1fr) auto auto; gap: 10px; padding: 12px 14px;
+      border-bottom: 1px solid var(--border); background: var(--surface-alt);
+    }
+    .input, .select, .textarea {
+      width: 100%; border: 1px solid var(--border); border-radius: var(--r); padding: 10px 11px;
+      background: var(--color-surface); color: var(--text); font: inherit;
+    }
+    .input:focus, .select:focus, .textarea:focus {
+      outline: 2px solid color-mix(in srgb, var(--navy), transparent 70%);
+      outline-offset: 1px;
+    }
+    .table-wrap { overflow: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 1020px; }
+    th, td { text-align: left; padding: 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--color-text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+    tr:hover td { background: color-mix(in srgb, var(--surface-alt), transparent 10%); }
+    .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .fs-table-empty { padding: 42px 16px; text-align: center; color: var(--color-text-muted); }
+    .fs-table-empty .emoji { font-size: 34px; margin-bottom: 8px; }
+    .msg { margin: 12px 14px 0; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; font-size: 13px; }
+    .msg.error { background: var(--danger-bg); color: var(--danger); border-color: var(--danger-bd); }
+    .msg.info { background: var(--surface-alt); color: var(--color-text-muted); }
+    .muted { color: var(--color-text-muted); font-size: 12px; }
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(10, 10, 20, .42); backdrop-filter: blur(3px);
+      display: none; place-items: center; padding: 16px; z-index: 60;
+    }
+    .modal-overlay.open { display: grid; }
+    .modal {
+      width: min(760px, 96vw); max-height: 90dvh; overflow: auto; background: var(--color-surface);
+      border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--sh-lg);
+    }
+    .modal-head { padding: 16px 16px 10px; border-bottom: 1px solid var(--border); }
+    .modal-head h2 { margin: 0; font-size: 20px; }
+    .modal-body { padding: 14px 16px; }
+    .modal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .field { display: grid; gap: 5px; }
+    .field label { font-size: 12px; color: var(--color-text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+    .field.full { grid-column: 1 / -1; }
+    .modal-foot { padding: 12px 16px 16px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+    .user-picker-container {
+      position: relative;
+      display: grid;
+      gap: 5px;
+    }
+    .user-picker-input {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 10px 11px;
+      background: var(--color-surface);
+      color: var(--text);
+      font: inherit;
+    }
+    .user-picker-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--color-surface);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 var(--r) var(--r);
+      max-height: 300px;
+      overflow-y: auto;
+      z-index: 100;
+      display: none;
+      box-shadow: var(--sh-xs);
+    }
+    .user-picker-dropdown.open {
+      display: block;
+    }
+    .user-picker-option {
+      padding: 10px 11px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      transition: background var(--ease);
+    }
+    .user-picker-option:hover {
+      background: var(--surface-alt);
+    }
+    .user-picker-option-name {
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .user-picker-option-meta {
+      font-size: 12px;
+      color: var(--color-text-muted);
+    }
+    .selected-user {
+      background: var(--navy-ghost);
+      padding: 8px 10px;
+      border-radius: var(--r);
+      margin-top: 5px;
+      font-size: 13px;
+    }
+    .selected-user-remove {
+      cursor: pointer;
+      color: var(--coral);
+      font-weight: 600;
+      margin-left: 8px;
+    }
+
+    @media (max-width: 980px) { .toolbar { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 760px) {
+      .shell { padding: 12px 10px 100px; }
+      .header { border-radius: 14px; top: 6px; }
+      .brand p { display: none; }
+      .toolbar { grid-template-columns: 1fr; }
+      .modal-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell main">
+    <header class="header" aria-label="Nexus management header">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">RS</div>
+        <div>
+          <h1>Nexus Management</h1>
+          <p id="welcomeLine">Nexus user admin mappings</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="fs-btn fs-btn-secondary" id="refreshBtn">Refresh</button>
+        <button class="fs-btn fs-btn-primary" id="addBtn">Add Mapping</button>
+        <button class="fs-btn fs-btn-secondary" id="signOutBtn">Sign out</button>
+      </div>
+    </header>
+
+    <section class="panel">
+      <div class="toolbar fs-action-bar">
+        <input class="input" id="searchInput" placeholder="Search mappings..." aria-label="Search mappings" />
+        <div style="display:flex;justify-content:flex-end">
+          <button class="fs-btn fs-btn-secondary" id="clearBtn">Clear</button>
+        </div>
+      </div>
+      <div id="errorHost"></div>
+      <div id="tableHost" class="table-wrap fs-table-wrap"></div>
+    </section>
+  </div>
+
+  <div class="modal-overlay" id="mapModalOverlay" role="dialog" aria-modal="true" aria-labelledby="mapModalTitle">
+    <div class="modal">
+      <div class="modal-head"><h2 id="mapModalTitle">Add Nexus Mapping</h2></div>
+      <form class="modal-body" id="mapForm">
+        <div class="modal-grid" id="mapFormGrid"></div>
+      </form>
+      <div class="modal-foot">
+        <button class="fs-btn fs-btn-secondary" id="cancelMapBtn">Cancel</button>
+        <button class="fs-btn fs-btn-primary" id="saveMapBtn">Save Mapping</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/config-helper.js"></script>
+  <script src="../js/toast.js"></script>
+  <script src="../js/runtime.js"></script>
+  <script type="module">
+    import { supabase, getCurrentProfile, isAdmin, requireAuth } from "../auth/auth-client.js";
+
+    const $ = (id) => document.getElementById(id);
+    const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (m) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m]));
+
+    const state = {
+      auth: null,
+      role: "",
+      search: "",
+      rows: [],
+      loadError: null,
+      editing: null,
+      nexusUsers: [],
+      selectedNexusUser: null
+    };
+
+    const els = {
+      welcomeLine: $("welcomeLine"),
+      refreshBtn: $("refreshBtn"),
+      addBtn: $("addBtn"),
+      signOutBtn: $("signOutBtn"),
+      searchInput: $("searchInput"),
+      clearBtn: $("clearBtn"),
+      errorHost: $("errorHost"),
+      tableHost: $("tableHost"),
+      mapModalOverlay: $("mapModalOverlay"),
+      mapModalTitle: $("mapModalTitle"),
+      mapForm: $("mapForm"),
+      mapFormGrid: $("mapFormGrid"),
+      cancelMapBtn: $("cancelMapBtn"),
+      saveMapBtn: $("saveMapBtn"),
+    };
+
+    function notify(message, type = "info", ttl = 3600) {
+      if (window.FSToast?.show) window.FSToast.show(message, type, ttl);
+    }
+
+    function setTheme() {
+      document.documentElement.setAttribute("data-theme", "light");
+      document.documentElement.classList.remove("dark");
+      document.body.classList.add("fs-force-light");
+      localStorage.setItem("fs_theme", "light");
+    }
+
+    function appPath(relativePath) {
+      const clean = String(relativePath || "").replace(/^\/+/, "");
+      const p = window.location.pathname || "";
+      return p.includes("/foundation/") ? `/foundation/${clean}` : `/${clean}`;
+    }
+
+    function loginPath() {
+      return appPath("auth/login.html");
+    }
+
+    function hasRole(role) {
+      return String(state.role || "").toLowerCase() === String(role || "").toLowerCase();
+    }
+
+    function canManageNexus() {
+      return hasRole("superadmin") || hasRole("admin");
+    }
+
+    function openModal(overlay, focusEl) {
+      overlay.classList.add("open");
+      setTimeout(() => focusEl?.focus(), 0);
+    }
+
+    function closeModal(overlay) {
+      overlay.classList.remove("open");
+    }
+
+    function setError(message) {
+      state.loadError = message || null;
+    }
+
+    function renderError() {
+      els.errorHost.innerHTML = state.loadError ? `<div class="fs-banner fs-banner-danger">${esc(state.loadError)}</div>` : "";
+    }
+
+    function currentRows() {
+      const q = state.search.toLowerCase();
+      if (!q) return state.rows;
+      return state.rows.filter((r) => JSON.stringify(r || {}).toLowerCase().includes(q));
+    }
+
+    function safeSortByName(rows, keys) {
+      return [...rows].sort((a, b) => {
+        const av = keys.map((k) => String(a?.[k] || "")).join(" ").toLowerCase();
+        const bv = keys.map((k) => String(b?.[k] || "")).join(" ").toLowerCase();
+        return av.localeCompare(bv);
+      });
+    }
+
+    async function loadMappings() {
+      const { data, error } = await supabase
+        .from("rocksolid_admin_mappings")
+        .select("id,admin_email,nexus_user_id,nexus_user_name,nexus_user_email,group_id,subgroup_id,active,updated_at")
+        .order("group_id", { ascending: true })
+        .limit(4000);
+
+      if (error) {
+        setError(`Failed to load mappings: ${error.message}`);
+        state.rows = [];
+        return;
+      }
+
+      state.rows = data || [];
+      setError(null);
+    }
+
+    async function loadNexusUsers() {
+      try {
+        const response = await fetch(`${window.location.origin}/functions/v1/nexus-users-search`, {
+          headers: {
+            "Authorization": `Bearer ${supabase.auth.session()?.access_token || ""}`,
+            "Content-Type": "application/json"
+          }
+        });
+
+        if (!response.ok) {
+          console.error("Failed to load Nexus users");
+          state.nexusUsers = [];
+          return;
+        }
+
+        const { users } = await response.json();
+        state.nexusUsers = safeSortByName(users || [], ["name", "email"]);
+      } catch (err) {
+        console.error("Error loading Nexus users:", err);
+        state.nexusUsers = [];
+      }
+    }
+
+    function renderTable() {
+      const rows = currentRows();
+
+      if (!rows.length) {
+        els.tableHost.innerHTML = `<div class="fs-table-empty"><div class="emoji">📭</div><h3 style="margin:0 0 6px">No mappings found.</h3><p style="margin:0">${state.search ? "No records matched your search." : "Add a mapping to get started."}</p></div>`;
+        return;
+      }
+
+      els.tableHost.innerHTML = `<table><thead><tr><th>Admin Email</th><th>Nexus User</th><th>Group</th><th>Subgroup</th><th>Active</th><th>Actions</th></tr></thead><tbody>${
+        rows.map((r) => `<tr>
+          <td><strong>${esc(r.admin_email || "-")}</strong></td>
+          <td>${esc(r.nexus_user_name || "-")}<br/><span class="muted">${esc(r.nexus_user_email || "")}</span></td>
+          <td>${esc(r.group_id || "-")}</td>
+          <td>${esc(r.subgroup_id || "-")}</td>
+          <td><span class="fs-badge ${r.active !== false ? "fs-badge-success" : "fs-badge-neutral"}">${r.active !== false ? "Active" : "Inactive"}</span></td>
+          <td><div class="row-actions">
+            <button class="fs-btn fs-btn-secondary" data-edit="${esc(r.id)}">Edit</button>
+            <button class="fs-btn ${r.active !== false ? "fs-btn-danger" : "fs-btn-secondary"}" data-toggle="${esc(r.id)}">${r.active !== false ? "Deactivate" : "Reactivate"}</button>
+          </div></td>
+        </tr>`).join("")
+      }</tbody></table>`;
+
+      els.tableHost.querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => openEditModal(b.dataset.edit)));
+      els.tableHost.querySelectorAll("[data-toggle]").forEach((b) => b.addEventListener("click", () => toggleActive(b.dataset.toggle)));
+    }
+
+    function render() {
+      renderError();
+      renderTable();
+    }
+
+    function openUserPicker(inputId, selectedId = null) {
+      const input = $(inputId);
+      const dropdown = document.createElement("div");
+      dropdown.className = "user-picker-dropdown";
+
+      const renderUsers = (filter = "") => {
+        const filtered = state.nexusUsers.filter(u =>
+          !filter ||
+          String(u.name || "").toLowerCase().includes(filter.toLowerCase()) ||
+          String(u.email || "").toLowerCase().includes(filter.toLowerCase())
+        );
+
+        dropdown.innerHTML = filtered.map(u => `
+          <div class="user-picker-option" data-user-id="${esc(u.id)}">
+            <div class="user-picker-option-name">${esc(u.name || "-")}</div>
+            <div class="user-picker-option-meta">${esc(u.email || "-")} · ${esc(u.role || "-")}</div>
+          </div>
+        `).join("");
+
+        dropdown.querySelectorAll(".user-picker-option").forEach(opt => {
+          opt.addEventListener("click", () => {
+            const userId = opt.dataset.userId;
+            const user = state.nexusUsers.find(u => u.id === userId);
+            if (user) {
+              state.selectedNexusUser = user;
+              input.value = `${user.name} (${user.email})`;
+              dropdown.classList.remove("open");
+              renderSelectedUser();
+            }
+          });
+        });
+      };
+
+      input.addEventListener("input", (e) => renderUsers(e.target.value));
+      input.addEventListener("focus", () => {
+        dropdown.classList.add("open");
+        renderUsers(input.value);
+      });
+
+      document.addEventListener("click", (e) => {
+        if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+          dropdown.classList.remove("open");
+        }
+      });
+
+      input.parentElement.appendChild(dropdown);
+      renderUsers();
+    }
+
+    function renderSelectedUser() {
+      const display = $("selectedUserDisplay");
+      if (!display) return;
+
+      if (state.selectedNexusUser) {
+        display.innerHTML = `<div class="selected-user">${esc(state.selectedNexusUser.name)} (${esc(state.selectedNexusUser.email)}) <span class="selected-user-remove" data-action="clear-user">✕</span></div>`;
+        $("[data-action=clear-user]")?.addEventListener("click", () => {
+          state.selectedNexusUser = null;
+          $("userPickerInput").value = "";
+          renderSelectedUser();
+        });
+      } else {
+        display.innerHTML = "";
+      }
+    }
+
+    function openEditModal(id) {
+      if (!canManageNexus()) {
+        notify("You do not have permission to edit mappings.", "error");
+        return;
+      }
+
+      const row = id ? state.rows.find((r) => String(r.id) === String(id)) : null;
+      state.editing = { id: id || null };
+      state.selectedNexusUser = row ? { id: row.nexus_user_id, name: row.nexus_user_name, email: row.nexus_user_email } : null;
+
+      els.mapModalTitle.textContent = row ? "Edit Nexus Mapping" : "Add Nexus Mapping";
+      els.mapFormGrid.innerHTML = `
+        <div class="field full">
+          <label for="adminEmail">Admin Email (Rock Solid)</label>
+          <input class="input" id="adminEmail" type="email" value="${esc(row?.admin_email || "")}" required />
+        </div>
+        <div class="field full">
+          <label>Select Nexus User</label>
+          <div class="user-picker-container">
+            <input class="user-picker-input" id="userPickerInput" placeholder="Search by name or email..." />
+            <div id="selectedUserDisplay"></div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="groupId">Group ID</label>
+          <input class="input" id="groupId" type="text" value="${esc(row?.group_id || "")}" required />
+        </div>
+        <div class="field">
+          <label for="subgroupId">Subgroup ID</label>
+          <input class="input" id="subgroupId" type="text" value="${esc(row?.subgroup_id || "")}" />
+        </div>
+        <div class="field full">
+          <label>Active</label>
+          <select class="select" id="isActive" required>
+            <option value="true" ${row?.active !== false ? "selected" : ""}>Active</option>
+            <option value="false" ${row?.active === false ? "selected" : ""}>Inactive</option>
+          </select>
+        </div>
+      `;
+
+      renderSelectedUser();
+      openUserPicker("userPickerInput", state.selectedNexusUser?.id);
+      openModal(els.mapModalOverlay, $("adminEmail"));
+    }
+
+    async function toggleActive(id) {
+      const row = state.rows.find((r) => String(r.id) === String(id));
+      if (!row) return;
+
+      const next = !(row.active !== false);
+      const { error } = await supabase.from("rocksolid_admin_mappings").update({ active: next, updated_at: new Date().toISOString() }).eq("id", row.id);
+
+      if (error) { notify(`Update failed: ${error.message}`, "error"); return; }
+      notify(`Mapping ${next ? "reactivated" : "deactivated"}.`, "success");
+      await loadMappings();
+      render();
+    }
+
+    async function saveMapping() {
+      if (!state.editing) return;
+
+      const adminEmail = String($("adminEmail")?.value || "").trim().toLowerCase();
+      const groupId = String($("groupId")?.value || "").trim();
+      const isActive = $("isActive")?.value !== "false";
+
+      if (!adminEmail || !groupId || !state.selectedNexusUser) {
+        notify("Admin email, group ID, and Nexus user are required.", "warning");
+        return;
+      }
+
+      els.saveMapBtn.disabled = true;
+
+      try {
+        const payload = {
+          admin_email: adminEmail,
+          nexus_user_id: state.selectedNexusUser.id,
+          nexus_user_name: state.selectedNexusUser.name,
+          nexus_user_email: state.selectedNexusUser.email,
+          group_id: groupId,
+          subgroup_id: String($("subgroupId")?.value || "").trim() || null,
+          active: isActive,
+          updated_at: new Date().toISOString()
+        };
+
+        let error = null;
+        if (state.editing.id) {
+          ({ error } = await supabase.from("rocksolid_admin_mappings").update(payload).eq("id", state.editing.id));
+        } else {
+          ({ error } = await supabase.from("rocksolid_admin_mappings").insert({ ...payload, created_at: new Date().toISOString() }));
+        }
+
+        if (error) {
+          notify(`Save failed: ${error.message}`, "error");
+          return;
+        }
+
+        notify("Mapping saved.", "success");
+        closeModal(els.mapModalOverlay);
+        await loadMappings();
+        render();
+      } finally {
+        els.saveMapBtn.disabled = false;
+      }
+    }
+
+    function bindEvents() {
+      els.searchInput.addEventListener("input", () => {
+        state.search = els.searchInput.value || "";
+        render();
+      });
+
+      els.clearBtn.addEventListener("click", () => {
+        state.search = "";
+        els.searchInput.value = "";
+        render();
+      });
+
+      els.addBtn.addEventListener("click", () => openEditModal(null));
+
+      els.refreshBtn.addEventListener("click", async () => {
+        await loadMappings();
+        render();
+        notify("Data refreshed.", "info", 1600);
+      });
+
+      els.signOutBtn.addEventListener("click", async () => {
+        await supabase.auth.signOut();
+        window.location.href = loginPath();
+      });
+
+      els.cancelMapBtn.addEventListener("click", () => closeModal(els.mapModalOverlay));
+      els.saveMapBtn.addEventListener("click", saveMapping);
+
+      els.mapModalOverlay.addEventListener("click", (e) => {
+        if (e.target === els.mapModalOverlay) closeModal(els.mapModalOverlay);
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeModal(els.mapModalOverlay);
+      });
+    }
+
+    async function ensureAccess() {
+      const auth = await requireAuth(["superadmin", "admin"]);
+      if (!auth) return false;
+
+      const role = String(auth.profile?.role || "").toLowerCase();
+      state.auth = auth;
+      state.role = role;
+
+      if (!["admin", "superadmin"].includes(role)) {
+        document.body.innerHTML = window.FSRuntime?._unauthorizedHtml?.("Your account does not have permission to view this page.") || "<h2>Access denied.</h2>";
+        return false;
+      }
+
+      const profile = await getCurrentProfile().catch(() => auth.profile);
+      els.welcomeLine.textContent = `${profile?.full_name || profile?.email || "Staff"} · ${role}`;
+      return true;
+    }
+
+    async function boot() {
+      setTheme();
+      const ok = await ensureAccess();
+      if (!ok) return;
+
+      bindEvents();
+      await loadNexusUsers();
+      await loadMappings();
+      render();
+      notify("Nexus management ready.", "info", 1600);
+    }
+
+    boot().catch((err) => {
+      const info = window.FSRuntime?.classifyError?.(err) || { message: String(err || "Unknown error"), isAuth: false };
+      if (info.isAuth) {
+        window.FSRuntime?.handleAuthExpiration?.();
+        return;
+      }
+      els.errorHost.innerHTML = `<div class="fs-banner fs-banner-danger">Page failed to load: ${esc(info.message || err?.message || err)}</div>`;
+    });
+  </script>
+  <script src="../js/admin-shell.js?v=20260710"></script>
+  <script>
+    window.FSAdminShell && window.FSAdminShell.mount({ active: "nexusmanagement", pageTitle: "Nexus Management" });
+  </script>
+</body>
+</html>

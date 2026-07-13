@@ -1,6 +1,6 @@
 # Rock Solid Foundation School — System Overview
 
-*Last updated: May 24, 2026 � Primary audience: engineers, new contributors, and operators*
+*Last updated: May 24, 2026 � Primary audience: engineers, new contributors, and operators*
 
 ---
 
@@ -352,8 +352,9 @@ When an applicant's `registration_status` becomes `ASSIGNED`, a row is inserted 
 
 ### 1. Read first
 - This document (SYSTEM_OVERVIEW.md)
-- `ai/constraints.md.txt` — hard rules for the platform
-- `ai/statuses.md.txt` — all status values used across tables
+- `CLAUDE.md` (repo root) — project context, hard constraints, and conventions
+- `ai/constraints.md` — hard rules for the platform
+- `ai/statuses.md` — all status values used across tables
 - `foundation/docs/ENGINEERING_CONVENTIONS.md` — coding conventions
 - `foundation/docs/NOTIFICATION_PIPELINE.md` — email pipeline topology
 

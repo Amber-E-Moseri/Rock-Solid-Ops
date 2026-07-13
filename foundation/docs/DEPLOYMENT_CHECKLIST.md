@@ -14,9 +14,8 @@
   - [ ] `MAILCHIMP_API_KEY`
   - [ ] `MAILCHIMP_SERVER_PREFIX`
   - [ ] `MAILCHIMP_AUDIENCE_ID`
-  - [ ] `CLICKUP_API_KEY`
-  - [ ] `CLICKUP_LIST_ID`
-  - [ ] `CLICKUP_DEFAULT_ASSIGNEE_ID`
+  - [ ] `NEXUS_API_URL`
+  - [ ] `NEXUS_API_KEY`
   - [ ] `PHASE2_WEBHOOK_SECRET`
   - [ ] `ATTENDANCE_ADMIN_EMAIL` (or `ADMIN_EMAIL`)
   - [ ] `TEACHER_PORTAL_URL`
@@ -34,10 +33,14 @@
 - [ ] System health checks are all green
 
 ## 3) Rollback Steps
-1. Revert Netlify site to the previous successful deploy.
+1. Revert the Vercel deployment to the previous successful deploy.
 2. Re-deploy prior Edge Function versions:
    - `supabase functions deploy <function-name>@<previous-version>` (or redeploy from previous commit).
 3. If recent schema migrations caused breakage:
    - Apply a forward fix migration (preferred), or restore DB from maintenance backup.
-4. Restore prior `netlify.toml` and `_headers` from previous commit and redeploy.
+4. Restore prior `vercel.json` and `_headers` from previous commit and redeploy.
 5. Re-run smoke checks: login, registration, admin, teacher, system health.
+
+> Note: this project migrated from Netlify to Vercel. The retired `netlify.toml`
+> and its config-generator script are kept for reference in
+> `archive/netlify-legacy/`, not at the repo root.
