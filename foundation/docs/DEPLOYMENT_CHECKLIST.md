@@ -11,9 +11,6 @@
   - [ ] `RESEND_API_KEY`
   - [ ] `MOODLE_URL`
   - [ ] `MOODLE_TOKEN`
-  - [ ] `MAILCHIMP_API_KEY`
-  - [ ] `MAILCHIMP_SERVER_PREFIX`
-  - [ ] `MAILCHIMP_AUDIENCE_ID`
   - [ ] `NEXUS_API_URL`
   - [ ] `NEXUS_API_KEY`
   - [ ] `PHASE2_WEBHOOK_SECRET`

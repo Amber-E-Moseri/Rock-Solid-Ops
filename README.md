@@ -88,7 +88,6 @@ Backend migration from Google Apps Script + Sheets to Supabase Postgres + Edge F
 | Email delivery | Resend API |
 | LMS sync | Moodle REST Web Services API |
 | Task escalation | Nexus API (internal project management) |
-| Newsletter sync | Mailchimp API (dormant) |
 | Hosting | Vercel (static frontend) + Supabase (functions) |
 | Design tokens | `tokens.css`, `primitives.css` |
 | Font | Manrope |
@@ -292,7 +291,6 @@ Note: current access is primarily role-based; regional data scoping is not globa
 | `nexus-users-search` | On-demand | Nexus user lookup for admin mapping UI |
 | `waitlist-processor` | On-demand | Waitlist evaluation |
 | `class-selection` | On-demand | Class selection token handler |
-| `mailchimp-sync` | Dormant | Not in active use |
 | `report-generator` | Cron | Report generation |
 | `reminder-processor` | Do not schedule | Legacy stub |
 
@@ -371,9 +369,6 @@ Messaging Phase 1 deploy commands:
 | `PHASE2_WEBHOOK_SECRET` | Yes | Phase2 auth |
 | `ATTENDANCE_ADMIN_EMAIL` | Yes | Attendance ops email |
 | `TEACHER_PORTAL_URL` | Yes | Teacher portal link |
-| `MAILCHIMP_API_KEY` | Optional (dormant) | Mailchimp |
-| `MAILCHIMP_SERVER_PREFIX` | Optional (dormant) | Mailchimp |
-| `MAILCHIMP_AUDIENCE_ID` | Optional (dormant) | Mailchimp |
 
 Never commit real credentials.
 
