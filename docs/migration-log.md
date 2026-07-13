@@ -1042,3 +1042,57 @@ covered and didn't on the first pass. Re-audited now; still read-only, still no 
 10. Decide whether fellowship-wide blasts should be required to go through Mailchimp (native
     unsubscribe) rather than `email_campaigns` (none) — currently both are available and
     produce the same visible outcome with different compliance postures (Phase B).
+
+---
+
+## 2026-07-13 — Email Pipeline Audit ADDENDUM 2: Mailchimp is not actually in use (operator-confirmed)
+
+User confirmed directly: only Resend is used today — Mailchimp is not live in practice.
+This wasn't discoverable from the code/docs alone (`registration-processor` still calls it
+unconditionally, and `ai/constraints.md` / `foundation/docs/DEPLOYMENT_CHECKLIST.md` still
+document it as required infrastructure), so recording it here rather than silently revising
+ADDENDUM 1 — it changes the risk read materially and is worth being explicit about what
+changed and why.
+
+- **Revises the "two channels, one compliant" framing in ADDENDUM 1.** If Mailchimp isn't
+  actually running campaigns, its native unsubscribe isn't actually protecting anything
+  right now. In current practice there is exactly **one** bulk-send surface —
+  `email_campaigns` / `email_queue` / `email-sender` — and it has no unsubscribe mechanism
+  at all. Follow-up item 10 above is moot in its "decide between two paths" framing; the
+  real ask is just: **add unsubscribe/suppression to `email_campaigns`**, full stop, since
+  it's the only campaign path actually in service.
+- **`registration-processor/index.ts:633` firing `triggerMailchimpSync()` on every
+  registration is very likely a live no-op failure, not a dormant code path.** If
+  `MAILCHIMP_API_KEY`/`MAILCHIMP_SERVER_PREFIX`/`MAILCHIMP_AUDIENCE_ID` aren't provisioned in
+  the real environment (consistent with "we only use Resend now"), every one of those calls
+  hits `mailchimp-sync`, fails the Mailchimp `fetch`, and — per ADDENDUM 1's failure-
+  visibility finding — writes one `audit_logs` row that nothing surfaces or alerts on, then
+  is gone. That means this has likely been happening on every single registration, silently,
+  for as long as Mailchimp credentials have been unset, with zero operator-visible signal
+  besides `audit_logs` rows nobody is watching for this action type.
+- **Confirms the docs are stale, not just the runtime behavior.** `foundation/docs/DEPLOYMENT_CHECKLIST.md:14-16`
+  still lists `MAILCHIMP_API_KEY`, `MAILCHIMP_SERVER_PREFIX`, `MAILCHIMP_AUDIENCE_ID` as
+  checklist items for deployment, and `ai/constraints.md`'s MAILCHIMP RULES section still
+  frames Mailchimp as a live architectural layer. Neither reflects "Resend only" as the
+  actual current state. Notably, `foundation/staff/env-check.html` (the ops health-check
+  page) has **no Mailchimp entries at all** — so the one place that should have surfaced
+  "Mailchimp isn't configured" doesn't check for it either.
+- **Not fixed in this brief (audit only).** Flagging as the clearest single follow-up out of
+  everything in this audit: either (a) provision Mailchimp for real, or (b) remove the
+  `triggerMailchimpSync` call and the `mailchimp-sync` function, and update
+  `ai/constraints.md` + `DEPLOYMENT_CHECKLIST.md` to stop describing infrastructure that
+  isn't in service. Right now the code, the docs, and actual practice all disagree with each
+  other, which is worse than any one of the three being wrong alone.
+
+### FOLLOW-UP LIST, REVISED
+
+Supersedes items 8–10 above given this confirmation:
+
+8. Decide Mailchimp's fate: provision it for real, or remove `triggerMailchimpSync` +
+   `mailchimp-sync` + its stale references in `ai/constraints.md` and
+   `foundation/docs/DEPLOYMENT_CHECKLIST.md` (Phase B/D).
+9. If Mailchimp stays removed/unused: add unsubscribe/suppression to `email_campaigns`
+   directly — it is the only bulk-send surface actually in service (Phase B).
+10. If Mailchimp is kept: fix the silent-failure path (`failed_syncs` write, or at minimum an
+    `env-check.html` entry so missing credentials are visible before the first silent
+    failure, not after) (Phase C/D).
