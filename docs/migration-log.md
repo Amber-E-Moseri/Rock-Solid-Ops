@@ -1291,3 +1291,32 @@ user's direction: the email-audit entry was committed first on `brief/email-audi
 the log reads chronologically (email-audit, then C.1) with each brief's entry in its own
 commit. Going forward this branch's work moves to a dedicated `git worktree` (see the branch
 policy note in CLAUDE.md) so parallel sessions stop sharing one checkout and one HEAD.
+
+---
+
+## 2026-07-13 — Removed superseded brief/pwa-push branch + worktree
+
+`brief/pwa-push` was fully superseded once C.1 merged (`brief/pwa-c1` → `main`) and C.2 was
+re-homed (`brief/push-notifications`). Before deleting, re-verified directly rather than
+trusting the prior session's claim — diffed each of its 5 unique commits against where its
+content was supposed to have landed:
+
+- `307e63b` (C.1 shell) vs `e3f053a` (main) — patch content identical.
+- `b9eeeaa` (C.1 log entry) — all 99 added lines present in main's `docs/migration-log.md`.
+- `cb7f5fd` (worktree-per-brief rule) — all 16 added lines present in main's `CLAUDE.md`.
+- `1a45292` (push infra) vs `c80192a` (`brief/push-notifications`) — patch content identical;
+  only blob hashes and hunk line-numbers differed, both expected (surrounding file content
+  had grown by cherry-pick time).
+- `9ca1721` (trigger wiring) vs `841ca3a` (`brief/push-notifications`) — same, patch content
+  identical.
+
+Nothing unaccounted for. Removed:
+- `git worktree remove ../rso-pwa-push`
+- `git branch -d brief/pwa-push` — refused (git doesn't recognize cherry-picked commits as
+  "merged," different hashes). Reported rather than force-deleting; user confirmed
+  `git branch -D brief/pwa-push` explicitly before it ran.
+
+`git worktree list` post-removal: only `main` and `../rso-push-notifications` remain — no
+other stale worktrees. `cleanup-review` and `feat/retry-worker-clickup-escalation` branches
+are still present (already-merged stale pointers, left in place per earlier session's
+instruction) — out of this brief's scope, not touched.
