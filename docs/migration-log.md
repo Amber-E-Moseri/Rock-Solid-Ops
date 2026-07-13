@@ -667,3 +667,23 @@ incrementally, merge to `main` in the same session once any gate is confirmed, d
 branch. Replaces the earlier lock-file approach, which coordinated parallel sessions on a
 shared tree but did nothing to keep unrelated hunks (e.g. the ClickUp removal below) from
 landing inside an unrelated feature commit.
+
+### DECISION — ClickUp removal attribution (no code change; already unrecoverable as a clean split)
+
+e26a408's own commit message already documents that the ClickUp assignee/watcher tab
+removal from `admin-management.html` (properly belonging to the Nexus cleanup, 9e1ed97)
+"could not be cleanly separated from this commit's hunks." Re-verified here: the working
+tree no longer contains any ClickUp/assignee/watcher markup in `admin-management.html`, and
+`9e1ed97`'s own diff never touched that file — confirming the hunk really did land only in
+e26a408, mixed with the unrelated create-staff-direct feature.
+
+Splitting it out now would require an interactive rebase of an already-existing commit
+(`git rebase -i` to break e26a408 into two commits). That is excluded by this project's git
+safety rules (no interactive rebase), and rewriting a local commit whose content is already
+relied upon by later commits is a hard-to-reverse operation with no corresponding benefit —
+the code state is identical either way. Recorded here as a **documentation-only attribution**
+instead: the ClickUp tab removal in `admin-management.html`, currently living inside
+e26a408, is attributed to the Nexus/ClickUp-replacement lineage (9e1ed97,
+`202607101000_rocksolid_nexus_integration.sql`), not to the create-staff-direct feature.
+No further action needed; flagged here so future `git blame`/archaeology on that file isn't
+misled by e26a408's feature-sounding commit message.
