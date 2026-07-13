@@ -2540,3 +2540,82 @@ reads/writes.
 None required — this is a reporting-RPC bug fix with no RLS or auth-boundary change, same
 class as the already-merged `get_teacher_attention_flags` fix which needed none. Safe to merge
 same session per the standing branch-per-brief workflow.
+
+---
+
+## 2026-07-13 — PWA Phase C.2: web push infrastructure (brief/pwa-push, C.2 gate)
+
+Phase C.2 of the PWA brief, built in the dedicated worktree (`../rso-pwa-push`). Adds the
+full web-push stack; the automatic-trigger wiring (item 5) is deliberately held for the two
+decisions named under GATE below rather than guessed into critical code.
+
+### BUILT
+
+- **Migration `202607131700_profiles_push_subscription.sql`** — adds `push_subscription`
+  (jsonb), `push_subscribed_at` (timestamptz), `push_enabled` (bool default false) to
+  `profiles`, plus a partial index. **No new RLS policies**: the existing
+  `profiles_self_or_admin_(select|update)` already give exactly self-read/write + no
+  cross-profile access; the self-role/activation triggers don't touch these columns.
+  Confirmed no broad/anon profiles read exists that would leak a subscription. Additive +
+  idempotent. (Not run against a live DB — no Postgres here.)
+- **New RSO VAPID keypair** generated (`npx web-push generate-vapid-keys`). Public key →
+  `VITE_VAPID_PUBLIC_KEY` in `foundation-spa/.env.local` (gitignored) and documented in
+  `.env.example`. **Private key is NOT committed and NOT in any client env** — it must be set
+  as an edge secret by the user (their infra): `supabase secrets set VAPID_PRIVATE_KEY=…`
+  plus `VAPID_SUBJECT=mailto:…`. Nexus's keys were not reused.
+- **Client subscribe flow** `foundation-spa/src/lib/webPush.js` — adapted from the Nexus
+  template to RSO's model: writes the subscription to `profiles` keyed by `user_id` (not a
+  `users` table), self-write via existing RLS. `subscribeToPush` / `unsubscribeFromPush` /
+  `getPushStatus` / `pushSupported`.
+- **Server sender core** `supabase/functions/_shared/webpush.ts` — built from the RFCs with
+  Web Crypto (no npm/Node-crypto dep that could break in the edge runtime), NOT ported from
+  Nexus's broken plaintext sender: VAPID (RFC 8292) ES256 JWT + `Authorization: vapid …`
+  header, and RFC 8291 aes128gcm payload encryption (ephemeral ECDH P-256 + HKDF key/nonce +
+  AES-128-GCM + aes128gcm framing). Handles 404/410 as "subscription gone".
+- **Fan-out helper** `_shared/push-notify.ts` — `notifyProfilesPush(db, userIds, message)`
+  (service-role; loads subscriptions, sends, clears 410/404-dead ones) and
+  `resolveStaffRecipients(db, roles)`. Fire-and-forget by contract: never throws into a
+  caller's flow, and no-ops (skipped) when VAPID isn't configured, so trigger points stay
+  safe pre-rollout.
+- **Sender edge function** `supabase/functions/send-push/index.ts` — the authenticated
+  callable surface: verifies a real user JWT and requires admin/superadmin (JWT caller
+  verification), uses `ALLOWED_ORIGINS` (never wildcard) via `_shared/http.ts`, audits each
+  send. For manual/test/broadcast sends; the automatic triggers will call the helper directly
+  (no edge-to-edge HTTP hop).
+
+### VERIFIED (crypto proven, not just asserted)
+
+Deno/Postgres are absent in this env, so the crypto was proven in-browser with the SAME Web
+Crypto API the edge runtime uses:
+- **VAPID JWT**: signed with the RSO private key (imported from d + x/y), then VERIFIED under
+  the public key alone (what FCM/Mozilla/Apple do) — valid P-256 point, 64-byte raw r||s
+  ES256 signature, correct aud/exp/sub, 3-part JWT.
+- **RFC 8291 aes128gcm**: full encrypt→decrypt roundtrip between two independent P-256
+  keypairs recovers the exact payload; AES-GCM tag verifies; last-record delimiter 0x02;
+  header framing rs=4096, keyid len 65.
+Deno unit tests written for CI (`_shared/webpush.test.ts`, `_shared/push-notify.test.ts`):
+JWT structure+verify, encrypt→decrypt roundtrip, and the fan-out matrix (sent / 410-expiry
+cleanup / VAPID-unconfigured skip / dedupe) with a mock DB and stubbed fetch.
+
+### GATE — two decisions before trigger wiring (item 5) and merge
+
+1. **Recipient role mapping (product decision).** Which staff roles should receive each push?
+   The mechanism (`resolveStaffRecipients` + `notifyProfilesPush`) is ready, but the brief
+   didn't specify recipients. Proposed defaults to confirm: registration status → admin +
+   superadmin + regional_secretary; teacher availability/waitlist → the availability-approver
+   roles (superadmin/admin/pastor/principal/regional_secretary). I did NOT inject push into
+   `registration-processor` (a release-blocker) on a guess.
+2. **"Attention flag raised" has no edge-function hook point (architecture decision).**
+   `attention_flags` rows are not INSERTed by any edge function (no INSERT found in functions
+   or migrations); flags surface via SECURITY DEFINER RPCs. So there's no natural place to
+   fire a push the way registration/waitlist have. Options: (a) a DB `AFTER INSERT` trigger on
+   `attention_flags` calling the sender via `pg_net`/`supabase_functions.http_request`;
+   (b) hook wherever flags originate once that path is identified; (c) a periodic sweep. Needs
+   a pick before wiring.
+
+### CANNOT VERIFY HERE (human step before ship)
+
+Migration apply (no Postgres); live push delivery end-to-end (subscribe → send → device
+receive) and real-device install, especially iOS Safari — no mobile hardware. The user must
+also set `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` / `ALLOWED_ORIGINS` as edge secrets and run the
+migration before any real send.
