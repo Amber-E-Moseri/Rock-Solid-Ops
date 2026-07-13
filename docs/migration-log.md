@@ -1320,3 +1320,130 @@ Nothing unaccounted for. Removed:
 other stale worktrees. `cleanup-review` and `feat/retry-worker-clickup-escalation` branches
 are still present (already-merged stale pointers, left in place per earlier session's
 instruction) — out of this brief's scope, not touched.
+
+---
+
+## 2026-07-13 — Mailchimp removed (`brief/mailchimp-ripout`)
+
+Removes the dead Mailchimp integration and its dead UI surfaces, per the earlier email-
+pipeline-audit addendums that found Mailchimp was firing unawaited on every registration with
+credentials very likely unprovisioned, silently, with no operator-visible signal.
+
+### Step 0 — reconfirmed before deleting
+
+**Credentials: operator-confirmed, not CLI-verified — logged explicitly as such.** Attempted
+to close this gap with `supabase secrets list`. The app's actual linked project
+(`xelpsttqhrcqmttmjory`, from `foundation-spa/.env.local` and a cached
+`supabase/.temp/project-ref`) does not appear in `supabase projects list` for the
+authenticated CLI account, and `supabase secrets list --project-ref xelpsttqhrcqmttmjory`
+returned a 403 ("account does not have the necessary privileges"). User made the call to
+proceed on the existing basis — told directly, twice, that only Resend is used — accepting
+that the downside of being wrong is trivially reversible (the function can be re-added).
+**This is an operator-confirmed fact, not a CLI-verified one; if the CLI account's access is
+ever fixed, worth a real confirmation pass.**
+
+**Exhaustive grep: the "known reference list" from the original brief was incomplete.**
+Re-grepped `mailchimp` case-insensitively across the whole repo (24 files) and found four
+items the known list missed:
+- `README.md` — dormant-integration row + function-schedule row + env var rows. Fixed (Step 3).
+- `foundation/staff/env-check.html:74` — **directly contradicts the prior audit's claim that
+  "env-check.html has no Mailchimp entries at all."** `mailchimp-sync` was literally in this
+  page's own `edgeFunctions` reachability array (a separate inline script from
+  `system-health.js`, not a duplicate of it). Fixed (Step 1/2, folded in per user direction).
+  The prior audit's claim was wrong; correcting it here rather than letting it stand.
+- `ai/constraints.md.txt` — a genuine stale duplicate of the (untracked) `ai/constraints.md`,
+  itself containing an older MAILCHIMP RULES section. Left alone per user decision (known
+  noise, not wired to anything).
+- `ai/backend-decision.md:35` — one line, "Integrations: Moodle/Mailchimp via Edge Functions."
+  Left alone per user decision (low priority).
+
+`archive/*` references (read-only, historical) were already expected and are untouched.
+
+### Step 1 + 2 — integration and dead UI removed (commit `4df4678`)
+
+- Deleted `supabase/functions/mailchimp-sync/` entirely.
+- Removed the inline `triggerMailchimpSync()` helper (lines 70-110) and its unawaited call
+  site (`void triggerMailchimpSync({...})`) from `registration-processor/index.ts`. No import
+  to clean up — it was a local closure doing a raw `fetch`, not a shared import.
+- Removed the "Failed Mailchimp" KPI counter and its `mailchimp` type-filter option from
+  `failed-sync-retry-center.js`/`.html` and the `foundation-spa` twin (`FailedSyncRetryCenterPage.jsx`,
+  `lib/failed-syncs.js`, `failedSyncRetryCenter.test.js`) — confirmed nothing ever wrote a
+  Mailchimp-classified row to `failed_syncs`, so this counter could never be non-zero.
+- Removed `mailchimp-sync` from the edge-function reachability probe array in
+  `system-health.js` (both trees) **and** `env-check.html` (per the Step 0.2 correction above
+  — this page has **no SPA twin**, so the brief's assumption that one exists was wrong; only
+  the legacy page needed the fix).
+- **Kept, decisions made explicitly:**
+  - `typeBadge()`'s `"mailchimp"` string-match branch in both failed-sync-retry-center trees —
+    dead but harmless generic classification logic, distinct from the counter itself, left as
+    out-of-scope-for-this-fix rather than chased into a larger cleanup.
+  - The MAILCHIMP-prefixed audit-log display type (`audit-log.html`/`auditLog.js` + SPA
+    twin) — **could not verify whether historical MAILCHIMP-prefixed `audit_logs` rows exist
+    in the last 90 days** (same CLI/project-access blocker as Step 0.1). Defaulted to the
+    brief's own stated fallback for the unverifiable case: keep the display type for
+    historical audit-trail readability. No "add new" path exists to remove (confirmed —
+    this is read-only classification logic, not a writer).
+- Incidental: touching `failed-sync-retry-center.html` tripped the pre-commit hook on 12
+  pre-existing `var(--muted)`/`var(--surface)` legacy patterns unrelated to this change (the
+  hook re-scans the whole staged file, not just the diff). Fixed only the two hook-banned
+  patterns; left `--surface-2`/`--shadow-soft`/`--border` alone since a full page token
+  migration is out of this brief's scope.
+
+### Step 4 — separate commit (`2cd82bf`): dropped the broken Resend health check
+
+`env-check.html`'s `checkSenderHealth()` posted to `/functions/v1/sender-healthcheck`,
+deleted 2026-05-18 per `NOTIFICATION_PIPELINE.md`'s own tombstone table, so the "RESEND
+configured" row permanently showed WARN/FAIL regardless of real Resend health.
+
+**The brief's suggested fix (probe `email-sender` instead) turned out to be unsafe, not just
+suboptimal.** `email-sender`'s `Deno.serve` handler takes no request parameter at all — it
+ignores method entirely and runs its real batch logic (recovering stuck `Processing` rows,
+then sending queued emails via Resend) on *any* invocation, OPTIONS included. An OPTIONS
+"reachability ping" of the kind used elsewhere in this codebase would have actually triggered
+a live email-send batch, not probed health. Grepped for other functions reading
+`RESEND_API_KEY` — only `email-sender` does. Per the brief's own fallback, dropped the
+"RESEND configured" row rather than leaving it permanently wrong or building an unsafe probe.
+Giving `email-sender` a real no-op health branch is a larger, separate change (touches a live
+production sender) — flagged as a follow-up, not done here.
+
+### Step 3 — docs fixed (commit `3c15573`), one item flagged unresolved
+
+Fixed `README.md`, `SYSTEM_OVERVIEW.md` (ASCII diagram box + function table row),
+`DEPLOYMENT_CHECKLIST.md` (checklist items) to state Resend-only, removing Mailchimp as a
+live layer rather than "dormant."
+
+**`ai/constraints.md`'s MAILCHIMP RULES section — not fixed, flagging a structural finding
+instead of guessing.** `ai/constraints.md` (the file CLAUDE.md instructs every session to
+read first) **is untracked in git** — it exists only in the shared main working tree, was
+never committed on any branch, and does not exist in this isolated worktree at all. The file
+actually tracked in git under `ai/` is `ai/constraints.md.txt`, a genuinely different,
+older document (confirmed by diff in an earlier session) — plus `ai-workflow.md.txt`,
+`statuses.md.txt`, `review-findings.md.txt`, all similarly `.txt`-suffixed and distinct from
+the non-`.txt` files every session actually reads per CLAUDE.md. This means the platform's
+own canonical AI-context docs are not under version control — a bigger issue than one stale
+MAILCHIMP RULES section, and not this brief's to resolve unilaterally (deciding whether to
+commit the untracked files for the first time, and what to do with the stale `.txt`
+duplicates, is a real scope decision). Flagging for a dedicated follow-up rather than
+silently committing an untracked file as a side effect of a Mailchimp doc fix.
+
+### Step 5 — broken template/trigger paths: report-only, and the honest state of that audit
+
+No auto-fix attempted here, per the brief. Checked `docs/migration-log.md` for any
+Phase-A.2-class finding ("orphaned template," "no template mapped," per-template 30-day
+send/fail counts) beyond the already-merged REVIEW/WAITLISTED fix (`6445e8c`, merged before
+this brief) — **found none, because that audit was never actually completed.** The earlier
+"Email Pipeline Audit" entry covers recipient-correctness and content/compliance (two
+parallel template tables with one dead, unescaped-interpolation HTML-injection risk in
+`substituteVariables`, `email_campaigns` having no unsubscribe mechanism) but explicitly
+states it had no DB access and never ran the per-template 30-day `email_queue`/`audit_logs`
+count sweep or the full orphaned-template/silent-no-op check A.2 asked for. The
+REVIEW/WAITLISTED fix was found and fixed independently, not as an output of that audit.
+**So Step 5 isn't "nothing else broken" — it's "the audit that would find anything else was
+never actually run."** Flagging as its own follow-up item rather than either fixing blind or
+overstating this brief's coverage.
+
+### GATE
+
+Confirm before merging `brief/mailchimp-ripout` to `main`. Removes a production integration
+point (`mailchimp-sync`, its call site) and touches the live email/registration pipeline
+(`registration-processor/index.ts`).
