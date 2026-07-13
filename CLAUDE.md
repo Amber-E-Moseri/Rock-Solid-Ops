@@ -112,7 +112,10 @@ When building or updating any staff page, match this page's:
 - Dark mode: every page must respect `data-theme="dark"` on `<html>`; toggle via moon emoji
 - Shell: admin pages use `admin-shell.js` for nav, topbar, auth handling, and theme toggle
 - Cards: rounded (`--r-xl`), soft shadow (`var(--sh-xs)`), warm surface background
-- Status chips: use `.chip` + `.chip-{status}` classes (draft, active, archived, etc.)
+- Status badges: use `.fs-badge` + a variant class (`.fs-badge-success`, `.fs-badge-warning`,
+  `.fs-badge-danger`, `.fs-badge-info`, `.fs-badge-neutral`, `.fs-badge-primary`) from
+  `primitives.css`. `class="chip"` is banned by the pre-commit hook and by
+  `foundation/docs/CSS_MIGRATION_GUIDE.md` — do not reintroduce it.
 - Loading: skeleton states before data loads; never blank pages
 - Toasts: use shared toast system; never `alert()`
 - Mobile: tables must have a card-view fallback at narrow viewports (< 640px)
