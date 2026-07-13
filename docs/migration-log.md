@@ -754,3 +754,222 @@ updating the other fails this test loudly instead of drifting silently.
 
 This branch touches a security boundary (profiles role-update authority). Final review
 requested before merging `brief/git-workflow-fixes` to `main`.
+
+---
+
+## 2026-07-13 — Email Pipeline Audit (read-only; brief/email-audit, no merge)
+
+Read-only audit, no code/schema/template changes. Branch exists only in case a follow-up
+brief needs to cite it; nothing here required a gate.
+
+### SCOPE NOTE — the brief's assumed topology was not quite the real one
+
+The brief described the pipeline as `notification-dispatcher` (event_type → template_key →
+recipient rule matching) feeding `scheduled_notifications` for the general case. In the
+actual code, `notification-dispatcher`/`notification_events`/`notification_rules` is a real,
+wired path but it has exactly **one** producer: `queue_waitlisted_class_available_notifications()`
+(migration `202605191920_waitlist_class_available_auto_notify.sql`), fired by triggers on
+`class_slots`/`class_options` becoming available — i.e. only the `CLASS_OPTIONS_AVAILABLE`
+waitlist-reopened case. Every other applicant-facing email (welcome, duplicate, waitlist,
+class assigned, moodle reminders) is written straight into `scheduled_notifications` or
+`email_queue` by `registration-processor`, `waitlist-processor`, and
+`queue_waitlisted_class_available_notifications` itself — bypassing the
+dispatcher/rules-table machinery entirely. So "the recipient rule table" is real but narrow,
+not the general-purpose router the brief assumed. Findings below are organized around what's
+actually there.
+
+### PHASE A — Recipient correctness
+
+- **`notification-dispatcher` rule matching (the one real path):** `event_type` = 
+  `CLASS_OPTIONS_AVAILABLE` → looks up `notification_rules` (active, matching event_type,
+  ordered by priority) → for each matching rule inserts a `scheduled_notifications` row
+  addressed to `event.email`, which is populated upstream as `lower(applicants.email)` for
+  every WAITLISTED applicant whose `fellowship_code` intersects the reopened class option's
+  `fellowship_codes` array (`supabase/migrations/202605191920_waitlist_class_available_auto_notify.sql:56-71`).
+  Recipient resolution is scoped correctly: WAITLISTED + no `class_option_id` assigned yet +
+  fellowship match. No wrong-role risk here — it can only ever address applicants, and the
+  `email <> ''` filter excludes rows with blank addresses. Deactivated/deleted applicant
+  accounts aren't a concern because applicants have no auth accounts to deactivate; a
+  withdrawn applicant would need `registration_status` changed off `WAITLISTED` to stop
+  being targeted, which is on the admin, not this code path.
+- **Everything else (welcome, duplicate, class-assigned, moodle reminders):** recipient is
+  `email` captured directly from the registration submission
+  (`supabase/functions/registration-processor/index.ts`) or from `applicants.email` looked
+  up by `applicant_id` (`notification-batch-processor/index.ts:81-87`, the
+  `moodle_login_check` path). No role/subgroup cross-check applies because these are all
+  applicant-addressed, single-recipient sends — there's no group resolution step that could
+  misfire onto the wrong cohort.
+- **`email_campaigns` is the one place with real "wrong audience" exposure** (see Phase
+  B/C) — it resolves recipients by `fellowship_code` tag against the `students` table
+  client-side (`foundation/js/email-campaigns.js:376-394`), which is a broader, coarser
+  resolution than anything in the transactional path.
+
+### PHASE A.2 — Email vs. push recipient parity
+
+Cross-checked against the three push triggers already approved in the PWA/push brief
+(`docs/migration-log.md`, 2026-07-13 PWA entry): registration status change, attention flag
+raised, teacher availability/waitlist movement. **They are not meant to reach the same
+recipient as the email equivalent, and today they don't overlap at all** — this is by
+design, not a bug: applicants have no Supabase Auth account (confirmed again while re-reading
+`applicants` schema), so push can only ever reach staff/teachers, while every event above
+also fires (or would fire) an **applicant-addressed** email about their own status. Email and
+push are answering different questions for different audiences: email tells the applicant
+what happened to them; push tells staff that something happened that needs attention. No
+mismatch found because there's no shared audience to mismatch. One gap worth naming: there is
+currently **no staff-facing email equivalent at all** for attention-flag-raised or teacher
+availability/waitlist events — today those are silent until the push sender (Phase C of the
+PWA brief, not yet built) ships. Not a defect in this pipeline, just a dependency to flag.
+
+### PHASE B — Content and compliance
+
+- **Two parallel template tables exist.** `email_templates` (migrations
+  `202605182000_email_templates_table.sql` and the `000_baseline_squash.sql` bootstrap) and
+  `notification_templates` (`000_baseline_squash.sql:1756`). `email-sender/index.ts:99-109`
+  reads **`notification_templates` only** — the code comment even says
+  `// canonical template source: notification_templates only`. `email_templates` has zero
+  readers or writers anywhere in `supabase/functions/` or `foundation/` — it's a dead table.
+  `foundation/docs/NOTIFICATION_PIPELINE.md:74-75` still documents `email-sender` as
+  resolving from `email_templates` — that doc is stale and describes the wrong table.
+- **Unescaped interpolation, confirmed:** `email-sender/index.ts:233-244`
+  (`substituteVariables`) does a raw `template.replace(/\{\{(\w+)\}\}/g, ...)` with no HTML
+  escaping, substituting `recipient_name`, `student_id`, and every key from `row.payload`
+  (which includes applicant-submitted fields like `full_name`, `teacher_name`, fellowship
+  labels, etc.) straight into `body_html` and `subject`. Since `full_name` originates from
+  the public registration form (`registration-processor`, `verify_jwt=false`), an attacker
+  who registers with a name containing `<`/`>`/HTML can have that string rendered unescaped
+  inside the HTML body of their own transactional emails (welcome, moodle reminder, etc.).
+  Blast radius is currently self-directed (the applicant only receives their own email), but
+  it is still a real HTML-injection primitive sitting in a shared template-substitution
+  function used by every template — worth fixing at the substitution layer rather than
+  per-template, since new templates would inherit the same gap silently.
+- **Merge-tag reconciliation:** appears to have landed for the transactional path — every
+  template referenced in `buildSubjectFromTemplate` (`notification-batch-processor/index.ts:41-56`)
+  has a matching entry, and `resolveContent`/`substituteVariables` in `email-sender` handle
+  arbitrary payload keys generically rather than a hardcoded allowlist, so there's no
+  per-template variable drift to find. Not verified against live `notification_templates`
+  row contents (no DB access in this session — see Phase C note below) — if any row's
+  `body_html` references a `{{tag}}` no writer ever populates, it will silently render blank
+  (`vars[key] ?? ''`) rather than error, which is not observable from the code alone.
+- **`email_campaigns` — this is the one that's actually bulk/marketing email, and it has
+  zero unsubscribe/opt-out mechanism.** `foundation/js/email-campaigns.js` is a client-side
+  workflow (an admin composes subject/body, picks fellowship tags or individual addresses,
+  and `sendCampaign()` inserts one `email_queue` row per resolved recipient — potentially an
+  entire fellowship's worth of `students`). There is no suppression list, no unsubscribe
+  link construction anywhere in the composer or in `email-sender`'s send path, and no
+  opt-out column on `students`, `applicants`, or `email_campaigns` itself. This is squarely
+  the kind of send this matters for (per the brief) — transactional notifications
+  (registration/waitlist/class-assigned) are not marketing email and don't need this, but
+  campaigns sent to a whole fellowship's student list are functionally a marketing blast
+  with no opt-out. Flagging plainly: **no unsubscribe mechanism exists for `email_campaigns`.**
+
+### PHASE C — Volume, duplication, and failure visibility
+
+- **Could not run the requested 30-day `email_queue`/`audit_logs` queries — no live DB
+  access in this session** (no Supabase MCP/connection configured, no `supabase` CLI login
+  found). Everything below is a code-level assessment of what duplication/failure protection
+  exists, not a live measurement. If live numbers are wanted, the SQL patterns in
+  `foundation/docs/NOTIFICATION_PIPELINE.md`'s "Operator lookup flow" section
+  (trace_id joins across `scheduled_notifications`/`email_queue`/`moodle_enrollment_sync`)
+  are the right starting queries — someone with DB access should run those.
+- **Duplicate-send protection is real but only covers the `scheduled_notifications` layer,
+  not `email_queue` directly.** `scheduled_notifications.dedupe_key` has a partial unique
+  index (`000_baseline_squash.sql:1767`, `where dedupe_key is not null`), and both
+  `notification-dispatcher` and `queue_waitlisted_class_available_notifications()` construct
+  a deterministic dedupe key per event before inserting, catching the `23505` conflict and
+  counting it as `skipped_duplicates` rather than erroring
+  (`notification-dispatcher/index.ts:153-164`). But `registration-processor` and
+  `email-campaigns.js` insert directly into `email_queue` with **no dedupe key and no unique
+  constraint on that table** — if either of those callers ever runs twice for the same
+  logical event (retried request, double form submit), nothing at the `email_queue` layer
+  stops a second row from being queued and sent. The closest thing to a backstop is
+  `email-sender`'s per-recipient 24h cap (max 3 sends per address, `index.ts:131-151`), which
+  is a rate limit, not a dedupe check — it would let two duplicate copies of the same
+  event through as sends #1 and #2 without flagging them as duplicates at all. This mirrors
+  the registration duplicate-detection pattern in spirit but the protection doesn't actually
+  extend down to `email_queue` itself.
+- **Permanently-failed sends: dead-letter cleanly, with operator visibility, no infinite
+  retry.** `email-sender` marks a row `Failed` with `error_message` set
+  (`index.ts:164-171`); it is not picked up again automatically — `retry-worker` documents
+  "No built-in limit" for `email_queue` and requires a manual reset via the Retry Center
+  (`foundation/docs/NOTIFICATION_PIPELINE.md:123-134`). `scheduled_notifications` has a real
+  ceiling (`attempts >= max_attempts` → `FAILED`, not re-queued,
+  `notification-batch-processor/index.ts:176-180`). Both failure states are queryable and
+  audited (`audit_logs` row per `SCHEDULED_NOTIFICATION_QUEUED`/send outcome), so nothing
+  fails silently at the code level — but neither table auto-retries a hard bounce, so a bad
+  address sits `Failed` until an operator notices it in the Retry Center. There's no
+  proactive alerting on `Failed` rows in this codebase; it's pull-based (someone has to look).
+- **Two crons diverge from what's documented.** Actual `config.toml` schedules:
+  `email-sender` = `*/15 * * * *` (every 15 minutes), `notification-batch-processor` =
+  `0 9 * * *` (daily 9am), `retry-worker` = `0 * * * *` (hourly). This contradicts **two**
+  canonical docs at once: `ai/statuses.md:116` says `email-sender` runs "cron daily 07:00
+  EST" and calls `notification-retry-helper`/batch processor on-demand; the repo's own
+  `foundation/docs/NOTIFICATION_PIPELINE.md:69,178` says the same "daily 07:00 EST" for
+  `email-sender` and describes `notification-batch-processor` as having no fixed schedule at
+  all. Both docs are stale relative to `supabase/functions/*/config.toml` — the real
+  system sends far more frequently (every 15 min, not daily) and batches notifications daily
+  rather than on-demand. This matters for the audit's own volume question: 15-minute email
+  delivery is nearly 100x more frequent than either doc implies, so anyone reasoning about
+  send volume or debugging "why did 5 emails go out today" from the docs alone would be
+  working from the wrong mental model.
+
+### PHASE D — Security posture
+
+- **`email-sender` is reachable fully unauthenticated — confirmed by evidence, not
+  assumption.** `supabase/config.toml` sets `verify_jwt = false` for `email-sender` (also
+  redundantly in its own `config.toml`), and the function body
+  (`supabase/functions/email-sender/index.ts`, full file read) has **no internal caller
+  check at all** — no shared-secret header, no service-role JWT verification, nothing before
+  it starts claiming and sending queued rows. Grepped every function directory for a call
+  site that invokes `email-sender` and found none — nothing in this codebase calls it
+  server-to-server. Its only two callers are the `*/15 * * * *` cron and, implicitly, anyone
+  who knows the project's function URL.
+- **Abuse potential is real but bounded — it cannot be used to send arbitrary emails.**
+  `email-sender` only processes rows already sitting in `email_queue`; an unauthenticated
+  caller can trigger early/repeated processing runs but cannot inject content through this
+  endpoint itself (no request body is read for send content). The atomic
+  `Pending`→`Processing` claim (`index.ts:80-90`) means concurrent unauthenticated calls
+  can't double-send the same row. The actual spam-relay lever is upstream: 
+  `registration-processor` (also `verify_jwt=false`, by necessity — it's the public
+  registration form) inserts an `email_queue` row addressed to whatever `email` the caller
+  submits, with no verification that the submitter controls that address. That gap is
+  already known and tracked as an open item (CLAUDE.md "Immediate priorities" list references
+  a registration-processor rate-limit gap) — it is the pre-existing lever that could be
+  combined with `email-sender`'s open reachability to accelerate delivery, but the
+  reachability of `email-sender` on its own is not a new content-injection path. Recommend
+  treating `email-sender`'s missing caller check as a defense-in-depth gap (add a
+  shared-secret header check per the edge-hardening pattern used elsewhere) rather than an
+  active incident — but it should still close, since "harmless today" depends entirely on the
+  registration-processor gap staying closed too.
+- **Incidental finding, outside this brief's scope:** `email_campaigns` RLS/RPC role sets
+  disagree. `campaign_begin_send`/`campaign_finish_send` and the `email_campaigns` table RLS
+  allow `superadmin`, `admin`, `regional_secretary`
+  (`supabase/migrations/202606101400_email_campaigns.sql:56-58,73-75`), but the
+  `email_queue_admin_all_hardened` RLS policy that `sendCampaign()`/`sendTestEmail()` rely on
+  for the client-side `email_queue` insert is gated by `is_admin()`, which only covers
+  `superadmin, admin, subgroup_admin, pastor, principal` — **`regional_secretary` is not in
+  that set** (`supabase/migrations/202605061400_rls_hardening.sql:289-294`,
+  `is_admin()` defined at `:63-74`). A `regional_secretary` can create/edit a campaign and
+  flip it to `sending` via the RPC, then have every `email_queue` insert in the batch loop
+  fail RLS — the client code handles this gracefully (`insertFailed` → campaign marked
+  `failed`, not silently stuck), but the role is functionally unable to send campaigns
+  despite being granted access to manage them. Not a security hole (fails closed), just a
+  broken permission boundary worth a follow-up brief.
+
+### SUMMARY — what would become a follow-up brief
+
+1. Add HTML-escaping to `substituteVariables` in `email-sender` (Phase B).
+2. Decide on an unsubscribe/suppression mechanism for `email_campaigns`, or explicitly scope
+   it as staff-composed-only (never touches external/public addresses) if that's the intended
+   boundary (Phase B).
+3. Add a dedupe key (or reuse `trace_id`) with a unique constraint on `email_queue` itself,
+   not just `scheduled_notifications` (Phase C).
+4. Reconcile `ai/statuses.md` and `foundation/docs/NOTIFICATION_PIPELINE.md` cron schedules
+   against actual `config.toml` values (Phase C).
+5. Add a shared-secret/service-role check inside `email-sender` so it isn't fully open
+   regardless of what happens with the registration-processor rate-limit gap (Phase D).
+6. Fix the `regional_secretary` / `is_admin()` mismatch blocking campaign sends (Phase D,
+   incidental).
+7. Delete the orphaned `email_templates` table or repurpose it — it has no readers/writers
+   anywhere in the codebase (Phase B).
+
+None of the above were fixed in this brief — audit only, per scope.
