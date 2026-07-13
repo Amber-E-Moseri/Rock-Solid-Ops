@@ -1096,3 +1096,25 @@ Supersedes items 8–10 above given this confirmation:
 10. If Mailchimp is kept: fix the silent-failure path (`failed_syncs` write, or at minimum an
     `env-check.html` entry so missing credentials are visible before the first silent
     failure, not after) (Phase C/D).
+
+---
+
+## 2026-07-13 — Email Pipeline Audit fix: REVIEW/WAITLISTED had no template mapping
+
+`registration-processor/index.ts`'s `templateKey` selection had no branch for
+`registrationStatusTyped === "REVIEW"`, and no catch-all for plain `WAITLISTED` outside the
+`CLASS_FULL`/`NO_CLASS_AVAILABLE` subcase — both silently fell through with no `templateKey`
+set, meaning those registrations queued no applicant-facing email at all. This is the same
+failure class as the Mailchimp no-op above (a trigger fires but nothing observable happens),
+just on the Resend path instead. Both `registration_under_review` and `waitlist_confirmation`
+are already canonical template keys per `ai/statuses.md`; this fix wires the two missing
+branches to the templates that already existed for them — no new template, no schema change.
+
+- `REVIEW` → `registration_under_review`
+- `WAITLISTED` (fallback, when no more specific `templateKey` already matched) → `waitlist_confirmation`
+
+Scope: this commit touches only the `templateKey` selection branches in
+`registration-processor/index.ts`. It does not touch the unrelated ClickUp→Nexus rebrand work
+also present uncommitted in this working tree (README/DEPLOYMENT_CHECKLIST/SYSTEM_OVERVIEW
+doc updates, `admin-shell.js` nav change, `rocksolid-management.html`, a new RLS migration) —
+that work is out of scope for the email-audit brief and is left as-is for its own session.

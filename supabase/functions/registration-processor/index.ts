@@ -535,6 +535,8 @@ Deno.serve(async (req) => {
     if (registrationStatusTyped === "DUPLICATE") templateKey = "duplicate_registration";
     if (registrationStatusTyped === "PENDING" && availabilityStatusTyped === "NO_MATCHING_TIME") templateKey = "no_suitable_times";
     if (registrationStatusTyped === "WAITLISTED" && (availabilityStatusTyped === "CLASS_FULL" || availabilityStatusTyped === "NO_CLASS_AVAILABLE")) templateKey = "no_class_available";
+    if (registrationStatusTyped === "REVIEW") templateKey = "registration_under_review";
+    if (registrationStatusTyped === "WAITLISTED" && !templateKey) templateKey = "waitlist_confirmation";
 
     console.log("EMAIL_TEMPLATE_SELECTED", {
       email,
@@ -556,6 +558,10 @@ Deno.serve(async (req) => {
           ? "We are working on a class time for you"
           : templateKey === "no_class_available"
           ? "We are preparing your class placement"
+          : templateKey === "registration_under_review"
+          ? "Your registration is under review"
+          : templateKey === "waitlist_confirmation"
+          ? "You are on our waitlist"
           : "Your Foundation School registration update",
       status: "Pending",
       trace_id: flowTraceId,
