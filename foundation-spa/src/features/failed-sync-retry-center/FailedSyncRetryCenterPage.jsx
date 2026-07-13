@@ -96,7 +96,7 @@ export default function FailedSyncRetryCenterPage() {
     <div style={{ display: 'grid', gap: 16 }}>
       <PageHeader
         title="Failed Sync Retry Center"
-        subtitle="Operational view for failed jobs across queue, notifications, Moodle sync, and Mailchimp-linked failures."
+        subtitle="Operational view for failed jobs across queue, notifications, and Moodle sync."
         actions={
           <Button onClick={refresh} disabled={isFetching}>
             <RefreshCw size={14} style={{ marginRight: 4, ...(isFetching ? { animation: 'spin 1s linear infinite' } : {}) }} />
@@ -110,7 +110,6 @@ export default function FailedSyncRetryCenterPage() {
         <KpiCard label="Total Failed Jobs" value={kpis.total} />
         <KpiCard label="Failed Emails" value={kpis.emails} />
         <KpiCard label="Failed Moodle Syncs" value={kpis.moodle} />
-        <KpiCard label="Failed Mailchimp" value={kpis.mailchimp} />
         <KpiCard label="Retries Today" value={kpis.retriesToday} />
       </div>
 
@@ -121,7 +120,6 @@ export default function FailedSyncRetryCenterPage() {
             <option value="">All Types</option>
             <option value="email">Email</option>
             <option value="moodle">Moodle</option>
-            <option value="mailchimp">Mailchimp</option>
             <option value="sync">Sync</option>
           </Select>
           <Select value={filters.status} onChange={setFilter('status')}>

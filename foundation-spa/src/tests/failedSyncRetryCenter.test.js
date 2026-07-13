@@ -13,13 +13,11 @@ describe('failed-syncs lib', () => {
     const rows = [
       makeJob({ source: 'email_queue', type: 'Email' }),
       makeJob({ id: '2', source: 'moodle_enrollment_sync', type: 'Moodle' }),
-      makeJob({ id: '3', source: 'failed_syncs', type: 'Mailchimp' }),
     ];
     const k = computeKpis(rows);
-    expect(k.total).toBe(3);
+    expect(k.total).toBe(2);
     expect(k.emails).toBe(1);
     expect(k.moodle).toBe(1);
-    expect(k.mailchimp).toBe(1);
   });
 
   it('filterJobs by status', () => {

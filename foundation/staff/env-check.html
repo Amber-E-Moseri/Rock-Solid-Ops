@@ -71,7 +71,7 @@
 
     const $ = (id) => document.getElementById(id);
     const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (m) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m]));
-    const edgeFunctions = ["retry-worker", "registration-processor", "moodle-sync", "notification-batch-processor", "notification-dispatcher", "mailchimp-sync"];
+    const edgeFunctions = ["retry-worker", "registration-processor", "moodle-sync", "notification-batch-processor", "notification-dispatcher"];
 
     function badge(state) {
       if (state === "PASS") return `<span class="fs-badge fs-badge-success">PASS</span>`;

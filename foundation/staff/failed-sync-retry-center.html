@@ -17,7 +17,7 @@
     /* Page head */
     .page-head { margin-bottom: 18px; }
     .page-head h1 { margin: 0; font-size: 1.75rem; font-weight: 800; }
-    .page-head p  { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+    .page-head p  { margin: 4px 0 0; color: var(--color-text-muted); font-size: 14px; }
 
     /* KPI grid */
     .ops-summary-grid {
@@ -26,14 +26,14 @@
       margin-bottom: 18px;
     }
     .ops-kpi-card {
-      border: 1px solid var(--border); background: var(--surface);
+      border: 1px solid var(--border); background: var(--color-surface);
       border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow-soft);
     }
-    .ops-kpi-card h3 { margin: 0; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 800; }
+    .ops-kpi-card h3 { margin: 0; color: var(--color-text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; font-weight: 800; }
     .ops-kpi-value { margin-top: 6px; font-size: 1.45rem; font-weight: 800; color: var(--ink, var(--text)); }
 
     /* Panels */
-    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow-soft); overflow: hidden; margin-bottom: 14px; }
+    .panel { background: var(--color-surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow-soft); overflow: hidden; margin-bottom: 14px; }
     .ph { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
     .ph h3 { margin: 0; font-size: 14px; font-weight: 800; }
     .pb { padding: 14px 18px; }
@@ -44,7 +44,7 @@
       grid-template-columns: repeat(auto-fit, minmax(140px,1fr));
       margin-bottom: 12px;
     }
-    .ops-filter-grid label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }
+    .ops-filter-grid label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-muted); margin-bottom: 4px; }
     input, select { width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: var(--text); font: inherit; font-size: 13px; }
     .ops-search-col { grid-column: span 2; }
 
@@ -64,21 +64,21 @@
     .sp-pending   { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
     .sp-retry     { background: #fdf4ff; color: #7e22ce; border-color: #e9d5ff; }
     .sp-resolved  { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
-    .sp-default   { background: var(--surface-2); color: var(--muted); }
+    .sp-default   { background: var(--surface-2); color: var(--color-text-muted); }
 
     /* Table */
     .table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
     .fs-table { width: 100%; border-collapse: collapse; min-width: 960px; }
-    .fs-table th { padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: .05em; background: var(--surface-2); text-align: left; }
+    .fs-table th { padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; color: var(--color-text-muted); letter-spacing: .05em; background: var(--surface-2); text-align: left; }
     .fs-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; vertical-align: top; }
     .fs-table tr:last-child td { border-bottom: 0; }
-    .muted-cell { color: var(--muted); max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+    .muted-cell { color: var(--color-text-muted); max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 
     /* Mobile cards */
     .ops-mobile-cards { display: none; gap: 10px; padding: 14px 18px; }
 
     /* State */
-    .state { padding: 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; color: var(--muted); font-size: 13px; margin: 14px 18px; }
+    .state { padding: 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; color: var(--color-text-muted); font-size: 13px; margin: 14px 18px; }
 
     /* Alert boxes */
     .err  { background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 10px 14px; color: #b91c1c; font-size: 13px; margin-bottom: 12px; }
@@ -100,17 +100,17 @@
     .fs-metric-grid { }
 
     /* Migration notes */
-    #migrationNotes { margin: 0 0 0 18px; color: var(--muted); font-size: 13px; }
+    #migrationNotes { margin: 0 0 0 18px; color: var(--color-text-muted); font-size: 13px; }
 
     .hidden { display: none !important; }
-    .muted  { color: var(--muted); }
+    .muted  { color: var(--color-text-muted); }
     .fs-badge, .fs-badge-info, .fs-badge-neutral, .fs-badge-danger, .fs-badge-warning {
       display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; border: 1px solid var(--border);
     }
     .fs-badge-info    { background: var(--soft-lavender,#f5f0ff); color: var(--primary,#4C2A92); border-color: color-mix(in srgb,var(--primary) 25%,transparent); }
     .fs-badge-danger  { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
     .fs-badge-warning { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
-    .fs-badge-neutral { background: var(--surface-2); color: var(--muted); }
+    .fs-badge-neutral { background: var(--surface-2); color: var(--color-text-muted); }
 
     @media (max-width: 1100px) { .ops-summary-grid { grid-template-columns: repeat(3,1fr); } }
     @media (max-width: 760px)  { .ops-summary-grid { grid-template-columns: 1fr 1fr; } .ops-mobile-cards { display: grid; } .table-wrap { display: none; } }
@@ -123,7 +123,7 @@
 
       <div class="page-head">
         <h1>Failed Sync Retry Center</h1>
-        <p>Operational view for failed jobs across queue, notifications, Moodle sync, and Mailchimp-linked failures.</p>
+        <p>Operational view for failed jobs across queue, notifications, and Moodle sync.</p>
       </div>
 
       <!-- KPI strip -->
@@ -131,7 +131,6 @@
         <article class="ops-kpi-card"><h3>Total Failed Jobs</h3><div id="kTotal" class="ops-kpi-value">0</div></article>
         <article class="ops-kpi-card"><h3>Failed Emails</h3><div id="kEmails" class="ops-kpi-value">0</div></article>
         <article class="ops-kpi-card"><h3>Failed Moodle Syncs</h3><div id="kMoodle" class="ops-kpi-value">0</div></article>
-        <article class="ops-kpi-card"><h3>Failed Mailchimp</h3><div id="kMailchimp" class="ops-kpi-value">0</div></article>
         <article class="ops-kpi-card"><h3>Retries Today</h3><div id="kRetriesToday" class="ops-kpi-value">0</div></article>
       </section>
 
@@ -145,7 +144,6 @@
                 <option value="all">All Types</option>
                 <option value="email">Email</option>
                 <option value="moodle">Moodle</option>
-                <option value="mailchimp">Mailchimp</option>
                 <option value="sync">Sync</option>
               </select>
             </div>

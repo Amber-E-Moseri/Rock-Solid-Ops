@@ -104,7 +104,7 @@ export async function runHealthChecks(supabaseUrl, anonKey) {
   }
 
   // 5. Edge function probes
-  const edgeFunctions = ['retry-worker', 'registration-processor', 'moodle-sync', 'notification-batch-processor', 'notification-dispatcher', 'mailchimp-sync'];
+  const edgeFunctions = ['retry-worker', 'registration-processor', 'moodle-sync', 'notification-batch-processor', 'notification-dispatcher'];
   if (supabaseUrl && anonKey) {
     for (const fn of edgeFunctions) {
       try {

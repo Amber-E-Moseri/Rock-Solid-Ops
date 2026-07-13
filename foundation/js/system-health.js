@@ -399,7 +399,7 @@
       }
 
       // 5. Edge function availability checks (non-destructive OPTIONS probe)
-      const edgeFunctions = ["retry-worker", "registration-processor", "moodle-sync", "notification-batch-processor", "notification-dispatcher", "mailchimp-sync"];
+      const edgeFunctions = ["retry-worker", "registration-processor", "moodle-sync", "notification-batch-processor", "notification-dispatcher"];
       for (const fn of edgeFunctions) {
         const result = await checkEdgeEndpoint(fn);
         pushCheck(`fn-${fn}`, `Edge Function: ${fn}`, result.state, result.detail);

@@ -88,7 +88,6 @@ async function ensureAccess() {
       document.getElementById("kTotal").textContent = String(s.rows.length);
       document.getElementById("kEmails").textContent = String(s.rows.filter((j) => j.source === "email_queue" || j.source === "scheduled_notifications").length);
       document.getElementById("kMoodle").textContent = String(s.rows.filter((j) => String(j.type).toLowerCase() === "moodle").length);
-      document.getElementById("kMailchimp").textContent = String(s.rows.filter((j) => String(j.type).toLowerCase() === "mailchimp").length);
       document.getElementById("summaryLine").textContent = `${s.filtered.length} visible of ${s.rows.length} total failed jobs`;
     },
     renderDetails: (job) => {

@@ -89,7 +89,6 @@ export function computeKpis(rows) {
     total: rows.length,
     emails: rows.filter((j) => j.source === 'email_queue' || j.source === 'scheduled_notifications').length,
     moodle: rows.filter((j) => String(j.type).toLowerCase() === 'moodle').length,
-    mailchimp: rows.filter((j) => String(j.type).toLowerCase() === 'mailchimp').length,
     retriesToday: rows.filter((j) => j.retryCount > 0 && (j.lastAttemptedAt || '').slice(0, 10) === today).length,
   };
 }
