@@ -2677,3 +2677,73 @@ C.2 complete (infra + wiring + UI). This branch touches `registration-processor`
 blocker) additively and adds one migration + one scheduled function. Final review requested
 before merge; on approval I merge brief/pwa-push → main, delete the branch, and remove the
 worktree.
+
+---
+
+## 2026-07-13 — C.1 merged to main, C.2 re-homed to brief/push-notifications (unmerged)
+
+Closes out the C.1/C.2 split. `brief/pwa-push` originally carried both phases on one branch;
+this entry records C.1 landing on `main` and C.2 moving to its own branch, verified
+independently rather than assumed to have carried over cleanly.
+
+### C.1 merge — sanity-checked post-merge, not just post-cherry-pick
+
+`brief/pwa-c1` (cherry-picked `307e63b` + `b9eeeaa` onto `main`, one append-only conflict in
+this file resolved by keeping both sides in chronological order) fast-forwarded into `main`
+at `5986db7`. Two things flagged as worth checking rather than assuming correct:
+- `CLAUDE.md` has exactly one "Use a dedicated worktree per brief" section (grep count: 1) —
+  confirms dropping `cb7f5fd` from the C.1 cherry-pick (its content had already reached `main`
+  independently via a different commit) left neither a gap nor a duplicate.
+- This log file has zero leftover `<<<<<<<`/`=======`/`>>>>>>>` markers and no duplicated
+  section headers post-resolution (1293 lines at that point, entries in chronological order).
+
+### C.2 re-homed: brief/push-notifications, off post-C.1 main
+
+Cherry-picked `1a45292` (VAPID/webpush infra) and `9ca1721` (trigger wiring + sweep +
+toggle) onto a fresh branch off `main` (5986db7). Both applied cleanly — `registration-
+processor/index.ts` auto-merged with no conflict (the email-audit `templateKey` fix and the
+push call block sit in disjoint regions of the file, as expected from the original file-list
+check). Isolation verified the same way as C.1: `git diff --stat main..brief/push-notifications`
+shows exactly 16 files, all push-related (`_shared/webpush.ts`, `_shared/push-notify.ts` +
+tests, `send-push`, `attention-flag-push-sweep`, the two migrations, `PushToggle.jsx`,
+`Shell.jsx`'s toggle mount, `webPush.js`, the three trigger call sites, `.env.example`) — no
+C.1 content, no unrelated work rode along.
+
+### Push-safety re-verified on this branch, not assumed to carry over
+
+Re-read the actual current state rather than reconfirming the prior analysis by assumption:
+- `registration-processor/index.ts:766-781` (shifted ~9 lines from pre-split due to the
+  interleaved email-audit fix earlier in the file) — the `try { resolveStaffRecipients(...);
+  notifyProfilesPush(...) } catch (_pushErr) {}` block is byte-identical to the pre-split
+  version, nested inside the handler's outer `try/catch` (closes at line 796).
+- `_shared/push-notify.ts` cherry-picked as a clean file creation (no merge). A first `diff`
+  against the original `1a45292` blob showed every line as changed — investigated rather than
+  reported as a real change: `core.autocrlf=true` on this Windows checkout converts LF→CRLF,
+  which is the entire difference (`diff -b` confirms content-identical). Worth recording as a
+  concrete instance of the "verify claims before acting on them" rule catching a false signal
+  before it became a false conclusion in this log.
+- Conclusion unchanged: `resolveStaffRecipients`/`notifyProfilesPush` are both `async`, so a
+  synchronous throw anywhere in their bodies becomes a rejected promise, never a raw exception
+  to the caller; combined with try/catch at every internal step plus the outer try/catch at
+  the call site, a push failure at any stage cannot block or break the registration response.
+
+### State: ready, not merged
+
+`brief/push-notifications` (worktree: `../rso-push-notifications`) is feature-complete and
+verified in isolation. Not merged — human-only steps remain:
+
+- [ ] Apply `202607131700_profiles_push_subscription.sql` and
+      `202607131800_attention_flags_push_notified.sql` to a real Postgres instance.
+- [ ] Provision `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `VAPID_PUBLIC_KEY`, `ALLOWED_ORIGINS`
+      as edge secrets.
+- [ ] Schedule `attention-flag-push-sweep` on `pg_cron`.
+- [ ] Real-device pass: subscribe → trigger → receive, on at least one Android and one iOS
+      device with the PWA installed to the home screen (iOS Safari push has installed-PWA-only
+      quirks that DevTools/emulation cannot reproduce).
+
+A separate gate/brief covers applying migrations and merging C.2 once the above are done.
+
+The original `brief/pwa-push` branch and its worktree (`../rso-pwa-push`) are now fully
+superseded — every commit on it is accounted for (C.1 merged, C.2 re-homed, the worktree-rule
+commit already independently on `main`) — but left in place, not deleted, since removing it
+wasn't asked for in this brief's scope.
