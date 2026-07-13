@@ -1118,3 +1118,77 @@ Scope: this commit touches only the `templateKey` selection branches in
 also present uncommitted in this working tree (README/DEPLOYMENT_CHECKLIST/SYSTEM_OVERVIEW
 doc updates, `admin-shell.js` nav change, `rocksolid-management.html`, a new RLS migration) —
 that work is out of scope for the email-audit brief and is left as-is for its own session.
+
+---
+
+## 2026-07-13 — Close out: main fast-forward, RLS merge, ClickUp→Nexus rebrand committed as WIP
+
+Closes out a shared-tree state that had accumulated three unrelated pieces of uncommitted
+work (email-audit fix, an unrelated RLS migration, and a ClickUp→Nexus rebrand bundle) plus
+a merge-sequencing gate for `brief/pwa-push`. Documenting the final state plainly rather than
+across several scattered entries.
+
+### What happened, in order
+
+1. **`brief/email-audit` → `main`** (fast-forward, no working-tree checkout needed since
+   `main` wasn't checked out at the time — preserved unrelated uncommitted files in the
+   shared tree untouched). `main` tip: `6445e8c`.
+2. **`brief/attention-flags-rls` → `main`** (fast-forward). This migration
+   (`202607131400_attention_flags_rls_coverage.sql`) was mischaracterized in an earlier
+   session's framing as part of the ClickUp→Nexus rebrand — it isn't; it's Phase B.2 of a
+   separate, already-logged legacy-hardening brief (see "2026-07-13 — Phase B started"
+   above), independently ready and approved. `main` tip: `9d5b503`.
+3. **`brief/rebrand-wip` → `main`** (fast-forward), committed and merged as explicit WIP.
+   Closes a **live production 404**: `admin-shell.js`'s nav (`SYSTEM_ADMIN_ROLES`, "Nexus
+   Mapping") has linked to `rocksolid-management.html` since before this session, but the
+   file itself had never been committed. Bundle: README/DEPLOYMENT_CHECKLIST/SYSTEM_OVERVIEW
+   doc catch-up to already-shipped Nexus code (`clickup-sync` posts to Nexus since `9e1ed97`)
+   and an unrelated Netlify→Vercel doc fix, `admin-shell.js`'s dead `admin-management` nav
+   mapping removed (stale since the ClickUp-tab removal in `e26a408`), and
+   `rocksolid-management.html` itself landed with two fixes made while preparing the commit
+   (see below). `main` tip: `c6ab8e8`.
+
+### Corrections to inherited claims (the reason for the new CLAUDE.md line, below)
+
+- The prior session's log note that `rocksolid-management.html` "needs a rebuild against
+  current design tokens" overstated the gap. Checked against both `tokens.css` and
+  `primitives.css` (the latter never checked before): `var(--fs-surface)`/
+  `var(--fs-text-muted)` (7× each) referenced tokens that exist in **neither** file —
+  `--fs-*` in `primitives.css` is the font-size namespace (`--fs-body`, `--fs-badge`, etc.),
+  unrelated to surface/text-color. Fixed to the real `--color-surface`/`--color-text-muted`.
+  Every other token reference in the file was already valid — this was a two-variable
+  find/replace, not a rebuild.
+- Separately, and not mentioned in any prior note: the repo's `.git/hooks/pre-commit` bans
+  `class="chip"` in `foundation/(staff|teacher)/*.html` and requires `primitives.css`'s
+  `fs-badge`/`fs-badge-{success,warning,danger,info,neutral,primary}` system instead —
+  caught only because the commit was rejected by the hook. Fixed
+  (`chip`/`chip-active`/`chip-inactive` → `fs-badge`/`fs-badge-success`/`fs-badge-neutral`),
+  dead `.chip*` CSS rules removed. **Not resolved**: this directly contradicts CLAUDE.md's
+  own UI-standards section, which still documents `.chip` + `.chip-{status}` as the
+  convention. The enforced hook and the doc disagree; CLAUDE.md needs reconciling in a
+  follow-up, not guessed at here. The hook's header comment also references
+  `CSS_MIGRATION_GUIDE.md`, which does not exist anywhere in the repo — dangling reference,
+  also unresolved.
+
+### Open questions consolidated, not duplicated
+
+Per this brief's Step 4: the two open questions below are folded into the already-queued
+"Watcher-Routing Decision, Dashboard Dead-Link Fix, Migration Apply/Verify" brief as
+additional Phase A items, not tracked as a separate thread:
+
+1. `clickup-management.html` retirement timing, relative to `rocksolid-management.html`/
+   SPA `nexus-management` reaching parity.
+2. Whether `rocksolid-management.html` and SPA `nexus-management` should be treated as
+   "retire legacy once SPA is parity-vetted" (the standard pattern used elsewhere in the
+   repo) or something else.
+
+Also newly surfaced by this brief, not yet triaged anywhere: the CLAUDE.md-vs-pre-commit-hook
+`.chip` contradiction above, and the dangling `CSS_MIGRATION_GUIDE.md` reference.
+
+### CLAUDE.md change
+
+Added a line under the worktree-per-brief standing rule (which itself had not yet reached
+`main` before this entry — it existed only on `brief/pwa-push`; added here alongside it since
+the remaining pwa-push merge work needs it): verify claims inherited from prior
+migration-log entries before acting on them, citing this entry's CSS-token correction and
+the earlier Nexus push-sender claim as the precedent.

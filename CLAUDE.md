@@ -230,6 +230,28 @@ collisions on the same working tree.
    for confirmation before merging — see `docs/migration-log.md` for the gate format used in
    prior briefs.
 
+### Use a dedicated worktree per brief (standing rule, adopted 2026-07-13)
+
+Do **not** run a brief from the shared checkout. When another session is (or may be) active,
+two sessions sharing one working tree share one `HEAD` — a branch switch or commit in one
+lands in the other's tree, and commits can end up on the wrong branch. Instead, give each
+brief its own `git worktree`:
+
+```
+git worktree add ../rso-<brief-name> brief/<brief-name>
+```
+
+Work entirely inside that worktree directory; run `git worktree remove` after the branch is
+merged and deleted. This isolates each brief's `HEAD` and working files so parallel sessions
+cannot collide. (Adopted after a session's commit landed on a parallel session's branch
+because both were operating in the same checkout.)
+
+Verify claims inherited from prior migration-log entries (e.g. "needs a rebuild," "reference
+implementation is proven") before acting on them — this repo has twice had stale/overstated
+descriptions corrected only after someone actually checked (the Nexus push-sender claim, and
+`rocksolid-management.html`'s CSS-token claim, which turned out to be a two-variable fix plus
+an unrelated pre-commit-hook violation the log entry never mentioned).
+
 ---
 
 ## Current open bugs (do not make them worse)
