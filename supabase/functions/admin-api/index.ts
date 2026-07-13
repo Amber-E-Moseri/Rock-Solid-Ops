@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createAnonClient, createServiceClient } from "../_shared/supabase.ts";
 import { assignApplicantAdminAction } from "./_actions/assign-applicant-admin.ts";
+import { createStaffDirectAction } from "./_actions/create-staff-direct.ts";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -16,6 +17,7 @@ function json(body: unknown, status = 200) {
 
 const actionMap: Record<string, (ctx: { db: any; auth: any; params: any }) => Promise<Response>> = {
   "assign-applicant-admin": assignApplicantAdminAction,
+  "create-staff-direct": createStaffDirectAction,
 };
 
 async function resolveAuth(req: Request, db: any) {

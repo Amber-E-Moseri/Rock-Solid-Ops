@@ -160,15 +160,13 @@
     const $ = (id) => document.getElementById(id);
     const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (m) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m]));
     const tabsByRole = {
-      superadmin: ["staff", "teachers", "assignees", "watchers"],
-      admin: ["staff", "teachers", "assignees", "watchers"],
+      superadmin: ["staff", "teachers"],
+      admin: ["staff", "teachers"],
       principal: ["teachers"],
     };
     const tabMeta = {
       staff: { label: "Staff Accounts", empty: "No staff profiles found." },
       teachers: { label: "Teachers", empty: "No teachers found." },
-      assignees: { label: "ClickUp Assignees", empty: "No ClickUp assignee mappings found." },
-      watchers: { label: "ClickUp Watchers", empty: "No ClickUp watcher mappings found." },
     };
     const validRoles = ["pending", "teacher", "principal", "admin", "superadmin", "subgroup_admin", "pastor"];
     const isElevatedRole = (role) => isAdmin(role);
@@ -184,8 +182,8 @@
       teachersEmailKey: "email",
       teacherSupportsDeletedAt: true,
       teacherSupportsStatus: true,
-      rows: { staff: [], teachers: [], assignees: [], watchers: [] },
-      loadErrors: { staff: null, teachers: null, assignees: null, watchers: null },
+      rows: { staff: [], teachers: [] },
+      loadErrors: { staff: null, teachers: null },
       editing: null
     };
 
@@ -337,41 +335,9 @@
       setError("teachers", null);
     }
 
-    async function loadAssignees() {
-      const { data, error } = await supabase
-        .from("clickup_admin_mappings")
-        .select("id,group_id,subgroup_id,clickup_user_id,admin_name,admin_email,active,updated_at")
-        .order("group_id", { ascending: true })
-        .limit(4000);
-      if (error) {
-        setError("assignees", tableMissingErr("clickup_admin_mappings", error));
-        state.rows.assignees = [];
-        return;
-      }
-      state.rows.assignees = data || [];
-      setError("assignees", null);
-    }
-
-    async function loadWatchers() {
-      const { data, error } = await supabase
-        .from("clickup_admin_watchers")
-        .select("id,group_id,subgroup_id,clickup_user_id,watcher_name,watcher_email,active,notes,updated_at")
-        .order("group_id", { ascending: true })
-        .limit(4000);
-      if (error) {
-        setError("watchers", tableMissingErr("clickup_admin_watchers", error));
-        state.rows.watchers = [];
-        return;
-      }
-      state.rows.watchers = data || [];
-      setError("watchers", null);
-    }
-
     async function refreshActiveData() {
       if (state.activeTab === "staff") return loadStaff();
       if (state.activeTab === "teachers") return loadTeachers();
-      if (state.activeTab === "assignees") return loadAssignees();
-      if (state.activeTab === "watchers") return loadWatchers();
     }
 
     function renderTabs() {
@@ -399,12 +365,10 @@
       }
       if (state.activeTab === "staff") return renderStaffTable(rows);
       if (state.activeTab === "teachers") return renderTeachersTable(rows);
-      if (state.activeTab === "assignees") return renderAssigneesTable(rows);
-      if (state.activeTab === "watchers") return renderWatchersTable(rows);
     }
 
     function renderStaffTable(rows) {
-      els.tabNote.textContent = "To invite a new user, create or invite them in Supabase Auth first, then set their role here.";
+      els.tabNote.textContent = "Use “Add” to create a new staff login directly (auth + profile). “Edit Role” changes an existing profile.";
       els.tableHost.innerHTML = `<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Active</th><th>Actions</th></tr></thead><tbody>${
         rows.map((r) => {
           const active = (r.is_active !== false && r.active !== false);
@@ -454,41 +418,6 @@
       els.tableHost.querySelectorAll("[data-unlink-teacher]").forEach((b) => b.addEventListener("click", () => unlinkTeacher(b.dataset.unlinkTeacher)));
     }
 
-    function renderAssigneesTable(rows) {
-      els.tabNote.textContent = "Primary assignee mapping: subgroup first, then group fallback.";
-      els.tableHost.innerHTML = `<table><thead><tr><th>Group</th><th>Subgroup</th><th>ClickUp User ID</th><th>Name</th><th>Email</th><th>Active</th><th>Actions</th></tr></thead><tbody>${
-        rows.map((r) => `<tr>
-          <td>${esc(r.group_id || "-")}</td><td>${esc(r.subgroup_id || "-")}</td><td>${esc(r.clickup_user_id || "-")}</td>
-          <td>${esc(r.admin_name || "-")}</td><td>${esc(r.admin_email || "-")}</td>
-          <td><span class="fs-badge ${r.active !== false ? "fs-badge-success" : "fs-badge-neutral"}">${r.active !== false ? "Active" : "Inactive"}</span></td>
-          <td><div class="row-actions">
-            <button class="fs-btn fs-btn-secondary" data-edit-assignee="${esc(r.id)}">Edit</button>
-            <button class="fs-btn ${r.active !== false ? "fs-btn-danger" : "fs-btn-secondary"}" data-toggle-assignee="${esc(r.id)}">${r.active !== false ? "Deactivate" : "Reactivate"}</button>
-          </div></td>
-        </tr>`).join("")
-      }</tbody></table>`;
-      els.tableHost.querySelectorAll("[data-edit-assignee]").forEach((b) => b.addEventListener("click", () => openAssigneeModal(b.dataset.editAssignee)));
-      els.tableHost.querySelectorAll("[data-toggle-assignee]").forEach((b) => b.addEventListener("click", () => toggleAssigneeActive(b.dataset.toggleAssignee)));
-    }
-
-    function renderWatchersTable(rows) {
-      els.tabNote.textContent = "Watcher mapping is secondary/follower routing only.";
-      els.tableHost.innerHTML = `<table><thead><tr><th>Group</th><th>Subgroup</th><th>ClickUp User ID</th><th>Name</th><th>Email</th><th>Active</th><th>Notes</th><th>Actions</th></tr></thead><tbody>${
-        rows.map((r) => `<tr>
-          <td>${esc(r.group_id || "-")}</td><td>${esc(r.subgroup_id || "-")}</td><td>${esc(r.clickup_user_id || "-")}</td>
-          <td>${esc(r.watcher_name || "-")}</td><td>${esc(r.watcher_email || "-")}</td>
-          <td><span class="fs-badge ${r.active !== false ? "fs-badge-success" : "fs-badge-neutral"}">${r.active !== false ? "Active" : "Inactive"}</span></td>
-          <td>${esc(r.notes || "-")}</td>
-          <td><div class="row-actions">
-            <button class="fs-btn fs-btn-secondary" data-edit-watcher="${esc(r.id)}">Edit</button>
-            <button class="fs-btn ${r.active !== false ? "fs-btn-danger" : "fs-btn-secondary"}" data-toggle-watcher="${esc(r.id)}">${r.active !== false ? "Deactivate" : "Reactivate"}</button>
-          </div></td>
-        </tr>`).join("")
-      }</tbody></table>`;
-      els.tableHost.querySelectorAll("[data-edit-watcher]").forEach((b) => b.addEventListener("click", () => openWatcherModal(b.dataset.editWatcher)));
-      els.tableHost.querySelectorAll("[data-toggle-watcher]").forEach((b) => b.addEventListener("click", () => toggleWatcherActive(b.dataset.toggleWatcher)));
-    }
-
     function render() {
       renderErrorForActiveTab();
       renderTable();
@@ -509,18 +438,59 @@
       const row = id ? state.rows.staff.find((r) => String(r.id || r.user_id || "") === String(id)) : null;
       state.editing = { kind: "staff", id: id || null };
       const options = allowedRoleAssignments();
+      els.saveModalBtn.textContent = "Save";
       els.entityModalTitle.textContent = row ? "Edit Staff Account" : "Add Staff Profile";
       els.entityFormGrid.innerHTML = fieldHtml("Email", "fEmail", "email", row?.email || "", true) +
         fieldHtml("Full Name", "fName", "text", row?.full_name || "", true) +
         selectHtml("Role", "fRole", options, row?.role || options[0], true) +
         `<div class="field"><label>Active</label><select class="select" id="fActive"><option value="true" ${(row?.is_active !== false && row?.active !== false) ? "selected" : ""}>Active</option><option value="false" ${(row?.is_active === false || row?.active === false) ? "selected" : ""}>Inactive</option></select></div>` +
-        `<div class="field full"><p class="muted" style="margin:0">To invite a new user, create or invite them in Supabase Auth first, then set their role here.</p></div>`;
+        `<div class="field full"><p class="muted" style="margin:0">This edits an existing staff profile. To create a brand-new login, use “Add Staff”.</p></div>`;
       openModal(els.entityModalOverlay, $("fEmail"));
+    }
+
+    function createStaffRoleOptions() {
+      // Client-side UX hint only; the edge function re-enforces the boundary server-side.
+      // superadmin -> any role; admin -> teacher only.
+      return hasRole("superadmin")
+        ? ["teacher", "principal", "subgroup_admin", "pastor", "regional_secretary", "admin", "superadmin"]
+        : ["teacher"];
+    }
+
+    function openStaffCreateModal() {
+      if (!canManageStaffRoles()) {
+        notify("You do not have permission to create staff accounts.", "error");
+        return;
+      }
+      state.editing = { kind: "staff-create", id: null };
+      const roleOptions = createStaffRoleOptions();
+      els.saveModalBtn.textContent = "Create User";
+      els.entityModalTitle.textContent = "Add Admin / Staff";
+      els.entityFormGrid.innerHTML = fieldHtml("Full Name", "fName", "text", "", true) +
+        fieldHtml("Email", "fEmail", "email", "", true) +
+        `<div class="field"><label for="fTempPassword">Temporary Password</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input class="input" id="fTempPassword" type="password" required style="flex:1" />
+            <button type="button" class="fs-btn fs-btn-secondary" id="fTogglePassword">Show</button>
+          </div></div>` +
+        selectHtml("Role", "fRole", roleOptions, roleOptions[0], true) +
+        fieldHtml("Notes (optional)", "fNotes", "text", "") +
+        `<div class="field full"><p class="muted" style="margin:0">Creates the Supabase Auth login and profile directly — no dashboard trip. Only roles you may assign are listed; the server re-checks this.</p></div>`;
+      const toggle = $("fTogglePassword");
+      const pw = $("fTempPassword");
+      if (toggle && pw) {
+        toggle.addEventListener("click", () => {
+          const next = pw.type === "password" ? "text" : "password";
+          pw.type = next;
+          toggle.textContent = next === "password" ? "Show" : "Hide";
+        });
+      }
+      openModal(els.entityModalOverlay, $("fName"));
     }
 
     function openTeacherModal(id) {
       const row = id ? state.rows.teachers.find((r) => String(r[state.teacherIdKey] || "") === String(id)) : null;
       state.editing = { kind: "teacher", id: id || null };
+      els.saveModalBtn.textContent = "Save";
       els.entityModalTitle.textContent = row ? "Edit Teacher" : "Add Teacher";
       els.entityFormGrid.innerHTML = fieldHtml("Full Name", "fName", "text", row?.[state.teacherNameKey] || "", true) +
         fieldHtml("Email", "fEmail", "email", row?.[state.teachersEmailKey] || "", true) +
@@ -531,37 +501,11 @@
       openModal(els.entityModalOverlay, $("fName"));
     }
 
-    function openAssigneeModal(id) {
-      const row = id ? state.rows.assignees.find((r) => String(r.id) === String(id)) : null;
-      state.editing = { kind: "assignee", id: id || null };
-      els.entityModalTitle.textContent = row ? "Edit ClickUp Assignee Mapping" : "Add ClickUp Assignee Mapping";
-      els.entityFormGrid.innerHTML = fieldHtml("Group ID", "fGroup", "text", row?.group_id || "", true) +
-        fieldHtml("Subgroup ID", "fSubgroup", "text", row?.subgroup_id || "") +
-        fieldHtml("ClickUp User ID", "fClickupUserId", "text", row?.clickup_user_id || "", true) +
-        fieldHtml("Admin Name", "fName", "text", row?.admin_name || "") +
-        fieldHtml("Admin Email", "fEmail", "email", row?.admin_email || "") +
-        selectHtml("Active", "fActive", ["true", "false"], row?.active === false ? "false" : "true", true);
-      openModal(els.entityModalOverlay, $("fGroup"));
-    }
-
-    function openWatcherModal(id) {
-      const row = id ? state.rows.watchers.find((r) => String(r.id) === String(id)) : null;
-      state.editing = { kind: "watcher", id: id || null };
-      els.entityModalTitle.textContent = row ? "Edit ClickUp Watcher Mapping" : "Add ClickUp Watcher Mapping";
-      els.entityFormGrid.innerHTML = fieldHtml("Group ID", "fGroup", "text", row?.group_id || "", true) +
-        fieldHtml("Subgroup ID", "fSubgroup", "text", row?.subgroup_id || "") +
-        fieldHtml("ClickUp User ID", "fClickupUserId", "text", row?.clickup_user_id || "", true) +
-        fieldHtml("Watcher Name", "fName", "text", row?.watcher_name || "") +
-        fieldHtml("Watcher Email", "fEmail", "email", row?.watcher_email || "") +
-        `<div class="field full"><label for="fNotes">Notes</label><textarea class="textarea" id="fNotes" rows="3">${esc(row?.notes || "")}</textarea></div>` +
-        selectHtml("Active", "fActive", ["true", "false"], row?.active === false ? "false" : "true", true);
-      openModal(els.entityModalOverlay, $("fGroup"));
-    }
-
     function linkTeacherModal(id) {
       const row = state.rows.teachers.find((r) => String(r[state.teacherIdKey] || "") === String(id));
       if (!row) return;
       state.editing = { kind: "teacher-link", id };
+      els.saveModalBtn.textContent = "Save";
       els.entityModalTitle.textContent = "Link Teacher to Auth User";
       els.entityFormGrid.innerHTML = fieldHtml("Teacher ID", "fTeacherId", "text", row[state.teacherIdKey] || "", true) +
         fieldHtml("Teacher Email", "fEmail", "email", row[state.teachersEmailKey] || "", true) +
@@ -632,28 +576,6 @@
       render();
     }
 
-    async function toggleAssigneeActive(id) {
-      const row = state.rows.assignees.find((r) => String(r.id) === String(id));
-      if (!row) return;
-      const next = !(row.active !== false);
-      const { error } = await supabase.from("clickup_admin_mappings").update({ active: next, updated_at: new Date().toISOString() }).eq("id", row.id);
-      if (error) { notify(`Update failed: ${error.message}`, "error"); return; }
-      notify(`Assignee mapping ${next ? "reactivated" : "deactivated"}.`, "success");
-      await loadAssignees();
-      render();
-    }
-
-    async function toggleWatcherActive(id) {
-      const row = state.rows.watchers.find((r) => String(r.id) === String(id));
-      if (!row) return;
-      const next = !(row.active !== false);
-      const { error } = await supabase.from("clickup_admin_watchers").update({ active: next, updated_at: new Date().toISOString() }).eq("id", row.id);
-      if (error) { notify(`Update failed: ${error.message}`, "error"); return; }
-      notify(`Watcher mapping ${next ? "reactivated" : "deactivated"}.`, "success");
-      await loadWatchers();
-      render();
-    }
-
     async function saveModal() {
       if (!state.editing) return;
       const kind = state.editing.kind;
@@ -695,6 +617,62 @@
           }
           closeModal(els.entityModalOverlay);
           await loadStaff();
+          render();
+          return;
+        }
+
+        if (kind === "staff-create") {
+          const fullName = String($("fName")?.value || "").trim();
+          const email = String($("fEmail")?.value || "").trim().toLowerCase();
+          const tempPassword = String($("fTempPassword")?.value || "");
+          const role = String($("fRole")?.value || "").trim().toLowerCase();
+          const notes = String($("fNotes")?.value || "").trim();
+          if (!canManageStaffRoles()) return notify("You do not have permission to create staff accounts.", "error");
+          if (!fullName || !email || !role) return notify("Full name, email, and role are required.", "warning");
+          if (!email.includes("@")) return notify("A valid email is required.", "warning");
+          if (tempPassword.length < 8 || tempPassword.length > 72) return notify("Temporary password must be 8–72 characters.", "warning");
+          if (!createStaffRoleOptions().includes(role)) return notify("You are not permitted to assign that role.", "error");
+
+          els.saveModalBtn.textContent = "Creating…";
+          let result = null;
+          try {
+            const { data, error } = await supabase.functions.invoke("admin-api", {
+              body: { action: "create-staff-direct", full_name: fullName, email, temp_password: tempPassword, role, notes: notes || null },
+            });
+            if (error) {
+              let msg = error.message || "Create failed";
+              try { const b = await error.context?.json?.(); if (b?.error) msg = b.error; } catch (_e) { /* ignore */ }
+              notify(msg, "error");
+              els.saveModalBtn.textContent = "Create User";
+              return;
+            }
+            if (!data?.ok) {
+              notify(data?.error || "Create failed", "error");
+              els.saveModalBtn.textContent = "Create User";
+              return;
+            }
+            result = data;
+          } catch (err) {
+            notify(err?.message || "Create failed", "error");
+            els.saveModalBtn.textContent = "Create User";
+            return;
+          }
+
+          els.entityModalTitle.textContent = "Staff Account Created";
+          els.entityFormGrid.innerHTML =
+            `<div class="field full"><p class="muted" style="margin:0 0 8px">Account created as <strong>${esc(result.role || role)}</strong>. Share these credentials — the temporary password is shown only once.</p></div>` +
+            `<div class="field"><label>Email</label><input class="input" value="${esc(result.email || email)}" readonly /></div>` +
+            `<div class="field"><label>Temporary Password</label><input class="input" value="${esc(result.temp_password || tempPassword)}" readonly /></div>`;
+          els.saveModalBtn.textContent = "Done";
+          state.editing = { kind: "staff-create-done" };
+          notify("Staff account created — share the credentials.", "success");
+          await loadStaff();
+          return;
+        }
+
+        if (kind === "staff-create-done") {
+          closeModal(els.entityModalOverlay);
+          els.saveModalBtn.textContent = "Save";
           render();
           return;
         }
@@ -755,55 +733,14 @@
           return;
         }
 
-        if (kind === "assignee") {
-          const group_id = String($("fGroup")?.value || "").trim();
-          const subgroup_id = String($("fSubgroup")?.value || "").trim();
-          const clickup_user_id = String($("fClickupUserId")?.value || "").trim();
-          const admin_name = String($("fName")?.value || "").trim();
-          const admin_email = String($("fEmail")?.value || "").trim();
-          const active = $("fActive")?.value !== "false";
-          if (!group_id || !clickup_user_id || (!admin_name && !admin_email)) return notify("Group, ClickUp user ID, and admin name or email are required.", "warning");
-          const payload = { group_id, subgroup_id: subgroup_id || null, clickup_user_id, admin_name: admin_name || null, admin_email: admin_email || null, active, updated_at: now };
-          let error = null;
-          if (state.editing.id) ({ error } = await supabase.from("clickup_admin_mappings").update(payload).eq("id", state.editing.id));
-          else ({ error } = await supabase.from("clickup_admin_mappings").insert({ ...payload, created_at: now }));
-          if (error) return notify(`Save failed: ${error.message}`, "error");
-          notify("ClickUp assignee mapping saved.", "success");
-          closeModal(els.entityModalOverlay);
-          await loadAssignees();
-          render();
-          return;
-        }
-
-        if (kind === "watcher") {
-          const group_id = String($("fGroup")?.value || "").trim();
-          const subgroup_id = String($("fSubgroup")?.value || "").trim();
-          const clickup_user_id = String($("fClickupUserId")?.value || "").trim();
-          const watcher_name = String($("fName")?.value || "").trim();
-          const watcher_email = String($("fEmail")?.value || "").trim();
-          const notes = String($("fNotes")?.value || "").trim();
-          const active = $("fActive")?.value !== "false";
-          if (!group_id || !clickup_user_id || (!watcher_name && !watcher_email)) return notify("Group, ClickUp user ID, and watcher name or email are required.", "warning");
-          const payload = { group_id, subgroup_id: subgroup_id || null, clickup_user_id, watcher_name: watcher_name || null, watcher_email: watcher_email || null, notes: notes || null, active, updated_at: now };
-          let error = null;
-          if (state.editing.id) ({ error } = await supabase.from("clickup_admin_watchers").update(payload).eq("id", state.editing.id));
-          else ({ error } = await supabase.from("clickup_admin_watchers").insert({ ...payload, created_at: now }));
-          if (error) return notify(`Save failed: ${error.message}`, "error");
-          notify("ClickUp watcher mapping saved.", "success");
-          closeModal(els.entityModalOverlay);
-          await loadWatchers();
-          render();
-        }
       } finally {
         els.saveModalBtn.disabled = false;
       }
     }
 
     function openAddForActiveTab() {
-      if (state.activeTab === "staff") return openStaffModal(null);
+      if (state.activeTab === "staff") return openStaffCreateModal();
       if (state.activeTab === "teachers") return openTeacherModal(null);
-      if (state.activeTab === "assignees") return openAssigneeModal(null);
-      if (state.activeTab === "watchers") return openWatcherModal(null);
     }
 
     function bindEvents() {
@@ -875,7 +812,7 @@
   </script>
   <script src="../js/admin-shell.js?v=20260518"></script>
   <script>
-    window.FSAdminShell && window.FSAdminShell.mount({ active: "clickupmanagement", pageTitle: "Admin Management" });
+    window.FSAdminShell && window.FSAdminShell.mount({ active: "", pageTitle: "Admin Management" });
   </script>
 </body>
 </html>
