@@ -96,31 +96,6 @@
       }
     }
 
-    async function checkSenderHealth() {
-      try {
-        const url = String(window.FS_CONFIG?.SUPABASE_URL || "").trim();
-        const anon = String(window.FS_CONFIG?.SUPABASE_ANON_KEY || "").trim();
-        if (!url || !anon) return { state: "FAIL", detail: "Missing runtime config." };
-        const res = await fetch(`${url}/functions/v1/sender-healthcheck`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: anon,
-            Authorization: `Bearer ${anon}`,
-          },
-          body: JSON.stringify({ ping: true }),
-        });
-        if (!res.ok) return { state: "WARN", detail: `Function reachable but returned HTTP ${res.status}.` };
-        const data = await res.json().catch(() => ({}));
-        const configured = Boolean(data?.resend_configured ?? data?.configured ?? data?.ok);
-        return configured
-          ? { state: "PASS", detail: "RESEND configured." }
-          : { state: "WARN", detail: "sender-healthcheck responded but RESEND not confirmed." };
-      } catch (e) {
-        return { state: "FAIL", detail: String(e?.message || e) };
-      }
-    }
-
     async function checkEdge(name) {
       const url = String(window.FS_CONFIG?.SUPABASE_URL || "").trim();
       const anon = String(window.FS_CONFIG?.SUPABASE_ANON_KEY || "").trim();
@@ -145,13 +120,11 @@
     async function render() {
       $("envState").textContent = "Running checks...";
       const supabaseResult = await checkSupabase();
-      const senderResult = await checkSenderHealth();
       const moodleConfigured = Boolean(String(window.FS_CONFIG?.MOODLE_URL || "").trim());
       const runtimeRows = [
         { key: "Current Environment", state: "PASS", detail: `${envName()} (${window.location.origin})` },
         { key: "Supabase Connection", ...supabaseResult },
         { key: "MOODLE_URL configured", state: moodleConfigured ? "PASS" : "WARN", detail: moodleConfigured ? "Yes" : "No" },
-        { key: "RESEND configured", ...senderResult },
       ];
       $("runtimeRows").innerHTML = runtimeRows.map((r) => `
         <tr>
