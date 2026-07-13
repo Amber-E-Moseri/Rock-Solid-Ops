@@ -1,0 +1,137 @@
+/* ============================================================
+   PWA UX components (Phase C.1) — RSO tokens, no Tailwind.
+   ============================================================ */
+
+/* ── Offline banner ── */
+.rso-offline-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-bottom: 1px solid var(--warn-bd);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+}
+
+.rso-offline-banner svg {
+  flex-shrink: 0;
+}
+
+/* ── Install prompt card ── */
+.rso-pwa-install {
+  position: fixed;
+  bottom: var(--space-4);
+  right: var(--space-4);
+  z-index: 1100;
+  max-width: 340px;
+  animation: rso-pwa-rise 0.24s ease-out;
+}
+
+@keyframes rso-pwa-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.rso-pwa-install-body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.rso-pwa-install-title {
+  font-size: var(--fs-body);
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: var(--space-1);
+}
+
+.rso-pwa-install-desc {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  margin: 0 0 var(--space-3);
+  line-height: 1.45;
+}
+
+.rso-pwa-install-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.rso-pwa-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 12px;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  /* Deliberately do NOT transition `background`: token-based colors are driven
+     by var(--primary) etc., and animating them means a theme toggle while this
+     card is open leaves the button stuck on the pre-toggle color until repaint.
+     Only opacity (disabled state) is animated. */
+  transition: opacity 0.15s ease;
+}
+
+.rso-pwa-btn-primary {
+  background: var(--primary);
+  color: var(--primary-fg, #fff);
+}
+
+.rso-pwa-btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.rso-pwa-btn-primary:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.rso-pwa-btn-ghost {
+  background: var(--surface-2);
+  color: var(--text-2);
+  border-color: var(--border);
+}
+
+.rso-pwa-btn-ghost:hover {
+  background: var(--soft-lavender, var(--surface-2));
+}
+
+.rso-pwa-install-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  padding: 2px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.rso-pwa-install-close:hover {
+  color: var(--text);
+}
+
+/* On narrow viewports the card spans the width with a small inset. */
+@media (max-width: 480px) {
+  .rso-pwa-install {
+    left: var(--space-3);
+    right: var(--space-3);
+    bottom: var(--space-3);
+    max-width: none;
+  }
+}

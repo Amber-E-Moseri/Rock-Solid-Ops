@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Rock Solid Ops">
+  <!-- Full-bleed background for maskable safe zone; glyph kept within the centre 60% -->
+  <rect width="512" height="512" fill="#4C2A92"/>
+  <text x="256" y="260" fill="#ffffff" font-family="Manrope, Inter, -apple-system, Segoe UI, sans-serif"
+        font-size="180" font-weight="800" text-anchor="middle" dominant-baseline="central"
+        letter-spacing="-6">RS</text>
+</svg>

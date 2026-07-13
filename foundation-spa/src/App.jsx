@@ -5,6 +5,8 @@ import { AuthProvider } from './context/AuthContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import ProtectedRoute from './components/layout/ProtectedRoute.jsx';
 import Shell from './components/layout/Shell.jsx';
+import { PWAInstallPrompt } from './components/pwa/PWAInstallPrompt.jsx';
+import { OfflineIndicator } from './components/pwa/OfflineIndicator.jsx';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -74,6 +76,8 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ToastProvider>
+          <OfflineIndicator />
+          <PWAInstallPrompt />
           <Suspense fallback={<PageLoader />}>
             <Routes>
               {/* Public */}
