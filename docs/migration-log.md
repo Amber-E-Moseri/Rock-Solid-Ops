@@ -625,3 +625,28 @@ Four call sites omitted it, so those modals showed nothing when triggered:
 Fix: add the `open` prop to each (one word per component), mirroring what every working
 Modal call site — and the new CreateStaffModal — already does. No behavior change beyond
 making the modals actually appear. `npm run build` passes.
+
+---
+
+## 2026-07-13 — Fix: server-side role-assignment boundary on profiles (RLS escalation gap)
+
+Fast follow-up to create-staff-direct. Phase A recorded this gap as "document, don't fix
+in this brief"; that call was revisited because shipping a feature whose entire purpose is
+tightening who can create/promote staff, while the underlying profiles RLS still lets any
+is_admin() role escalate anyone to superadmin via direct REST, is internally inconsistent —
+front door locked, side door open.
+
+New migration `202607131500_profiles_role_assignment_boundary.sql`: a BEFORE UPDATE trigger
+`profiles_enforce_role_assignment()` that gates role CHANGES in a user (RLS) session:
+  - superadmin -> may assign any role
+  - admin      -> may assign only non-elevated roles (teacher, pending)
+  - all others -> may not change roles at all
+Service-role/backend writes (auth.uid() IS NULL) are exempt — they go through already-gated
+edge functions. Only fires when role actually changes; other profile-field edits are
+untouched. Additive + idempotent (create or replace / drop trigger if exists).
+
+Behavior change (intended tightening): an `admin` editing a staff member's role can no
+longer assign an elevated role (previously the legacy dropdown offered principal to admins);
+principal/subgroup_admin/pastor/regional_secretary can no longer change any role via REST.
+NOT executed against a live DB here (no Postgres in dev env) — apply + verify with a
+non-superadmin session before relying on it.
