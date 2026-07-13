@@ -687,3 +687,70 @@ e26a408, is attributed to the Nexus/ClickUp-replacement lineage (9e1ed97,
 `202607101000_rocksolid_nexus_integration.sql`), not to the create-staff-direct feature.
 No further action needed; flagged here so future `git blame`/archaeology on that file isn't
 misled by e26a408's feature-sounding commit message.
+
+### DECISION — Phase A.5 verification: teachers-table RLS is NOT a live gap
+
+Checked whether `toggleTeacherActive()`'s client-side `.update()` on `teachers` (used to
+activate/deactivate a teacher — a different table from `profiles`, no role write involved)
+is actually RLS-gated, since the JS has no server-side role check of its own.
+
+`000_baseline_squash.sql` originally created `teachers_staff_update ... TO authenticated
+USING (true) WITH CHECK (true)` — genuinely open to any authenticated caller. But two later
+migrations, applied after the baseline in lexical order, close this:
+- `202605061400_rls_hardening.sql` drops that policy and adds `teachers_admin_all` (`FOR ALL
+  TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin())`).
+- `202605121320_security4_legacy_broad_rls_hardening.sql` re-does the same drop/create
+  idempotently (expected duplicate hardening pass, converges on the same policy).
+- `is_admin()` (final definition in `202605220030_regional_secretary_rls_fix.sql`) resolves
+  to `superadmin, admin, subgroup_admin, pastor, principal, regional_secretary` — the
+  elevated-role set, not "any authenticated user."
+- The only other policy touching `teachers` writes is `"allow public teacher self
+  registration"` (`202605171600_teacher_self_register_rls.sql`), scoped to `INSERT ... WITH
+  CHECK (status = 'PENDING' AND active = false)` — no UPDATE reach.
+
+Conclusion: `teachers` UPDATE is correctly gated to elevated roles today. This is a static
+migration-file analysis (same caveat as the Phase A audit: verifies what migrations declare
+in lexical order, not a live-DB query — no Postgres connection in this dev env). No second
+gap found; no fix needed for A.5.
+
+### DECISION — `pending` gap, revised (narrower than the 07-13 profiles-boundary entry above)
+
+The entry above ("Fix: server-side role-assignment boundary on profiles") left `admin` able
+to assign `teacher` or `pending` to an existing profile via direct REST update. Revisited:
+admin's only real account-lifecycle levers elsewhere in the codebase are (a) create a
+teacher account via `create-staff-direct` (already `teacher`-only) and (b) activate/deactivate
+an existing teacher via `teachers.active`/`status`/`deleted_at` — a different table, not
+`profiles.role` at all. Letting admin additionally demote/reset an existing profile's role
+to `pending` or re-affirm `teacher` via direct REST was an inconsistent extra lever with no
+corresponding UI or edge-function analog. Narrowed to: **admin has zero `profiles.role`
+UPDATE authority**, full stop — not "some roles." This is simpler than the roles-allowlist
+approach and matches how `admin` behaves everywhere else (creation-only, never direct
+profile-role mutation). Superadmin is unaffected: still full authority over all 8 roles,
+including `pending`.
+
+New migration `202607131600_profiles_role_assignment_admin_zero_authority.sql`:
+`create or replace function public.profiles_enforce_role_assignment()` — removes the
+`admin` branch's `v_new = any(v_elevated)` check entirely; any genuine role change attempted
+by an `admin` caller now raises `42501` unconditionally. `superadmin` and "all others"
+branches are unchanged. Additive/idempotent (`create or replace function`; trigger already
+exists from 202607131500 and is not recreated). NOT executed against a live DB here (no
+Postgres in dev env) — apply + verify with an admin session attempting any role update
+(including to `teacher`/`pending`) returns `42501` before relying on it.
+
+### DRIFT GUARD — added
+
+`supabase/functions/admin-api/role-boundary-matrix.test.ts`: runs the full 8-role matrix
+(`pending, teacher, principal, admin, superadmin, subgroup_admin, pastor,
+regional_secretary`) against both `assertStaffCreationAllowed()` (creation, real code under
+test) and a pure mirror of the trigger's new logic (`allowedRoleUpdateFor`, since the trigger
+itself is PL/pgSQL and this dev env has no Postgres to run it against — same limitation
+noted in every migration entry above). Asserts: `admin` → create `{teacher}` only, update
+`{}`; `superadmin` → create all 7 non-`pending` roles, update all 8 including `pending`;
+every other role → empty in both dimensions. The mirror function carries a comment pointing
+back to the migration file as the single source of truth, so a future change to one without
+updating the other fails this test loudly instead of drifting silently.
+
+### GATE — confirm before merging
+
+This branch touches a security boundary (profiles role-update authority). Final review
+requested before merging `brief/git-workflow-fixes` to `main`.
