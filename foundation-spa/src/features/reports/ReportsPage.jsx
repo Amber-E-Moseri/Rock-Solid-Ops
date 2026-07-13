@@ -224,7 +224,7 @@ export default function ReportsPage() {
 
       {/* Re-send modal */}
       {resendModal && (
-        <Modal title="Re-send Report" onClose={() => setResendModal(null)} footer={
+        <Modal open title="Re-send Report" onClose={() => setResendModal(null)} footer={
           <>
             <Button variant="ghost" onClick={() => setResendModal(null)}>Cancel</Button>
             <Button variant="primary" onClick={() => handleResend(resendModal)} disabled={genMut.isPending}>

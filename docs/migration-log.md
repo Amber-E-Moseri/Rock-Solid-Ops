@@ -607,3 +607,21 @@ push** — iOS Safari only delivers web push to a PWA actually installed to the 
 screen, so meaningful iOS push testing requires the install shell to exist first.
 Real-device testing (Phase C.5) cannot be done in this environment (no Android/iOS
 hardware); it remains a human step, especially iOS Safari.
+
+---
+
+## 2026-07-13 — Fix: SPA modals rendered nothing (missing `open` prop)
+
+Standalone bug fix, tracked separately from the create-staff-direct feature. This is a
+real functional bug affecting current users, found incidentally while building that
+feature — deliberately NOT folded into the feature commit.
+
+`src/components/ui/Modal.jsx` only renders its content when passed a truthy `open` prop.
+Four call sites omitted it, so those modals showed nothing when triggered:
+- `AdminManagementPage.jsx`: StaffModal (Edit Role), TeacherModal (Edit Teacher), LinkModal
+  (Link Teacher to Auth User)
+- `ReportsPage.jsx`: Re-send Report modal
+
+Fix: add the `open` prop to each (one word per component), mirroring what every working
+Modal call site — and the new CreateStaffModal — already does. No behavior change beyond
+making the modals actually appear. `npm run build` passes.

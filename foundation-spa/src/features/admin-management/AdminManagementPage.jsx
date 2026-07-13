@@ -275,7 +275,7 @@ function StaffModal({ row, roleOptions, isSelf, onClose, onSave, saving }) {
   });
   const set = (k, v) => setValues((p) => ({ ...p, [k]: v }));
   return (
-    <Modal title={row ? 'Edit Staff Account' : 'Add Staff Profile'} onClose={onClose} footer={
+    <Modal open title={row ? 'Edit Staff Account' : 'Add Staff Profile'} onClose={onClose} footer={
       <>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <Button variant="primary" onClick={() => onSave(values)} disabled={saving || !values.email || !values.full_name}>{saving ? 'Saving…' : 'Save'}</Button>
@@ -314,7 +314,7 @@ function TeacherModal({ row, meta, onClose, onSave, saving }) {
   });
   const set = (k, v) => setValues((p) => ({ ...p, [k]: v }));
   return (
-    <Modal title={row ? 'Edit Teacher' : 'Add Teacher'} onClose={onClose} footer={
+    <Modal open title={row ? 'Edit Teacher' : 'Add Teacher'} onClose={onClose} footer={
       <>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <Button variant="primary" onClick={() => onSave(values)} disabled={saving || !values.full_name || !values.email || !values.group_id}>{saving ? 'Saving…' : 'Save'}</Button>
@@ -341,7 +341,7 @@ function LinkModal({ row, meta, onClose, onLink, saving }) {
   const [authUserId, setAuthUserId] = useState('');
   const [allowRelink, setAllowRelink] = useState(false);
   return (
-    <Modal title="Link Teacher to Auth User" onClose={onClose} footer={
+    <Modal open title="Link Teacher to Auth User" onClose={onClose} footer={
       <>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <Button variant="primary" onClick={() => onLink(authUserId, allowRelink)} disabled={saving || !authUserId}>{saving ? 'Linking…' : 'Link'}</Button>
