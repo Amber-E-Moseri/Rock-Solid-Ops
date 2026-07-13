@@ -650,3 +650,20 @@ longer assign an elevated role (previously the legacy dropdown offered principal
 principal/subgroup_admin/pastor/regional_secretary can no longer change any role via REST.
 NOT executed against a live DB here (no Postgres in dev env) — apply + verify with a
 non-superadmin session before relying on it.
+
+---
+
+## 2026-07-13 — Branch policy adoption + commit isolation + boundary reconciliation (Phase B)
+
+Follow-up to the prior Phase A audit brief ("Rock-Solid-Ops"), which surfaced three items:
+branch-per-brief vs. the earlier lock-file convention, an unattributed ClickUp-removal hunk
+baked into e26a408, and a real disagreement between the `create-staff-direct` boundary and
+the `profiles` role-update trigger over what `admin` may do to an existing profile's role.
+
+### DECISION — branch-per-brief adopted as standing policy
+
+Documented in `CLAUDE.md` under "Git workflow": create `brief/<name>` off `main`, commit
+incrementally, merge to `main` in the same session once any gate is confirmed, delete the
+branch. Replaces the earlier lock-file approach, which coordinated parallel sessions on a
+shared tree but did nothing to keep unrelated hunks (e.g. the ClickUp removal below) from
+landing inside an unrelated feature commit.
