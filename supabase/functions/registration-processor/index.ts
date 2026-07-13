@@ -11,6 +11,7 @@ import {
   safeLogAudit,
 } from "../_shared/http.ts";
 import { assignApplicant } from "../_shared/lib/assign-applicant.ts";
+import { notifyProfilesPush, resolveStaffRecipients } from "../_shared/push-notify.ts";
 
 const allowedOrigins = [
   "https://rocksolidsuite.netlify.app",
@@ -713,6 +714,27 @@ Deno.serve(async (req) => {
       await writeAudit("REGISTRATION_DUPLICATE", "SUCCESS", commonAuditDetails);
     } else if (registrationStatusTyped === "REVIEW") {
       await writeAudit("REGISTRATION_REVIEW", "SUCCESS", commonAuditDetails);
+    }
+
+    // Complementary push channel (PWA Phase C.2): nudge admins for the two
+    // staff-actionable outcomes. Recipients = admins only (superadmin + admin),
+    // per the C.2 gate decision. Fire-and-forget: notifyProfilesPush never
+    // throws and no-ops without VAPID, so this can never affect registration.
+    if (registrationStatusTyped === "REVIEW" || registrationStatusTyped === "DUPLICATE") {
+      try {
+        const admins = await resolveStaffRecipients(db, ["superadmin", "admin"]);
+        if (admins.length > 0) {
+          const label = registrationStatusTyped === "DUPLICATE" ? "possible duplicate" : "manual review";
+          await notifyProfilesPush(db, admins, {
+            title: "Registration needs attention",
+            body: `A new registration (${email}) was flagged for ${label}.`,
+            url: "/staff/applicant-directory",
+            type: "registration_status",
+          });
+        }
+      } catch (_pushErr) {
+        // Best-effort only — must not affect the registration response.
+      }
     }
 
     return jsonResponse({

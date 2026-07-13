@@ -2619,3 +2619,61 @@ Migration apply (no Postgres); live push delivery end-to-end (subscribe → send
 receive) and real-device install, especially iOS Safari — no mobile hardware. The user must
 also set `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` / `ALLOWED_ORIGINS` as edge secrets and run the
 migration before any real send.
+
+---
+
+## 2026-07-13 — PWA Phase C.2: trigger wiring + attention sweep + push toggle (C.2 merge gate)
+
+Follow-up to the C.2 infrastructure entry above. The two gate decisions were answered:
+**recipients = admins only (superadmin + admin)** for all three push types, and
+**attention flags = a 5-minute periodic sweep** (retry-worker cron pattern), batched per
+recipient. Item 5 (wiring) is now complete.
+
+### WIRED (all fire-and-forget; a push failure can never affect the host flow)
+
+- **Registration status → `registration-processor`**: after the existing audit, for the two
+  staff-actionable outcomes (`REVIEW`, `DUPLICATE`) only, push admins "Registration needs
+  attention" → `/staff/applicant-directory`. Routine ASSIGNED/WAITLISTED do not push (noise).
+- **Waitlist movement → `waitlist-processor`**: after the run loop, ONE summary push per run
+  when `results.notified > 0` ("N waitlisted students matched a now-available class") →
+  `/staff/waitlist`. One push per run, not per student, to avoid fragmentation.
+- **Teacher availability → `teacher-portal-api/_actions/submit-teacher-availability.ts`**:
+  after the availability upsert + audit, push admins "Availability submitted" →
+  `/staff/availability-approval`. `db` there is service-role, so it can read admin subs.
+- **Attention flags → new `attention-flag-push-sweep` edge function** + migration
+  `202607131800_attention_flags_push_notified.sql` (adds `push_notified_at` + partial index).
+  Cron every 5 min (retry-worker pattern): selects unresolved flags with
+  `push_notified_at IS NULL`, sends ONE batched nudge to admins with a per-type breakdown →
+  `/staff/needs-attention`, then stamps `push_notified_at` so each flag nudges at most once.
+  If VAPID is unconfigured it no-ops WITHOUT stamping, so nudges begin once secrets are set.
+
+### CLIENT UI
+
+- `foundation-spa/src/components/pwa/PushToggle.jsx` — a topbar Bell/BellOff toggle (mounted
+  in `Shell.jsx` next to the theme toggle) that calls the `webPush.js` subscribe/unsubscribe
+  flow. Renders nothing where push is unsupported (no SW/PushManager/VAPID), so it degrades
+  cleanly. This is the entry point that lets a signed-in staff/teacher turn push on.
+
+### VERIFIED
+
+- SPA production build clean with the toggle wired into the Shell (2188 modules; SW + 63-entry
+  precache intact).
+- Client `applicationServerKey` conversion proven: the RSO VAPID public key decodes to a valid
+  65-byte uncompressed P-256 point (0x04 prefix) — what `PushManager.subscribe` requires.
+- Edge functions could NOT be run here (no Deno); import paths verified, logic reviewed. The
+  push toggle itself is behind auth (topbar renders only when signed in), so a live click-through
+  is a human step, like the card-with-data checks in Phase B.
+
+### STILL A HUMAN STEP BEFORE SHIP (unchanged from the infra entry)
+
+Apply both migrations; set `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` / `VAPID_PUBLIC_KEY` /
+`ALLOWED_ORIGINS` as edge secrets; schedule `attention-flag-push-sweep` on pg_cron; then a
+real-device pass (subscribe → trigger → device receives), especially iOS Safari installed to
+the home screen. No Postgres/Deno/mobile hardware in this environment.
+
+### GATE — confirm before merging brief/pwa-push to main
+
+C.2 complete (infra + wiring + UI). This branch touches `registration-processor` (a release-
+blocker) additively and adds one migration + one scheduled function. Final review requested
+before merge; on approval I merge brief/pwa-push → main, delete the branch, and remove the
+worktree.

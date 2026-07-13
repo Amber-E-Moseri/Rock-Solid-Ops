@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse, safeLogAudit, withTimeout } from "../_shared/http.ts";
 import { buildClassAvailableDedupeKey, CANONICAL_TEMPLATE_KEY } from "./dedupe.ts";
+import { notifyProfilesPush, resolveStaffRecipients } from "../_shared/push-notify.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -266,6 +267,26 @@ Deno.serve(async (req) => {
     for (const slot of slots) {
       const classInfo = await getClassInfo(slot.class_option_id);
       await notifyClassNowAvailable(slot, classInfo, results);
+    }
+
+    // Complementary push channel (PWA Phase C.2): one summary nudge to admins
+    // per run when the waitlist actually moved. Recipients = admins only
+    // (superadmin + admin) per the C.2 gate. One push per run (not per student)
+    // to avoid fragmenting related movements. Fire-and-forget: never affects the run.
+    if (results.notified > 0) {
+      try {
+        const admins = await resolveStaffRecipients(sb, ["superadmin", "admin"]);
+        if (admins.length > 0) {
+          await notifyProfilesPush(sb, admins, {
+            title: "Waitlist moved",
+            body: `${results.notified} waitlisted student${results.notified === 1 ? "" : "s"} matched a now-available class.`,
+            url: "/staff/waitlist",
+            type: "waitlist_movement",
+          });
+        }
+      } catch (_pushErr) {
+        // Best-effort only.
+      }
     }
 
     return jsonResponse({ ok: true, ...results });
