@@ -1192,3 +1192,102 @@ Added a line under the worktree-per-brief standing rule (which itself had not ye
 the remaining pwa-push merge work needs it): verify claims inherited from prior
 migration-log entries before acting on them, citing this entry's CSS-token correction and
 the earlier Nexus push-sender claim as the precedent.
+
+---
+
+## 2026-07-13 — PWA Phase C.1: install shell + service worker (brief/pwa-push, C.1 gate)
+
+Phase C.1 of the PWA + Push brief. Adds the installable PWA shell and an offline-capable
+service worker to `foundation-spa`. Push (C.2) is gated behind this and not started.
+
+### PRE-FLIGHT — branch hygiene
+
+Two branches named in the brief as "existing unmerged work" (`cleanup-review`,
+`feat/retry-worker-clickup-escalation`) were both found **already fully merged** into `main`
+(tip is an ancestor of `main`, 0 commits ahead; last activity 2026-05-07/08). They are stale
+pointers, safe to delete; left in place this session per the user's instruction. The actually-
+live unmerged branch at the time was `brief/git-workflow-fixes`, which was merged to `main`
+(security gate confirmed) and deleted before `brief/pwa-push` was cut off the updated `main`.
+
+### DECISION — custom hand-written service worker, NOT the Nexus SW
+
+The Nexus reference SW (`public/service-worker.js`) network-first-caches **all** Supabase REST
+responses (`url.origin.includes('supabase')` → networkFirst with a 5-min expiry). That
+directly violates this project's approved never-cache boundary for the RLS-gated/mutable
+tables. So it was not ported. `src/sw.js` is written from scratch and implements the approved
+boundaries exactly:
+  - CACHE-FIRST (config/reference): `class_options`, `milestone_definitions`, `batches`
+    (+ the app shell / help-guide content, which is precached as part of the build).
+  - NEVER-CACHE (explicit bypass, never read/written): `applicants`, `profiles`,
+    `attendance_records`, `attendance_log`, `audit_logs`/`audit_log`, `email_queue`,
+    `attention_flags`. Plus `/auth/v1/` and `/realtime/v1/` always bypass (token-replay
+    hazard), and all non-GET requests bypass.
+  - DEFAULT for any Supabase table NOT in either list (e.g. `students`, `class_roster`) and
+    all `/rest/v1/rpc/*` calls: network-only, no caching — the safe default, so an unlisted
+    or future table is never silently cached. `NEVER_CACHE_TABLES` is therefore belt-and-
+    braces, not the sole guard.
+  Nothing was added to either approved list. The one judgement call flagged for sign-off:
+  cross-origin Google Fonts are currently left to the browser (NOT cached), because fonts
+  were not part of the approved cache-first "app shell" set — see GATE QUESTION below.
+
+### DECISION — vite-plugin-pwa with `injectManifest`
+
+`vite-plugin-pwa@1.3.0` (new devDependency) in `injectManifest` mode: it injects the content-
+hashed shell file list into `self.__WB_MANIFEST` in `src/sw.js`, but every caching strategy is
+hand-written with the plain Cache API rather than workbox routing, so the boundaries above are
+auditable in one file. Manifest is generated from config (name "Rock Solid Ops", theme
+`#4C2A92`, background `#f8f5ee`, standalone, SVG icons any+maskable). usePWA hook + install
+prompt + offline indicator adapted from the Nexus templates and **de-Tailwinded** to RSO
+tokens (`--primary`/`--text`/`--surface-2`/`--warn`), lucide icons ported as-is.
+
+### FIX during verification — precache resilience + theme-toggle color stick
+
+- Install originally used `cache.addAll(PRECACHE_URLS)`, which is atomic: a single 404
+  discarded the entire 61-entry precache (observed: shell cache had 0 entries). Rewritten to
+  `Promise.allSettled` with per-entry `cache.add` so one miss is logged and skipped. Result:
+  61 unique assets cached (63 manifest entries − 2 duplicate icon URLs from `includeAssets`).
+- The install-prompt primary button used `transition: background`; toggling `data-theme`
+  while the card was open left the button stuck on the pre-toggle brand color until repaint
+  (var()-driven color changes don't re-interpolate a running transition). Scoped the
+  transition to `opacity` only; verified the button now snaps correctly light↔dark.
+
+### VERIFIED (DevTools + preview browser, desktop + mobile)
+
+- SW registers, activates, and controls the page (dev via `devOptions`, and the production
+  `vite preview` build).
+- Manifest valid + installable shape; theme-color, apple-touch-icon, apple-mobile-web-app-*
+  meta added to `index.html` for the iOS install path.
+- Caching-boundary routing proven with a deterministic decision matrix: all 3 config tables →
+  cache-first; all 6 sensitive tables + RPCs + unlisted tables → network bypass; POST /
+  auth / realtime → never cached.
+- Offline app boot: with the preview server STOPPED, a fresh navigation to `/staff/dashboards`
+  boots the full SPA from the SW cache (redirects to login, renders it). `/index.html` and all
+  51 referenced chunks serve 200 from cache offline.
+- Install prompt + offline indicator render with correct RSO tokens in BOTH light and dark
+  (primary button `#4C2A92`/`#8B6BFF`; offline banner `--warn`/`--warn-bg`); install card goes
+  full-width at 375px.
+- Production build clean; SW builds; 61-entry precache.
+
+### CANNOT VERIFY HERE (human step before ship)
+
+Real-device install + offline, especially **iOS Safari** (web push there requires an installed
+PWA). No Android/iOS hardware in this environment — DevTools + preview browser only. The iOS
+meta tags and SVG icons are in place, but a real iOS home-screen install/offline pass is
+unverified. A PNG maskable icon set may be needed for best home-screen rendering (currently
+SVG-only, which Chromium accepts for install but iOS renders less predictably).
+
+### GATE — C.1 confirmed 2026-07-13
+
+C.1 approved. Fonts decision: **leave Google Fonts uncached** (current behaviour) — offline
+the app falls back to the system font stack in the CSS `font-family` chain. `fonts.gstatic.com`
+is deliberately NOT added to the cache-first set; no cross-origin host is cached.
+
+### NOTE — log-collision resolution + worktree adoption
+
+This entry originally sat as an uncommitted append on top of a parallel session's uncommitted
+"Email Pipeline Audit" (`brief/email-audit`) text in the shared working tree. Resolved per the
+user's direction: the email-audit entry was committed first on `brief/email-audit`
+(`d5de9a4`), then `brief/pwa-push` was rebased onto it and this C.1 entry appended after — so
+the log reads chronologically (email-audit, then C.1) with each brief's entry in its own
+commit. Going forward this branch's work moves to a dedicated `git worktree` (see the branch
+policy note in CLAUDE.md) so parallel sessions stop sharing one checkout and one HEAD.
