@@ -1719,3 +1719,19 @@ Branch state and current `main` state diverge here:
 So the correct statement is: **if this branch merged as-is, a taquangminh081-shaped case would
 surface through the Needs Attention path; on current `main`, that loop is still not fully
 closed yet.**
+
+---
+
+## 2026-07-14 — Reserved templates explicitly unwired
+
+The following templates exist in repo/database state but are **explicitly not wired** to any
+active producer, trigger, or cron at this time:
+
+- `class_slot_cancelled`: reserved for a future class-cancellation feature if implemented.
+  Current class-management behavior changes class slots rather than cancelling them.
+- `waitlist_promoted`: reserved; no current use case.
+- `engagement_final_notice`: reserved; `student-engagement-monitor` currently fires only the
+  first two engagement templates.
+
+If any of those features are implemented in the future, wire the producer/trigger deliberately
+and reference this log entry when doing so.
