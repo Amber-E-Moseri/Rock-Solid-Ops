@@ -1,9 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse, safeLogAudit, withTimeout } from "../_shared/http.ts";
+import { buildClassAvailableDedupeKey, CANONICAL_TEMPLATE_KEY } from "./dedupe.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const MOODLE_URL = "https://rocksolid.lwcanada.org";
+// Same selection-link base the DB trigger path uses (202605191920 / 202607141000).
+const SELECTION_URL_BASE = "https://rocksolidsuite.netlify.app/foundation/registration/class-selection.html?token=";
 
 const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE);
 
@@ -68,13 +71,91 @@ async function notifyClassNowAvailable(slot: Slot, classInfo: ClassInfo, results
   let notified = 0;
   for (const app of matched) {
     const firstName = String(app.full_name || "Student").split(/\s+/)[0];
-    const dedupeKey = `class_now_available:${String(app.id)}:${String(slot.batch_id)}:${String(slot.class_option_id)}`;
+    // Dedupe key format: see ai/statuses.md CLASS_AVAILABLE entry. Must be
+    // identical in both trigger and cron. No timestamp component.
+    const dedupeKey = buildClassAvailableDedupeKey(
+      String(app.id),
+      String(slot.batch_id),
+      String(slot.class_option_id),
+    );
+
+    // Insert-if-absent: the previous blind upsert reset an existing row
+    // (including SENT ones) back to PENDING on conflict, which could re-send.
+    // Pre-check first so a suppressed duplicate never mints an orphan
+    // selection token every 15 minutes.
+    const { data: existing, error: existErr } = await sb
+      .from("scheduled_notifications")
+      .select("id")
+      .eq("dedupe_key", dedupeKey)
+      .limit(1)
+      .maybeSingle();
+
+    if (existErr) {
+      results.errors.push(`class_available dedupe check ${app.id}: ${existErr.message}`);
+      continue;
+    }
+
+    const flipAvailabilityStatus = async () => {
+      await sb
+        .from("applicants")
+        .update({ availability_status: "CLASS_AVAILABLE", updated_at: new Date().toISOString() })
+        .eq("id", app.id)
+        .eq("availability_status", "NO_MATCHING_TIME");
+    };
+
+    const auditSuppressed = async () => {
+      await safeLogAudit(sb, {
+        actor_email: "waitlist-processor@system",
+        action: "WAITLIST_DUPLICATE_SUPPRESSED",
+        entity_type: "applicant",
+        entity_id: app.id,
+        status: "SUCCESS",
+        details: {
+          class_option_id: slot.class_option_id,
+          batch_id: slot.batch_id,
+          dedupe_key: dedupeKey,
+          source: "cron",
+        },
+      });
+    };
+
+    if (existing) {
+      await auditSuppressed();
+      // Behavioral parity with the old upsert path, which also flipped the
+      // status on conflict: the applicant already has a notification row for
+      // this exact (applicant, batch, class_option), so flip them out of the
+      // candidate pool rather than re-auditing every 15 minutes forever.
+      await flipAvailabilityStatus();
+      continue;
+    }
+
+    // Mint the selection token only after the dedupe check passes.
+    const { data: tokenRow, error: tokenErr } = await sb
+      .from("class_selection_tokens")
+      .insert({
+        applicant_id: app.id,
+        batch_id: slot.batch_id,
+        fellowship_code: String(app.fellowship_code || "").trim(),
+      })
+      .select("token")
+      .single();
+
+    if (tokenErr || !tokenRow?.token) {
+      results.errors.push(`class_available token ${app.id}: ${tokenErr?.message || "no token returned"}`);
+      continue;
+    }
+
+    const selectionUrl = `${SELECTION_URL_BASE}${tokenRow.token}`;
+
+    // ignoreDuplicates guards the small race window after the pre-check; a
+    // conflicting concurrent insert is silently skipped (empty data array),
+    // never overwritten.
     const queueRes = await sb.from("scheduled_notifications").upsert({
       dedupe_key: dedupeKey,
       recipient_email: String(app.email || "").trim().toLowerCase(),
       applicant_id: app.id,
       event_type: "class_now_available",
-      template_key: "class_now_available",
+      template_key: CANONICAL_TEMPLATE_KEY,
       scheduled_for: new Date().toISOString(),
       status: "PENDING",
       payload: {
@@ -89,19 +170,26 @@ async function notifyClassNowAvailable(slot: Slot, classInfo: ClassInfo, results
         class_option_id: slot.class_option_id,
         batch_id: slot.batch_id,
         moodle_url: MOODLE_URL,
+        selection_url: selectionUrl,
+        expires_days: 7,
       },
-    }, { onConflict: "dedupe_key" });
+    }, { onConflict: "dedupe_key", ignoreDuplicates: true }).select("id");
 
     if (queueRes.error) {
-      results.errors.push(`class_now_available queue ${app.id}: ${queueRes.error.message}`);
+      results.errors.push(`class_available queue ${app.id}: ${queueRes.error.message}`);
       continue;
     }
 
-    await sb
-      .from("applicants")
-      .update({ availability_status: "CLASS_AVAILABLE", updated_at: new Date().toISOString() })
-      .eq("id", app.id)
-      .eq("availability_status", "NO_MATCHING_TIME");
+    const inserted = Array.isArray(queueRes.data) && queueRes.data.length > 0;
+    if (!inserted) {
+      // Lost the race to a concurrent producer between pre-check and insert.
+      // The freshly minted token is orphaned but harmless (expires in 7 days).
+      await auditSuppressed();
+      await flipAvailabilityStatus();
+      continue;
+    }
+
+    await flipAvailabilityStatus();
 
     await safeLogAudit(sb, {
       actor_email: "waitlist-processor@system",
@@ -109,7 +197,14 @@ async function notifyClassNowAvailable(slot: Slot, classInfo: ClassInfo, results
       entity_type: "applicant",
       entity_id: app.id,
       status: "SUCCESS",
-      details: { class_option_id: slot.class_option_id, batch_id: slot.batch_id, class_day: classDay, class_time: classTime },
+      details: {
+        class_option_id: slot.class_option_id,
+        batch_id: slot.batch_id,
+        class_day: classDay,
+        class_time: classTime,
+        dedupe_key: dedupeKey,
+        template_key: CANONICAL_TEMPLATE_KEY,
+      },
     });
 
     notified += 1;
