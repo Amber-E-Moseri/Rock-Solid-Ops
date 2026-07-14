@@ -1735,3 +1735,97 @@ active producer, trigger, or cron at this time:
 
 If any of those features are implemented in the future, wire the producer/trigger deliberately
 and reference this log entry when doing so.
+
+---
+
+## 2026-07-14 — `get_teacher_attention_flags` / `get_system_attention_flags` audit (Phase A, audit only)
+
+Follow-up to the `get_student_attention_flags` bug (invalid `student_grades.student_email`
+reference, fixed only on branch `brief/moodle-credential-safety` via `57fa0bd` — **not yet on
+`main`**, see the 2026-07-13 sanity-check entry above). Checked whether the two sibling RPCs in
+`202605220011_needs_attention_rpcs.sql` share the same bug class. They do not share the same
+bug, but one of them is broken by a different bug, with the same silent-failure effect.
+
+**Correction to the brief's premise:** the brief that triggered this audit stated
+`get_student_attention_flags` "was just fixed." On current `main` state, checked as part of
+this pass, it is not — `supabase/migrations/202605220011_needs_attention_rpcs.sql` on `main`
+still contains the invalid `sg.student_email` clause. The fix exists only on the unmerged
+branch noted above.
+
+### `get_teacher_attention_flags` — **BROKEN**, confirmed live, different bug class
+
+Every column reference in `classes` / `class_metrics` / `class_expectation` / `overdue` /
+`neglect` / `unlinked` was checked against the live `foundation-school` schema
+(`class_options`, `class_slots`, `teachers`, `batches`, `attendance_log`) — all column names
+exist. The bug is not an invalid column, it's a type error:
+
+```sql
+floor(extract(epoch FROM (LEAST(COALESCE(c.end_date, now()::date), now()::date) - c.start_date)) / 604800)
+```
+
+`batches.start_date` and `batches.end_date` are both `date`. In Postgres, `date - date` returns
+`integer` (a day count), not `interval` — `extract(epoch FROM <integer>)` has no matching
+function overload. Confirmed live:
+
+```
+select (now()::date - '2026-01-01'::date) as diff, pg_typeof(now()::date - '2026-01-01'::date);
+→ diff: 194, diff_type: integer
+```
+
+Running the `class_metrics` CTE standalone against the live DB throws:
+`ERROR: 42883: function pg_catalog.extract(unknown, integer) does not exist`.
+Calling `select * from get_teacher_attention_flags();` live returns **zero rows** — the
+blanket `EXCEPTION WHEN OTHERS THEN RETURN` (lines 343–345) swallows this every time. Because
+all three flag branches (`overdue_attendance_submission`, `teacher_neglect`,
+`teacher_unlinked_auth`) are combined into one `UNION ALL` inside a single `RETURN QUERY`
+statement, the type error in `class_metrics`/`class_expectation` (used only by `overdue` and
+`neglect`) takes down `unlinked` too, even though `unlinked` doesn't reference those CTEs —
+Postgres has to evaluate the whole statement, so a fatal error anywhere in it aborts all of it.
+
+This function has produced **zero flags for all three flag types since it was created
+(`202605220011`, 2026-05-22)** — roughly 7.5 weeks as of this audit (2026-07-14). No migration
+after `202605220011` has touched the function body; the only later migration referencing it
+(`202607131400_attention_flags_rls_coverage.sql`) only added RLS policies to the
+`attention_flags` table, not the RPC. Same severity class as the student RPC: a real,
+production-affecting alerting gap, not a minor issue.
+
+### `get_system_attention_flags` — **clean**, confirmed live
+
+All column references (`moodle_enrollment_sync.sync_status/updated_at/created_at`,
+`email_queue.status/created_at`, `applicants.registration_status/status/updated_at/created_at`)
+verified against the live schema — all exist. Live invocation
+(`select * from get_system_attention_flags();`) returns 3 rows (one per branch), each with a
+real `count` (currently all `0`, which reflects an actually-clean current state, not a
+swallowed exception — an error would have produced zero *rows*, not three rows of zero
+*counts*). No fix needed.
+
+### Exception-handling philosophy (judgment call, not just mechanics)
+
+The blanket `EXCEPTION WHEN OTHERS THEN RETURN` pattern is not appropriate for this RPC family
+and should be narrowed or removed. Reasoning:
+
+- These are **admin-facing alerting RPCs**. Their entire purpose is to surface problems. A
+  pattern that converts "the query itself is broken" into "there are no problems to report" is
+  the worst possible failure mode for exactly this kind of function — it is silent,
+  indistinguishable from a genuinely healthy system, and has now caused two independent bugs
+  (an invalid column, and a type error) to go undetected for months across two of the three
+  sibling functions.
+- There is no expected/recoverable error condition inside these queries that would justify a
+  catch-all: they're read-only aggregation queries over tables that already exist, gated by
+  `SECURITY DEFINER` with `search_path` pinned. Nothing in the query logic legitimately raises
+  and expects to be caught.
+- If the concern was "one bad flag type shouldn't take down the whole page," the right fix is
+  **narrowing the blast radius, not swallowing the error**: either run each flag-type branch as
+  its own statement/RPC (so a bug in `teacher_neglect` doesn't hide `teacher_unlinked_auth`),
+  or wrap only genuinely-recoverable conditions (e.g. a specific expected NULL/division case)
+  in a narrow exception, and let anything else propagate so it shows up in logs/monitoring
+  immediately instead of silently returning an empty admin dashboard.
+- If a catch-all is kept for defense-in-depth, it should at minimum log to `audit_logs` (or
+  raise a warning/notice) before returning, so a broken RPC leaves a trace instead of looking
+  identical to "nothing to report."
+
+### Status
+
+Audit only — no fixes applied in this pass, per the brief's Phase A scope. Both findings
+(`get_teacher_attention_flags` broken, `get_system_attention_flags` clean) and the
+exception-handling recommendation are reported for a follow-up decision/fix pass.
