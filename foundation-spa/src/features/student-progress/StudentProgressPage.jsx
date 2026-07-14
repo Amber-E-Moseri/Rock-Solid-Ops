@@ -133,7 +133,7 @@ export default function StudentProgressPage() {
   }, [filtered, view, milestones, classCols]);
 
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
+    <div className="rso-stack">
       <PageHeader title="Student Progress" subtitle="Class attendance and milestone grid — read-only attendance view from student records." />
 
       <Card>
@@ -297,6 +297,55 @@ export default function StudentProgressPage() {
               </table>
             </div>
           )}
+
+          {/* Mobile cards (fallback for <640px; tappable milestone chips) */}
+          {!gridLoading && filtered.length > 0 && (
+            <div className="rso-table-cards">
+              {filtered.map((s) => {
+                const checks = computeChecks(s, view, milestones, classCols);
+                const pct = computeProgressPct(checks);
+                return (
+                  <div key={s.studentId} className="rso-table-card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>{s.fullName || '-'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>{s.studentId || ''}</div>
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap' }}>{pct}%</div>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
+                      <Badge variant={faithBadgeVariant('born', s.bornAgain)}>Born Again: {normFaith(s.bornAgain)}</Badge>
+                      <Badge variant={faithBadgeVariant('tongues', s.speaksInTongues)}>Tongues: {normFaith(s.speaksInTongues)}</Badge>
+                      <Badge variant={faithBadgeVariant('water', s.waterBaptized)}>Baptized: {normFaith(s.waterBaptized)}</Badge>
+                    </div>
+                    <div style={{ height: 7, borderRadius: 99, background: 'var(--surface-2)', border: '1px solid var(--border)', overflow: 'hidden', margin: '10px 0' }}>
+                      <div style={{ height: '100%', borderRadius: 99, width: `${pct}%`, background: 'var(--primary)' }} />
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {checks.map((on, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          disabled={view === 'classes'}
+                          onClick={() => view === 'milestones' && handleToggleMilestone(s, milestones[idx])}
+                          style={chipToggleStyle(on, view === 'classes')}
+                        >
+                          <span style={cbStyle(on, view === 'classes')} aria-hidden="true">
+                            {on && (
+                              <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
+                                <path d="M1 4L4 7.5L10 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
+                          </span>
+                          {view === 'classes' ? activeCols[idx] : (milestones[idx]?.label || milestones[idx]?.code)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {msg && (
             <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 8, background: 'var(--danger-bg, #fef2f2)', color: 'var(--color-danger)', fontSize: 13, fontWeight: 600 }}>
               {msg}
@@ -333,6 +382,17 @@ function atRiskChipStyle(active) {
     padding: '7px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
     background: active ? 'var(--color-danger)' : 'var(--surface-2)',
     color: active ? '#fff' : 'var(--muted)',
+  };
+}
+
+function chipToggleStyle(checked, disabled) {
+  return {
+    display: 'inline-flex', alignItems: 'center', gap: 8,
+    minHeight: 40, padding: '6px 12px 6px 8px', borderRadius: 10,
+    border: `1px solid ${checked ? 'var(--primary)' : 'var(--border)'}`,
+    background: 'var(--surface)', color: 'var(--text)',
+    fontSize: 12.5, fontWeight: 700, fontFamily: 'inherit',
+    cursor: disabled ? 'default' : 'pointer',
   };
 }
 
