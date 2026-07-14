@@ -58,7 +58,7 @@ export default function ClassCorrectionModal({ model, app, open, onClose, onSave
         </div>
 
         {cls && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, fontSize: 13 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, fontSize: 13 }}>
             <div><div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700 }}>Teacher</div><strong>{cls.teacher_name || '-'}</strong></div>
             <div><div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700 }}>Day / Time</div><strong>{cls.day || '-'} {cls.class_time || ''}</strong></div>
             <div><div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700 }}>Enrolled</div><strong>{capacity.current}{capacity.max ? ` / ${capacity.max}` : ''}</strong></div>

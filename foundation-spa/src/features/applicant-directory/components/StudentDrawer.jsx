@@ -68,7 +68,7 @@ export default function StudentDrawer({ model, applicantId, onClose, canDecide, 
         </div>
       )}
       <Section title="Overview">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className="rso-form-grid">
           <Kv label="Fellowship" value={app.fellowship_code || app.fellowship || app.subgroup_id || '-'} />
           <Kv label="Group / Subgroup" value={`${displayGroupValue(app)} / ${displaySubgroupValue(app)}`} />
           <Kv label="Assigned Class" value={app.class_option_id || '-'} />
@@ -89,7 +89,7 @@ export default function StudentDrawer({ model, applicantId, onClose, canDecide, 
       </Section>
 
       <Section title="Attendance">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className="rso-form-grid">
           <Kv label="Attendance %" value={attendance.pct == null ? '-' : `${attendance.pct}%`} />
           <Kv label="Sessions Attended" value={`${attendance.attended}/${attendance.total}`} />
           <Kv label="Last Attendance" value={fmt(attendance.last)} />
