@@ -19,9 +19,11 @@ async function getConfig(): Promise<Record<string, number>> {
   const map: Record<string, number> = {};
   for (const row of data || []) map[row.key] = Number(row.value) || 0;
   return {
-    never_started_days:      map.never_started_days      ?? 7,
-    dropoff_days:            map.dropoff_days            ?? 14,
-    max_emails_per_scenario: map.max_emails_per_scenario ?? 2,
+    never_started_days:          map.never_started_days          ?? 7,
+    dropoff_days:                map.dropoff_days                ?? 14,
+    max_emails_per_scenario:     map.max_emails_per_scenario     ?? 2,
+    never_started_email_enabled: map.never_started_email_enabled ?? 1,
+    dropped_off_email_enabled:   map.dropped_off_email_enabled   ?? 1,
   };
 }
 
@@ -164,10 +166,15 @@ async function processNeverStarted(
       };
 
       if (prior === 0) {
-        // First email — never_started template
-        const traceId = await queueEmail(app.email, app.full_name || "", "engagement_never_started",
-          `We saved your spot at Foundation School — ${firstName}`, payload);
-        await insertLog(app.email, batchId, "never_started", "email_queued", "first outreach");
+        // First outreach — never_started template (email paused via student_engagement_config)
+        const emailEnabled = !!cfg.never_started_email_enabled;
+        let traceId = "";
+        if (emailEnabled) {
+          traceId = await queueEmail(app.email, app.full_name || "", "engagement_never_started",
+            `We saved your spot at Foundation School — ${firstName}`, payload);
+        }
+        await insertLog(app.email, batchId, "never_started", emailEnabled ? "email_queued" : "skipped",
+          emailEnabled ? "first outreach" : "email paused via student_engagement_config");
         await sb
           .from("students")
           .update({
@@ -179,8 +186,9 @@ async function processNeverStarted(
           .eq("email", app.email)
           .or("needs_attention_flag.is.null,needs_attention_flag.eq.false");
         await safeLogAudit(sb, "ENGAGEMENT_NEVER_STARTED_FLAGGED", "applicant", String(app.id),
-          { batch_id: batchId, email: app.email, trace_id: traceId });
-        emails++; flagged++;
+          { batch_id: batchId, email: app.email, trace_id: traceId, email_sent: emailEnabled });
+        if (emailEnabled) emails++;
+        flagged++;
       }
     }));
   }
@@ -249,9 +257,15 @@ async function processDroppedOff(
       };
 
       if (prior === 0) {
-        const traceId = await queueEmail(stu.email, stu.full_name || "", "engagement_dropped_off",
-          `We miss you at Foundation School — ${firstName}`, payload);
-        await insertLog(stu.email, batchId, "dropped_off", "email_queued");
+        // Email paused via student_engagement_config; flagging always proceeds
+        const emailEnabled = !!cfg.dropped_off_email_enabled;
+        let traceId = "";
+        if (emailEnabled) {
+          traceId = await queueEmail(stu.email, stu.full_name || "", "engagement_dropped_off",
+            `We miss you at Foundation School — ${firstName}`, payload);
+        }
+        await insertLog(stu.email, batchId, "dropped_off", emailEnabled ? "email_queued" : "skipped",
+          emailEnabled ? undefined : "email paused via student_engagement_config");
         await sb
           .from("students")
           .update({
@@ -263,8 +277,9 @@ async function processDroppedOff(
           .eq("email", stu.email)
           .eq("status", "Active");
         await safeLogAudit(sb, "ENGAGEMENT_DROPPED_OFF_FLAGGED", "student", stu.student_id,
-          { batch_id: batchId, days_since_last: daysSinceLast, trace_id: traceId });
-        emails++; flagged++;
+          { batch_id: batchId, days_since_last: daysSinceLast, trace_id: traceId, email_sent: emailEnabled });
+        if (emailEnabled) emails++;
+        flagged++;
       }
     }));
   }
@@ -310,16 +325,22 @@ async function processMoodleNoLogin(
       if (await hasLogEntry(row.email, batchId, "moodle_no_login")) return;
       if (await hasLogEntry(row.email, batchId, "never_started")) return; // avoid duplicate
 
+      // Shares the engagement_never_started template — same pause toggle applies
+      const emailEnabled = !!cfg.never_started_email_enabled;
       const firstName = String(row.full_name || "Student").split(/\s+/)[0];
-      const traceId = await queueEmail(row.email, row.full_name || "", "engagement_never_started",
-        `We saved your spot at Foundation School — ${firstName}`, {
-          first_name:  firstName,
-          full_name:   row.full_name,
-          class_time:  "your scheduled class time",
-          teacher_name: "your teacher",
-          moodle_url:  MOODLE_URL,
-        });
-      await insertLog(row.email, batchId, "moodle_no_login", "email_queued");
+      let traceId = "";
+      if (emailEnabled) {
+        traceId = await queueEmail(row.email, row.full_name || "", "engagement_never_started",
+          `We saved your spot at Foundation School — ${firstName}`, {
+            first_name:  firstName,
+            full_name:   row.full_name,
+            class_time:  "your scheduled class time",
+            teacher_name: "your teacher",
+            moodle_url:  MOODLE_URL,
+          });
+      }
+      await insertLog(row.email, batchId, "moodle_no_login", emailEnabled ? "email_queued" : "skipped",
+        emailEnabled ? undefined : "email paused via student_engagement_config");
       await sb
         .from("students")
         .update({
@@ -330,8 +351,9 @@ async function processMoodleNoLogin(
         .eq("email", row.email)
         .or("needs_attention_flag.is.null,needs_attention_flag.eq.false");
       await safeLogAudit(sb, "ENGAGEMENT_MOODLE_NO_LOGIN_FLAGGED", "applicant",
-        row.applicant_id ?? row.email, { batch_id: batchId, trace_id: traceId });
-      emails++; flagged++;
+        row.applicant_id ?? row.email, { batch_id: batchId, trace_id: traceId, email_sent: emailEnabled });
+      if (emailEnabled) emails++;
+      flagged++;
     }));
   }
 
