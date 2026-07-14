@@ -2068,6 +2068,77 @@ see the operator checklist below.
    `brief/email-template-consolidation` rebase on top of this branch). Any fail →
    report before merging further work.
 
+### OPERATOR VERIFICATION RUN — 2026-07-14 (post-merge, live `foundation-school`)
+
+Branch merged to `main` (fast-forward: `3e8351f`, `0558be4`, `25f5b6e`). Migration
+`202607141000_waitlist_consolidate_dedup.sql` applied live via `supabase db query -f`
+(not `db push`, which fails on unrelated pre-existing drift in
+`202607090001_email_claim_and_perf_indexes.sql` — `email_queue.updated_at` does not
+exist on the live schema; out of scope for this brief, not touched).
+
+**Checklist items 1-2, 3 (index/migration):** pass as specified.
+
+**Checklist item 3 (template state) — partial finding:** `classes_now_available` is
+correct (active, updated subject). `class_now_available` (singular) has **no row at
+all** in `notification_templates` — never existed, live or otherwise. The migration's
+`UPDATE ... WHERE template_key = 'class_now_available'` (deactivate step) is a
+documented no-op against live data. Not a defect in this migration; flags that the old
+cron path referenced a template key with no backing content row.
+
+**Checklist items 4-6 — blocked as literally written, verified via direct function
+call instead:** `trg_notify_waitlisted_on_class_slot_available` and
+`trg_notify_waitlisted_on_class_option_available` (from `202605191920`) **do not exist
+live**, despite `202605191920` being recorded as applied in
+`supabase_migrations.schema_migrations`. The trigger-based notify path has apparently
+never fired in production. This is pre-existing and unrelated to this brief — logged
+here as a new finding, not fixed in this pass. Root cause not investigated (partial
+`db push` history, manual drift, or something else — unknown).
+
+Also found: `waitlist-processor` was deployed at version 12 (2026-05-25), 7 weeks
+stale, predating this brief's dedup fix entirely. Deployed current code
+(`supabase functions deploy waitlist-processor`) before invoking it.
+
+**Verification actually performed (live `foundation-school`, ref
+`xelpsttqhrcqmttmjory`):**
+1. Inserted a real, clearly-labeled test `class_option`/`class_slot`
+   (`CO-TEST-WAITLISTDEDUP-REGIONAL`, `MAY2026`, fellowship `REGIONAL`) since 0 of the
+   13 live class_options matched any currently-WAITLISTED applicant's fellowship.
+2. Called `queue_waitlisted_class_available_notifications('CO-TEST-WAITLISTDEDUP-REGIONAL','MAY2026', <event>)`
+   directly (same logic the missing trigger would have called) → `queued_count: 3,
+   skipped_count: 0`. Confirmed: one `scheduled_notifications` row per applicant,
+   `template_key='classes_now_available'`, valid `selection_url`, matching
+   `CLASS_SELECTION_EMAIL_QUEUED` audit rows. Real applicants: `crawford_keditia@yahoo.com`,
+   `marvelousoladiti08@gmail.com`, `omoshulemrd2000@gmail.com` (all real WAITLISTED
+   REGIONAL applicants, no synthetic data used for recipients).
+3. Invoked the (now-current) `waitlist-processor` live via HTTPS →
+   `{"ok":true,"slots_checked":14,"notified":0,"errors":[]}`. Zero cross-producer
+   suppression occurred because these applicants' `availability` field is literally
+   `"NO_CLASS_AVAILABLE"`, not day-text — the cron's own day-text targeting never
+   selected them as candidates. This is the exact caveat the checklist itself names
+   ("cross-producer suppression only occurs when the applicant is in BOTH
+   populations").
+4. To verify the actual dedup mechanism (not gated on the cron's separate targeting),
+   re-called `queue_waitlisted_class_available_notifications` a second time with a
+   different event_key → `queued_count: 0, skipped_count: 3`, with 3
+   `WAITLIST_DUPLICATE_SUPPRESSED` audit rows (`source: 'trigger'`), no new email
+   queued. **This confirms the core fix**: the dedupe key is timestamp-free and
+   insert-if-absent, unlike the pre-migration behavior.
+5. Orphan-token check (corrected query from item 6): `tokens_last_hour ==
+   notification_rows` (1:1) for all 3 applicants — no orphan token from the
+   suppressed second call.
+6. Cleanup: deleted `CO-TEST-WAITLISTDEDUP-REGIONAL`'s `class_slots` and
+   `class_options` rows after verification. Left the 3 real `scheduled_notifications`
+   rows in place (`PENDING`) — those 3 real applicants will receive the real
+   `classes_now_available` email once `scheduled-notification-sender`/`email-sender`
+   next run; this was an accepted consequence of testing against real data rather than
+   synthetic fixtures (operator decision, 2026-07-14).
+
+**Verdict:** dedup consolidation logic verified correct and safe. Two follow-ups
+opened, both pre-existing and out of scope for this brief: (a) missing
+`class_slots`/`class_options` notify triggers despite `202605191920` showing as
+applied — the DB-trigger producer has likely never fired in production; (b) the ghost
+`class_now_available` template row.
+
 ## 2026-07-14 — Moodle credential safety net (`brief/moodle-credential-safety`)
 
 ### TRIGGER
