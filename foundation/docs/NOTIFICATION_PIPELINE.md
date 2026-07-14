@@ -3,7 +3,7 @@
 Authoritative reference for the Foundation School email notification pipeline.
 Keep this document up to date when pipeline functions change.
 
-Last updated: May 23, 2026
+Last updated: July 14, 2026
 
 ---
 
@@ -298,4 +298,120 @@ Implementation note (MVP safety hardening):
 | `email-retry` | Tombstoned (410) | May 23, 2026 | Merged into `retry-worker` — supports both `email_queue` and `scheduled_notifications` |
 | `notification-retry-helper` | Tombstoned (410) | May 23, 2026 | Merged into `retry-worker` — `scheduled_for` reset behavior preserved |
 
+---
+
+## Template Inventory
+
+Full audit of every row in `notification_templates` as of July 14, 2026 (43 rows). This is
+the only table `email-sender` reads from (`email-sender/index.ts` — canonical template source
+comment: "`notification_templates` only"); the separate `email_templates` table is dead code
+with zero readers anywhere in `supabase/functions/` or `foundation/`.
+
+Three producers (`campaign`, `report`, `announcement`) queue emails against template keys
+that have **no corresponding row** in `notification_templates` at all — they aren't in the 43
+rows below because there's no row to list. See Known Issues.
+
+| Template Key | Status | Producer(s) | Notes |
+|---|---|---|---|
+| `foundation_welcome` | live | `_shared/lib/assign-applicant.ts:176`, called from `registration-processor` (immediate ASSIGNED) and `admin-api` manual assign | `phase2-processor`'s call site is likely dead (its own registration path returns 410) |
+| `no_class_available` | live | `registration-processor/index.ts:495,509` | WAITLISTED + no class option available |
+| `no_suitable_times` | live | `registration-processor/index.ts:494,509` | PENDING + NO_MATCHING_TIME |
+| `class_assigned` | live | `registration-processor/index.ts:620` → `notification-batch-processor` (daily 9am cron pass-through) | |
+| `duplicate_registration` | live | `registration-processor/index.ts:493,509` | |
+| `class_reminder_7_day` | unwired-reserved | none | reserved; see migration-log.md 2026-07-14 entry (extends prior reserved-templates entry) |
+| `class_reminder_1_day` | unwired-reserved | none | reserved; see migration-log.md 2026-07-14 entry |
+| `class_reminder_2_hour` | unwired-reserved | none | reserved; see migration-log.md 2026-07-14 entry |
+| `waitlist_confirmation` | live | `registration-processor/index.ts:497,509` | WAITLISTED fallback, no other template matched |
+| `registration_under_review` | live | `registration-processor/index.ts:496,509` | duplicate-flagged (name) — see `registration_under_review_checkin` |
+| `engagement_never_started` | live, duplicate-flagged | `student-engagement-monitor/index.ts:168,314` (daily cron) **and** manual "Send Check-in" button (`at-risk-students.html`, `atRisk.js`) | dual producers, no shared dedupe — see Known Issues |
+| `engagement_dropped_off` | live, duplicate-flagged | `student-engagement-monitor/index.ts:252` (daily cron) **and** the same manual button | same dual-producer gap |
+| `engagement_final_notice` | unwired-reserved | none | reserved; see migration-log.md 2026-07-14 "Reserved templates explicitly unwired" |
+| `missed_class_checkin` | live, trigger unconfirmed | `missed-class-detector/index.ts:277` | no cron/schedule for this function found anywhere in the repo despite docs claiming a daily cron exists — see Known Issues |
+| `registration_under_review_checkin` | live | `review-checkin/index.ts:102` (daily cron) | duplicate-flagged (name) — see `registration_under_review` |
+| `teacher_suspended` | live, legacy-only | `foundation/js/teacher-management.js:433` | SPA equivalent is stubbed (no-op) — see Known Issues |
+| `teacher_reactivated` | live, legacy-only | `teacher-management.js:441` | same SPA gap |
+| `class_reassignment_notice` | live | `applicant-directory.js:1313` (legacy) + `mutations.js:93` (SPA) | expected legacy/SPA pair, not a bug |
+| `teacher_approved` | live, legacy-only | `teacher-management.js:459` | same SPA gap |
+| `teacher_rejected` | live, legacy-only | `teacher-management.js:467` | same SPA gap |
+| `batch_rollover_notice` | live | `batch-management.html:407` (legacy) + `batchManagement.js:108` (SPA) | expected pair |
+| `waitlist_promoted` | unwired-reserved, contested | none | reserved per 2026-07-14 log entry; `brief/email-template-consolidation` (unmerged) deactivates it as "orphaned" — unresolved conflict, see Known Issues |
+| `class_time_changed` | live | `class-editor.html:517` (legacy) + `classEditor.js:109` (SPA) | expected pair |
+| `class_slot_cancelled` | unwired-reserved | none | reserved; see migration-log.md 2026-07-14 "Reserved templates explicitly unwired" |
+| `classes_now_available` | live, duplicate-flagged | DB trigger `queue_waitlisted_class_available_notifications()` (`202605191920...sql`) | duplicate pair with `class_now_available` — pending merge of `brief/waitlist-dedup-consolidation` |
+| `class_assigned_confirmation` | live | `class-selection/index.ts:173` | student self-selects a class via token link |
+| `direct_message` | live | `messaging-api/index.ts:413` (in-app messaging) + `direct-email-modal.js:212` (admin ad-hoc broadcast) | one template shared by two unrelated features — see Known Issues |
+| `moodle_credentials` | live | `moodle-sync/index.ts:571,602` | fires after Moodle account is created/enrolled |
+| `makeup_reminder` | unwired-reserved | none | no producer found anywhere in the repo; not previously documented as reserved — flagging here for the first time |
+| `moodle_login_reminder` | live | `submit-teacher-attendance.ts:336` → `notification-batch-processor` (`moodle_login_check` handling, daily cron) | |
+| `class_now_available` | live, duplicate-flagged | `waitlist-processor/index.ts:77` (15-min cron) | duplicate pair with `classes_now_available` — pending merge of `brief/waitlist-dedup-consolidation` |
+| `WELCOME` | dead (deactivated) | none | empty body, dupe of `foundation_welcome` — deactivated in `202607142000` |
+| `CLASS_ASSIGNED` | dead (deactivated) | none | empty body, dupe of `class_assigned` — deactivated in `202607142000` |
+| `TEACHER_ROSTER_DAILY` | dead (deactivated) | none | empty body — deactivated in `202607142000` |
+| `TEACHER_ROSTER_WEEKLY` | dead (deactivated) | none | empty body — deactivated in `202607142000` |
+| `WEEK3_FOLLOWUP` | dead (deactivated) | none | empty body — deactivated in `202607142000` |
+| `WEEK6_FOLLOWUP` | dead (deactivated) | none | empty body — deactivated in `202607142000` |
+| `ATTENDANCE_FLAG_CLASS1` | dead (deactivated) | none | empty body — deactivated in `202607142000` |
+| `ATTENDANCE_FLAG_REPEAT` | dead (deactivated) | none | empty body — deactivated in `202607142000` |
+| `GRADUATION_READY` | dead (deactivated) | none | empty body — deactivated in `202607142000` |
+| `TRANSITION_OVERDUE` | dead (deactivated) | none | empty body — deactivated in `202607142000` |
+| `attendance_reminder` | live | `attendance-reminder/index.ts:151` (daily cron) | promoted from `email_templates` by `202605221030` but is real/live — not a dead stub |
+| `attendance_escalation` | live | `attendance-reminder/index.ts:184` (same daily cron) | same — real/live, not a dead stub |
+
+### Known issues — not fixed in this pass
+
+These were found during the same audit that produced the table above. None are touched by
+migration `202607142000` — flagging them here so they aren't lost, not proposing fixes.
+
+- **`campaign` / `report` / `announcement` have no `notification_templates` row at all.**
+  `email-sender`'s `resolveContent` throws `"No template found for key: ..."` for any of
+  these — every queued send (fellowship-wide campaigns, weekly/monthly regional reports,
+  batch-wide announcements) currently lands `Failed`. Live producers:
+  `foundation/js/email-campaigns.js` + SPA equivalent (`campaign`), `report-generator/index.ts`
+  (`report`), `batch-management.html` + SPA (`announcement`).
+- **SPA teacher-status emails silently no-op.**
+  `foundation-spa/src/features/teacher-management/lib/teacherManagement.js:80-83` builds the
+  template map but never inserts into `email_queue` — comment reads *"Email would be queued
+  here in production."* Teacher suspend/reactivate/approve/reject emails only send when the
+  action is taken from the legacy page, never from the SPA.
+- **`notification-dispatcher` / `notification_rules` is entirely dead machinery.** Every real
+  send in this codebase is a direct `email_queue`/`scheduled_notifications` insert from
+  application code. No live producer anywhere reaches the rules/dispatcher path — this
+  corrects an earlier audit (2026-07-13 Email Pipeline Audit) that believed one producer used
+  it; that producer (the waitlist trigger) actually inserts directly and just happens to share
+  an `event_type` name with an orphaned rule row.
+- **`class-selection`'s `notify_waitlisted` action is unreachable dead code** (produces
+  `classes_now_available`, but nothing anywhere calls it — the real producer for that key is
+  the DB trigger).
+- **`missed-class-detector`'s cron trigger can't be confirmed.** Docs (`README.md`,
+  `SYSTEM_OVERVIEW.md`, `NOTIFICATION_PIPELINE.md` itself) all claim a daily `15 2 * * *`
+  cron, but no `pg_cron` migration or `config.toml` schedule line exists anywhere in the repo
+  for this function, unlike every sibling cron function. Either it relies on an
+  out-of-repo Dashboard cron, or `missed_class_checkin` doesn't actually send today.
+- **`phase2-processor`'s call into the shared assignment/welcome-email pipeline is likely
+  dead** — its own registration path is hard-410'd, and no DB webhook wiring it to `applicants`
+  INSERT exists in the repo despite docs claiming one does.
+- **`classes_now_available` vs `class_now_available`** — confirmed duplicate pair (two
+  templates, two producers, same "a class opened up for you" purpose). Already being fixed on
+  the unmerged `brief/waitlist-dedup-consolidation` branch; not touched here.
+- **`registration_under_review` vs `registration_under_review_checkin`** — different real
+  purposes (initial review notice vs. a days-later follow-up), but similar enough names to be
+  easy to mix up when wiring a new event trigger.
+- **`engagement_never_started` / `engagement_dropped_off` have two uncoordinated producers**
+  each: a daily cron and a manual "Send Check-in" button on the At-Risk Students page. The
+  cron path checks `student_engagement_log` before queuing; the manual button does not appear
+  to check the same log — same duplicate-risk shape as the waitlist bug already fixed
+  elsewhere, not yet addressed here.
+- **`direct_message` is shared by two unrelated features** — in-app peer messaging and an
+  admin's ad-hoc broadcast modal. Not confirmed wrong, worth a copy review to make sure the
+  template reads sensibly for both.
+- **`waitlist_promoted` has conflicting fates on two unmerged branches.** The existing
+  2026-07-14 "Reserved templates explicitly unwired" log entry keeps it active/reserved;
+  `brief/email-template-consolidation` deactivates it as orphaned. Both are correct that it
+  has no producer — they disagree on what to do about it. Whoever merges either branch first
+  should resolve this.
+- **`makeup_reminder` has zero producers anywhere** and wasn't previously documented as
+  reserved (unlike its siblings `class_slot_cancelled`, `waitlist_promoted`,
+  `engagement_final_notice`, and the three `class_reminder_*` keys). Flagging it here for the
+  first time; not deactivated in this pass since it's real content, not an empty stub, and may
+  simply be awaiting a producer rather than being dead.
 
