@@ -16,6 +16,32 @@ CLASS_ASSIGNED
 CLASS_FULL
 NO_MATCHING_TIME
 MANUAL_REVIEW_REQUIRED
+CLASS_AVAILABLE
+
+CLASS_AVAILABLE means: a NO_MATCHING_TIME applicant has been queued a
+"class now available" notification (waitlist-processor cron flips the status
+so the 15-minute cron does not re-notify). Allowed by the check constraint
+since 202605250002; documented 2026-07-14 as part of the waitlist dedup
+consolidation.
+
+Dedupe key for the consolidated "class now available" notification
+(scheduled_notifications.dedupe_key), shared by BOTH producers:
+
+    class_available:{applicant_id}:{batch_id}:{class_option_id}
+
+* Producers: DB trigger function queue_waitlisted_class_available_notifications
+  (recreated in migration 202607141000) and the waitlist-processor cron
+  (supabase/functions/waitlist-processor/dedupe.ts). The format MUST be
+  byte-identical in both — parity-tested in
+  supabase/functions/waitlist-processor/waitlist-dedup.test.ts.
+* Timestamp-free and idempotent: one notification per
+  (applicant, batch, class_option), ever, regardless of how many availability
+  events fire.
+* Insert-if-absent only: producers must never upsert-overwrite an existing
+  row (a SENT row flipped back to PENDING re-sends). Suppressed duplicates are
+  audited as WAITLIST_DUPLICATE_SUPPRESSED.
+* Canonical template for this notification: 'classes_now_available'
+  (notification_templates). 'class_now_available' retired/inactive 202607141000.
 
 ---
 

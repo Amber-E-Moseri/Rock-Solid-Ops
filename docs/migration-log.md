@@ -1891,3 +1891,179 @@ report."
 wanted to reconcile several unrelated older migrations, one of which fails against current
 schema — out of scope for this brief and not touched). Migration file is staged on
 `brief/fix-teacher-attention-flags` pending merge confirmation.
+
+## 2026-07-14 — Waitlist "class available" dedup consolidation (`brief/waitlist-dedup-consolidation`)
+
+### What was wrong (duplication mechanism)
+
+Two independent producers notified waitlisted applicants when a class opened, with
+**two different templates** and **two different dedupe-key namespaces**, so overlapping
+populations got duplicate, inconsistent emails:
+
+1. **DB trigger path** — `queue_waitlisted_class_available_notifications()`
+   (202605191920, fired from `class_slots` / `class_options` triggers). Template
+   `classes_now_available`. Its dedupe key embedded a timestamp-derived `event_key`
+   (`slot:<id>:<updated_at>` / `class_option:<id>:<updated_at>`), so every firing minted a
+   **fresh key** — the dedupe never held across events. Targeting:
+   `registration_status='WAITLISTED'` + `class_option_id IS NULL` + fellowship intersect.
+2. **Cron path** — `waitlist-processor` edge function, every 15 min (202605180002).
+   Template `class_now_available` (singular). Timestamp-free key but in its own
+   namespace, and written with a **blind upsert on dedupe_key** that reset the existing
+   row to `PENDING` — i.e. a SENT row could be resurrected and re-sent; the only real
+   guard was the `availability_status` flip to CLASS_AVAILABLE. Targeting:
+   `availability_status='NO_MATCHING_TIME'` + fellowship + class-day text found in the
+   applicant's availability string.
+
+**Broken cron CTA finding:** the cron template's button ("Register / Confirm your spot")
+pointed at a bare Moodle login URL. Recipients at this stage have **no assigned class and
+no Moodle account** (Moodle provisioning happens after ASSIGNED via enrollment sync), so
+that email was a dead end — nothing the recipient clicked could actually get them a seat.
+The trigger path's selection-token CTA (`class_selection_finalize()` assigns the class,
+increments enrollment, queues Moodle sync) is the only functional call-to-action.
+
+### Why Option C
+
+Options considered at the Phase A gate: (A) retire one producer — loses either the
+event-driven immediacy or the day/time-availability targeting; (B) shared dedupe key
+only — still two templates, still a dead-end CTA on cron sends; **(C) shared
+timestamp-free dedupe key + one canonical template + cron adopts the selection-token
+CTA** — keeps both producers' targeting strengths, fixes the dead-end CTA, and makes the
+dedupe actually dedupe. C was approved.
+
+### What was consolidated (migration `202607141000_waitlist_consolidate_dedup.sql` + `waitlist-processor`)
+
+- **Canonical dedupe key for any future producer of this notification:**
+  `class_available:{applicant_id}:{batch_id}:{class_option_id}`
+  Timestamp-free, byte-identical in SQL (`format('class_available:%s:%s:%s', ...)`) and
+  TypeScript (`buildClassAvailableDedupeKey()` in
+  `supabase/functions/waitlist-processor/dedupe.ts`). Parity-tested in
+  `waitlist-dedup.test.ts` (5 tests, all passing under deno 2.9.2). Documented in
+  `ai/statuses.md` under the CLASS_AVAILABLE entry.
+- **Upsert → insert-if-absent (SENT-resurrection rationale):** the cron's old
+  `upsert(..., { onConflict: 'dedupe_key' })` overwrote whatever row held the key,
+  including `status` — a SENT row went back to PENDING and re-sent. Both producers now
+  check-then-insert (cron additionally uses `ignoreDuplicates: true` on the insert to
+  close the pre-check race; a lost race orphans one 7-day token, harmless). An existing
+  row is **never modified**, whatever its status. Suppressed duplicates are audited:
+  `audit_logs` action `WAITLIST_DUPLICATE_SUPPRESSED`, entity applicant, details incl.
+  `dedupe_key` and `source` (`trigger` | `cron`).
+- **Canonical template:** `notification_templates.classes_now_available` — gate-approved
+  merged body (202605201000 purple/logo/footer base + class-details block +
+  `{{expires_days}}` + CTA "Choose My Class Time" → `{{selection_url}}`). Merge fields:
+  `first_name, class_day, class_time, teacher_name, fellowship_code, selection_url,
+  expires_days` — every one supplied by both producers, so no silent-empty `{{tags}}`
+  (email-sender substitutes unknown tags with empty string). No `{{moodle_url}}` /
+  `{{class_label}}`. The body update is an isolated, clearly-labeled section (2) of the
+  migration, strippable on its own if the operator reverses the body decision.
+- **`class_now_available` retired:** set `active = false` (row kept). Because
+  email-sender loads only active templates and hard-fails queue rows whose template is
+  missing, the migration first **re-points in-flight rows**: PENDING
+  `scheduled_notifications` rows get a freshly minted selection token,
+  `selection_url`/`expires_days` payload keys, the canonical template key and the
+  canonical dedupe key (or are explicitly FAILED as
+  `DEDUP_CONSOLIDATION_202607141000: superseded…` when a canonical-key row already
+  exists); Pending `email_queue` rows are recovered via (email, batch_id) applicant
+  lookup, or explicitly Failed when unmappable. Expected population of both blocks: ~0
+  (rows drain in minutes); the blocks are defensive.
+- **Cron behavior preserved:** targeting (NO_MATCHING_TIME + fellowship + day-text) and
+  the `availability_status` → CLASS_AVAILABLE flip are unchanged (the flip also fires on
+  a suppressed duplicate — behavioral parity with the old upsert path, and it stops the
+  cron re-auditing the same applicant every 15 minutes). Request/response shape of the
+  edge function is unchanged.
+- **Trigger function replaced via CREATE OR REPLACE in the NEW migration only** —
+  202605191920 was not edited. Signature kept (`p_event_key` still accepted; now goes to
+  `notification_events` payload and audit metadata only, not the key).
+
+### Discrepancy noted for the record
+
+The operator's Phase B brief text referred to the template table as `email_templates`.
+Per the Phase A audit (2026-07-13 email pipeline audit + this brief's verification),
+`email_templates` is dead: **`notification_templates` is the canonical and only table
+email-sender reads**. This brief used `notification_templates` throughout.
+
+### Third producer: manual-only decision
+
+`class-selection` edge function, action `notify_waitlisted`
+(`supabase/functions/class-selection/index.ts`) also queues `classes_now_available` —
+directly into `email_queue`, with **no dedupe key**. Gate decision: keep as a
+**manual-only operator escape hatch** (it can force a re-send the canonical key would
+suppress). A code comment at the site records this and its payload gaps (no
+class_day/class_time/teacher_name → those render empty in the class-details block —
+acceptable for a manual tool). It must not be wired into any automated flow without
+adopting the shared dedupe key.
+
+### Tests
+
+`deno test supabase/functions/waitlist-processor/waitlist-dedup.test.ts` → 5 passed,
+0 failed (deno 2.9.2). `deno check` on the modified `waitlist-processor/index.ts` shows
+the same 8 pre-existing errors as the unmodified baseline (all in `_shared/http.ts`
+typing of `withTimeout`/`jsonResponse` call sites) — zero new errors introduced.
+A live integration test (slot flip + cron invoke) is not possible in this environment;
+see the operator checklist below.
+
+### OPERATOR VERIFICATION CHECKLIST (run before any merge/deploy decision)
+
+1. Apply migrations: `supabase db push --include-all` (or apply
+   `202607141000_waitlist_consolidate_dedup.sql` via the SQL editor). Confirm no errors.
+2. Verify the dedupe index exists:
+   ```sql
+   SELECT indexname, indexdef FROM pg_indexes
+   WHERE tablename = 'scheduled_notifications'
+     AND indexname = 'scheduled_notifications_dedupe_key';
+   ```
+   Expect one row, UNIQUE, partial `WHERE (dedupe_key IS NOT NULL)`.
+3. Verify template state:
+   ```sql
+   SELECT template_key, active, subject, updated_at FROM public.notification_templates
+   WHERE template_key IN ('classes_now_available', 'class_now_available');
+   ```
+   Expect `classes_now_available` active=true with the new subject
+   ("Good news — a Foundation School class is now available for you!") and
+   `class_now_available` active=false.
+4. Trigger-path check: flip a test class option/slot to available (e.g. set an inactive
+   `class_slots` row for an active batch to `status='Active'`, with at least one
+   WAITLISTED, fellowship-matching applicant with `class_option_id IS NULL`). Then:
+   ```sql
+   SELECT id, template_key, dedupe_key, status, payload->>'selection_url' AS selection_url
+   FROM public.scheduled_notifications
+   WHERE dedupe_key LIKE 'class_available:%'
+   ORDER BY scheduled_for DESC LIMIT 10;
+   ```
+   Expect exactly ONE row per (applicant, batch, class_option) with
+   `template_key='classes_now_available'`, a non-null selection_url, and a matching
+   `audit_logs` row (`action='CLASS_SELECTION_EMAIL_QUEUED'`).
+5. Cron-path dedupe check: within ~5 minutes, run
+   `supabase functions invoke waitlist-processor` (or wait for the 15-min cron). Then
+   re-run the query from step 4 — expect NO second row for the same
+   (applicant, batch, class_option), and:
+   ```sql
+   SELECT action, entity_id, details FROM public.audit_logs
+   WHERE action = 'WAITLIST_DUPLICATE_SUPPRESSED'
+   ORDER BY created_at DESC LIMIT 10;
+   ```
+   Expect a row with `details->>'source' = 'cron'` (or 'trigger' if the trigger re-fired)
+   and the same dedupe_key. NOTE: this cross-producer suppression only occurs when the
+   applicant is in BOTH populations (WAITLISTED and NO_MATCHING_TIME with a day-text
+   match); pick or stage the test applicant accordingly.
+6. Orphan-token check — CORRECTED QUERY. The operator draft referenced
+   `class_selection_tokens.scheduled_notification_id`, which does not exist (the table's
+   columns are id/token/applicant_id/batch_id/fellowship_code/expires_at/used_at/
+   used_class_option_id/created_at; see 202605180005). Correct equivalent — recent
+   tokens per (applicant, batch) vs. notification rows for the same tuple:
+   ```sql
+   SELECT t.applicant_id, t.batch_id, COUNT(*) AS tokens_last_hour,
+          (SELECT COUNT(*) FROM public.scheduled_notifications sn
+           WHERE sn.applicant_id = t.applicant_id
+             AND sn.dedupe_key LIKE 'class_available:' || t.applicant_id || ':' || t.batch_id || ':%')
+          AS notification_rows
+   FROM public.class_selection_tokens t
+   WHERE t.created_at > now() - interval '1 hour'
+   GROUP BY t.applicant_id, t.batch_id
+   ORDER BY tokens_last_hour DESC;
+   ```
+   Expect tokens_last_hour ≈ notification_rows for each tuple (a +1 skew is possible
+   only from a concurrent-race orphan, which should be rare to nonexistent). Re-running
+   the cron repeatedly must NOT grow tokens_last_hour for suppressed applicants.
+7. All pass → safe to proceed (operator sequences the
+   `brief/email-template-consolidation` rebase on top of this branch). Any fail →
+   report before merging further work.

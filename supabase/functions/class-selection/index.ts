@@ -212,6 +212,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    // MANUAL-ONLY OPERATOR ESCAPE HATCH (2026-07-14 consolidation gate
+    // decision â€” see docs/migration-log.md, waitlist dedup consolidation).
+    // This third producer of 'classes_now_available' deliberately BYPASSES the
+    // scheduled_notifications dedupe (it writes straight to email_queue with
+    // no dedupe key), so an operator can force a re-send that the canonical
+    // class_available:{applicant_id}:{batch_id}:{class_option_id} key would
+    // suppress. Known payload gaps, acceptable for a manual tool: it does not
+    // supply class_day / class_time / teacher_name, so those render as empty
+    // strings in the canonical template's class-details block (email-sender
+    // substitutes missing {{tags}} with ""). Do not wire this into any
+    // automated flow without adding the shared dedupe key first.
     if (action === "notify_waitlisted") {
       const authHeader = String(req.headers.get("Authorization") || "");
       const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
@@ -258,7 +269,7 @@ Deno.serve(async (req) => {
           recipient_email: ap.email,
           recipient_name: ap.full_name,
           template_key: "classes_now_available",
-          subject: "Good news — Foundation School classes are now available for you!",
+          subject: "Good news ï¿½ Foundation School classes are now available for you!",
           status: "Pending",
           payload: {
             first_name: firstName(String(ap.full_name || "Student")),

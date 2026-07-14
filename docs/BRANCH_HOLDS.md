@@ -4,6 +4,25 @@ Durable branch-level merge holds that must be visible without reading the full m
 
 ## Active Holds
 
+### `brief/waitlist-dedup-consolidation`
+
+Status: work complete, deliberately NOT merged (2026-07-14, per operator's Phase B brief).
+
+This brief lands on its branch and stops. Two explicit gates before merge:
+1. The operator must run the verification checklist in the migration-log entry
+   "2026-07-14 — Waitlist 'class available' dedup consolidation" (db push, dedupe index,
+   template state, trigger-path single-row check, cron-path suppression check,
+   orphan-token check).
+2. The operator sequences `brief/email-template-consolidation`, which is to be REBASED ON
+   TOP of this branch afterward. Do not merge this branch out of order and do not touch
+   `brief/email-template-consolidation` from other sessions.
+
+One flagged item awaiting possible operator override: the operator brief contained a line
+"no changes to the template body," but the earlier explicit gate approval of the merged
+canonical body supersedes it (main session flagged the conflict to the operator). The body
+update is isolated in section 2 of `202607141000_waitlist_consolidate_dedup.sql`,
+strippable on its own if the operator reverses.
+
 ### `brief/moodle-credential-safety`
 
 Status: SQL-query hold resolved. Branch still not ready to merge: remaining open gate is
