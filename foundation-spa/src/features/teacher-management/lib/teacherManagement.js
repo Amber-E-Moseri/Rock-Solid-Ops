@@ -132,6 +132,18 @@ export async function unlinkTeacherAuth(teacherId, actorEmail, reason) {
   if (data?.ok === false) throw new Error(data.message || 'Unlink failed');
 }
 
+export const GROUP_OPTIONS = ['CE', 'CS', 'WS'];
+export const SUBGROUP_OPTIONS = ['CESGA', 'CESGB', 'CSGA', 'CSGB', 'WSGA', 'WSGB'];
+
+export async function fetchFellowshipOptions() {
+  const { data, error } = await supabase.from('fellowship_map')
+    .select('fellowship_code, campus_name, group_id, subgroup_id')
+    .eq('active', true)
+    .order('fellowship_code');
+  if (error) throw error;
+  return data ?? [];
+}
+
 export function fmtDate(ts) {
   if (!ts) return '—';
   try { return new Date(ts).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' }); }
