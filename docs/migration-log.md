@@ -2255,3 +2255,73 @@ against actual Moodle behavior. Everything else on this branch (nav link, RPC bu
 threshold) is UI/RPC-only and lower risk, but is being held together with the core fix
 per the user's standing instruction not to merge this branch until the Moodle question is
 resolved.
+
+---
+
+## 2026-07-14 — Real-Moodle verification: Phase A findings (still no code changes)
+
+Brief: find real Moodle verification for the warnings-rejection fix (`warningRejection()` in
+`supabase/functions/moodle-sync/index.ts`) before merge, or determine that's not possible and
+recommend a path.
+
+**No non-production Moodle instance exists anywhere in this repo.** Searched all migrations,
+edge functions, and docs for any staging/sandbox/test-instance reference — the only Moodle
+instance mentioned anywhere is the single production instance (Hostinger-hosted, credentials
+in Supabase secrets `MOODLE_URL`/`MOODLE_TOKEN`, documented in
+`foundation/docs/moodle-test.md`). There is one hardcoded production URL constant
+(`https://rocksolid.lwcanada.org`) used only for building login links in outbound email, not
+for API calls.
+
+**This session has no path to any Moodle instance, staging or production.** No network access
+to Supabase secrets or any live Moodle endpoint from this environment — the same limitation
+every prior audit in this repo has hit. Even with credentials, deliberately triggering a real
+password-policy rejection against the production instance is a live-system action on a shared
+resource that needs the operator's own hands on it, not something to attempt unilaterally.
+
+**What was attempted instead: independently corroborate the fix's assumed response shape
+against Moodle's own public source, without touching production.** `warningRejection()` and
+its test fixture (`moodle-sync.test.ts:18-29`) assume Moodle returns a rejected password write
+as HTTP 200 with a `warnings: [{ item, itemid, warningcode, message }]` array and no top-level
+`exception` — the test fixture's comment calls this the "real-world shape" but that claim had
+never itself been checked against anything, which is exactly what this gate is about. Web
+search corroborates the *structure*: Moodle's `user/externallib.php update_users()` builds
+warning entries with exactly those four keys (`item`, `itemid`, `warningcode`, `message`),
+with `warningcode` taken from the caught validation exception's error code — this matches
+`warningRejection()`'s parser field-for-field. Could not confirm the exact literal warning
+code string (`passwordpolicynocharacters`) at the source-line level — GitHub raw/API and two
+independent PHP source mirrors (Fossies, phpcrossref) all refused this session's fetch tool
+(401/403/404), a tooling limitation, not a "the claim is wrong" signal.
+
+**Both call sites the fix protects, for the record:** `findOrCreateMoodleUser()` in
+`moodle-sync/index.ts` passes `failOnWarnings: true` on both `core_user_create_users` (new
+student) and `core_user_update_users` (password reset on an existing student, lines 200-203) —
+so a live check would need to cover only one of these two, since they share the exact same
+`callMoodle(..., { failOnWarnings: true })` path and the same `warningRejection()` parser.
+
+**Recommended path, since this is not a flat "impossible" — it's "only the operator can do
+this":**
+1. **Operator-run live check (closes the gate with real evidence).** Using the existing
+   pattern in `foundation/docs/moodle-test.md` Check 5 (disposable `probe_test_do_not_use`
+   account, deleted immediately after): create that probe user via
+   `core_user_create_users` with a password that violates the site's password policy (e.g.
+   too short, or missing a required character class per whatever policy the live site
+   enforces), and confirm the response comes back HTTP 200 with a `warnings` array rather than
+   a top-level `exception`. That single observed response is sufficient to confirm or refute
+   the shape the fix depends on — it does not require running the edge function itself, just
+   the raw curl call Check 5 already documents, with a deliberately bad password. Delete the
+   probe account afterward per Check 5's existing warning.
+2. **Accept current evidence as sufficient.** The parsing logic itself is fully covered by
+   unit tests (`moodle-sync.test.ts`) against the assumed shape, and that shape is now
+   partially corroborated against Moodle's own source (structure confirmed, exact string not
+   independently re-derived). Combined with the already-resolved incident classification (this
+   branch's earlier SQL-query gate confirmed the real-world impact was one isolated student,
+   `taquangminh081`, not a systemic pattern), this may be judged sufficient without a live
+   production probe.
+3. A local mock endpoint (the brief's other suggested fallback) was considered and rejected as
+   low-value here: it would only re-test the code against a shape I assumed myself, which is
+   what the existing unit test already does. It doesn't close the actual open question (does
+   production Moodle really emit this shape today), so building one wouldn't move the gate.
+
+**Status: gate still open.** This is Phase A only, per the brief's explicit stop-and-report
+instruction — no code changed, no live check run. Waiting on the operator to choose between
+path 1 (run the live probe) and path 2 (accept current evidence and close the gate).
