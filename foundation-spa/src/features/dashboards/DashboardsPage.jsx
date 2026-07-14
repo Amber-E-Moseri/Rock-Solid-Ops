@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, Download } from 'lucide-react';
 import {
@@ -16,6 +17,7 @@ export default function DashboardsPage() {
   const { profile } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const [batchId, setBatchId] = useState(null);
   const [retrying, setRetrying] = useState(false);
@@ -45,9 +47,9 @@ export default function DashboardsPage() {
 
   if (isLoading) {
     return (
-      <div style={{ display: 'grid', gap: 16 }}>
+      <div className="rso-stack">
         <Skeleton style={{ height: 40 }} />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
           {Array.from({ length: 7 }).map((_, i) => <Skeleton key={i} style={{ height: 90, borderRadius: 12 }} />)}
         </div>
         <Skeleton style={{ height: 200 }} />
@@ -64,7 +66,7 @@ export default function DashboardsPage() {
   const moodle = d?.moodleSync;
 
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
+    <div className="rso-stack">
       {/* Header */}
       <PageHeader
         title="Operational Dashboard"
@@ -103,16 +105,13 @@ export default function DashboardsPage() {
       {stale?.count > 0 && (
         <div className="rso-banner rso-banner-warning" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <span><strong>{stale.count} registration(s)</strong> have been in REVIEW status for over 48 hours.</span>
-          <Button size="sm" variant="secondary" onClick={() => window.location.href = '/staff/applicant-directory'}>View Applicants</Button>
+          <Button size="sm" variant="secondary" onClick={() => navigate('/staff/applicant-directory')}>View Applicants</Button>
         </div>
       )}
 
       {/* Batch switcher pills */}
       {batches?.length > 0 && (
-        <div style={{
-          display: 'flex', flexWrap: 'wrap', gap: 4, background: 'var(--surface-2)',
-          border: '1px solid var(--border)', borderRadius: 14, padding: 4,
-        }}>
+        <div className="rso-pill-row">
           <BatchPill active={!batchId} onClick={() => setBatchId(null)} label="All Batches" meta="" />
           {batches.map((b) => (
             <BatchPill
@@ -140,7 +139,7 @@ export default function DashboardsPage() {
       {/* Duplicate summary */}
       {d?.duplicates && (
         <Card>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, alignItems: 'center' }}>
+          <div className="rso-media-row">
             <div>
               <div style={{ fontSize: 14, fontWeight: 800 }}>Duplicate Registrations</div>
               <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--danger)', lineHeight: 1.1, marginTop: 4 }}>
@@ -152,7 +151,7 @@ export default function DashboardsPage() {
                   : 'No unresolved duplicate groups in your current scope.'}
               </div>
             </div>
-            <Button variant="secondary" onClick={() => window.location.href = '/staff/applicant-directory?duplicate=unresolved_only'}>
+            <Button variant="secondary" onClick={() => navigate('/staff/applicant-directory?duplicate=unresolved_only')}>
               Open Applicant Directory
             </Button>
           </div>
@@ -241,9 +240,9 @@ export default function DashboardsPage() {
         <Card>
           <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: 'var(--text)' }}>Quick Actions</div>
           <div style={{ display: 'grid', gap: 8 }}>
-            <Button size="sm" variant="secondary" onClick={() => window.location.href = '/staff/teacher-schedule'}>Approve Teacher Slots</Button>
+            <Button size="sm" variant="secondary" onClick={() => navigate('/staff/teacher-schedule')}>Approve Teacher Slots</Button>
             <Button size="sm" variant="secondary" onClick={handleRetryMoodle} disabled={retrying}>Retry all failed Moodle syncs</Button>
-            <Button size="sm" variant="secondary" onClick={() => window.location.href = '/staff/audit-log'}>View audit log</Button>
+            <Button size="sm" variant="secondary" onClick={() => navigate('/staff/audit-log')}>View audit log</Button>
             <Button size="sm" variant="secondary" onClick={() => d?.capacity && exportCapacityCsv(d.capacity)}>
               <Download size={14} style={{ marginRight: 4 }} />
               Export student list (CSV)
@@ -318,7 +317,7 @@ export default function DashboardsPage() {
 
       {/* Escalation + activity row */}
       {!isRS && (
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
+        <div className="rso-split">
           <Card>
             <SectionHeader title="Escalation Tasks" />
             {d?.escalation?.length > 0 ? (
@@ -461,14 +460,7 @@ function BatchPill({ active, onClick, label, meta }) {
     <button
       type="button"
       onClick={onClick}
-      style={{
-        border: 'none',
-        background: active ? 'var(--surface)' : 'transparent',
-        boxShadow: active ? 'var(--sh-xs)' : 'none',
-        borderRadius: 10, padding: '8px 14px', cursor: 'pointer',
-        textAlign: 'left', flex: 1, minWidth: 160,
-        transition: 'background .15s, box-shadow .15s',
-      }}
+      className={`rso-pill${active ? ' active' : ''}`}
     >
       <div style={{ fontSize: 13, fontWeight: 700, color: active ? 'var(--primary)' : 'var(--text)' }}>{label}</div>
       {meta && <div style={{ marginTop: 2, fontSize: 11, color: 'var(--muted)' }}>{meta}</div>}

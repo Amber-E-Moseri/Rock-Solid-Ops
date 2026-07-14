@@ -109,7 +109,7 @@ export function ProgressBar({ value, max = 100, variant }) {
 export function FunnelGrid({ steps }) {
   if (!steps?.length) return null;
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(steps.length, 5)}, minmax(0,1fr))`, gap: 8 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8 }}>
       {steps.map((s, i) => {
         const prev = i === 0 ? s.count : steps[i - 1].count;
         const pct = prev > 0 ? Math.round((s.count * 100) / prev) : 0;

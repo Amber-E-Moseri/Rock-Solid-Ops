@@ -462,3 +462,87 @@
 .status-success { color: var(--success, #22863a); font-weight: 600; }
 .status-error   { color: var(--danger,  #d73a49); font-weight: 600; }
 .status-pending { color: var(--warning, #b08800); font-weight: 600; }
+
+/* ── Responsive layout utilities ──
+   Inline grid styles can't respond to media queries; pages use these
+   classes for any multi-column block that must collapse on phones. */
+
+/* Vertical page stack. min-width:0 on children stops wide content
+   (tables with white-space:nowrap / min-width) from blowing the grid
+   tracks past the viewport — the inner .rso-table-wrap scrolls instead. */
+.rso-stack {
+  display: grid;
+  gap: 16px;
+}
+.rso-stack > * { min-width: 0; }
+
+/* Wide/narrow pair (e.g. main table + side card). One column on phones. */
+.rso-split {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+}
+.rso-split > * { min-width: 0; }
+
+/* Content + trailing action (text block with a button beside it). */
+.rso-media-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: center;
+}
+.rso-media-row > * { min-width: 0; }
+
+/* Segmented pill switcher (batch selector). Wraps on desktop; becomes a
+   swipeable single row on phones instead of stacking into a tall wall. */
+.rso-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 4px;
+}
+.rso-pill {
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  text-align: left;
+  flex: 1;
+  min-width: 160px;
+  font-family: inherit;
+  transition: background .15s, box-shadow .15s;
+}
+.rso-pill.active {
+  background: var(--surface);
+  box-shadow: var(--sh-xs);
+}
+
+@media (max-width: 900px) {
+  .rso-split { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .rso-media-row { grid-template-columns: 1fr; }
+  .rso-media-row .rso-btn { width: 100%; }
+
+  .rso-pill-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+  }
+  .rso-pill-row .rso-pill {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+
+  /* Page-header controls drop below the title and stretch edge to edge
+     so selects and buttons are easy to hit one-handed. */
+  .rso-page-actions { width: 100%; }
+  .rso-page-actions .rso-select { flex: 1 1 auto; min-width: 0 !important; }
+}
