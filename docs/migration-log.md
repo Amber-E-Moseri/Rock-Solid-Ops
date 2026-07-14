@@ -1498,3 +1498,58 @@ all) — safe to remove with no dangling reference.
 Confirm before merging `brief/ai-docs-fix` to `main`. Low risk (docs-only, no code/schema
 touched) but changes what every future session reads as the canonical constraints/statuses
 reference, so flagging per standing policy rather than treating as a default-safe merge.
+
+---
+
+## 2026-07-14 — Main-sync policy adopted; status check on two loose ends (no code changes)
+
+### Policy change: main-sync check before merge (commit `1b091e8`)
+
+Added step 6 to the branch-per-brief workflow in `CLAUDE.md`: before merging, run `git log
+main -1` and confirm the tip matches what the branch last synced against; if it moved,
+rebase and re-verify isolation before merging. Worktree-per-brief already protects
+in-progress branch work from cross-session collisions, but `main` itself was still an
+unprotected merge point — a same-day collision there (`e5e8cb0` landing mid-session, from
+outside this session, during the `ai-docs-fix` merge) had already happened once and was
+resolved cleanly only because it touched non-overlapping files. This makes the check
+standing practice instead of a one-off reasoning exercise each time it recurs.
+
+### Status check: `brief/moodle-credential-safety` (read-only, nothing modified)
+
+No gate framed as "waiting on the user's SQL query results to check for other affected
+students" exists anywhere in this branch's `docs/migration-log.md` history — that context
+isn't recorded here. What the branch actually contains, as of this check: **5 commits**,
+not a hold. `771a68a` (root-cause fix: `moodle-sync`'s `callMoodle` now fails on Moodle's
+`warnings`-array rejection instead of silently treating it as success, +3 unit tests),
+`f21e3b1` (nav fix linking the pre-existing but unreachable "Needs Attention" page),
+`c90157c` (48h threshold on the `moodle_synced_no_login` flag), `1f9394b` (two schema-drift
+fixes in `retry-worker`/`moodle_enrollment_sync` — content-identical to `e5e8cb0`, already on
+`main` via a different path, confirmed by diff), and `6dcf539` (a full migration-log entry
+documenting all of it). That entry has its own GATE — merge-confirmation, contingent on a
+`deno test` run and a manual verification checklist, neither executed yet (`deno`/Docker
+unavailable in that session's environment); it explicitly states the core fix "has not been
+exercised against a real or mocked Moodle response." One untracked file in that worktree:
+`deno.lock`. Not touched, per this brief's read-only instruction.
+
+### Triage: `student-engagement-monitor.ts` + `202607131700_engagement_email_pause_toggle.sql`
+
+Still uncommitted in the shared tree, unowned since before this conversation started.
+Functionally: adds two config-driven toggles (`never_started_email_enabled`,
+`dropped_off_email_enabled`) read from `student_engagement_config`, gating all three of the
+function's email-sends (`processNeverStarted`, `processDroppedOff`, `processMoodleNoLogin` —
+the last shares the `never_started` toggle). Flagging/`needs_attention_flag`/audit logging
+still happens when a toggle is off; only the email queue insert is skipped. The migration
+inserts both keys defaulting to `'0'` (paused), commented "per explicit request."
+
+No relation found to a flagged attendance-reminder/missed-class-detector/student-engagement-
+monitor notification-overlap problem — no mention of that exists anywhere in this log, and
+the diff doesn't touch either of the other two functions or any dedup logic; it's narrowly
+an email on/off switch. Looks complete, not mid-edit — all three code paths follow the same
+pattern consistently, the migration's two keys match exactly what the code reads, and the
+code degrades safely without the migration applied (`?? 1` defaults to enabled). Nothing on
+`main` currently depends on or is broken by this being unlanded — pure additive feature.
+
+Recommendation (not acted on, per this brief's stop-after-triage instruction): closest to
+commit-as-is — reads as complete and internally consistent — with the caveat that nothing
+here was exercised this session (no dry run against the config table), so commit-as-WIP is
+the more conservative version of the same call if a verification pass is wanted first.
