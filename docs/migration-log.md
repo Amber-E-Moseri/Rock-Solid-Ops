@@ -2067,3 +2067,101 @@ see the operator checklist below.
 7. All pass → safe to proceed (operator sequences the
    `brief/email-template-consolidation` rebase on top of this branch). Any fail →
    report before merging further work.
+
+## 2026-07-14 — Moodle credential safety net (`brief/moodle-credential-safety`)
+
+### TRIGGER
+
+A specific student (taquangminh081@gmail.com) reported never receiving a working Moodle
+login. Traced end-to-end via SQL against the live DB (`moodle_enrollment_sync`,
+`email_queue`): his row shows `sync_status = 'SYNCED'`, `moodle_user_id = 219`,
+`course_id = 13`, and a `moodle_credentials` email with `status = 'Sent'` — every signal
+in our own system said this worked. User separately confirmed in the Resend dashboard that
+no email was ever actually delivered/logged there, and the temp password we did send is
+rejected by Moodle as incorrect. This is a real bug, not user error.
+
+### ROOT CAUSE
+
+`moodle-sync/index.ts`'s `callMoodle` only treats a response as a failure when Moodle
+returns a top-level `exception` key or a non-2xx HTTP status. Moodle reports a rejected
+user-write (e.g. a password failing the site's password policy) via a `warnings` array
+instead — an HTTP 200, no `exception`, that looks identical to success. `findOrCreateMoodleUser`
+additionally wrapped every password-reset call in `try { ... } catch { console.error(...) }`,
+so even a *thrown* reset failure was swallowed and the pre-generated temp password was
+returned and emailed regardless. The row reached `SYNCED` and the credentials email was
+queued and sent — with a password that was never actually applied server-side.
+
+Confirmed via two parallel Explore-agent research passes plus direct migration/RPC reads:
+this is the only place in the codebase with this gap (also present, lower-stakes, in
+`notification-batch-processor` and `moodle-grade-sync`'s own separate `callMoodle`
+implementations — not touched this brief, read-only calls, lower risk, noted for a future
+centralization pass).
+
+### WHAT SHIPPED (working tree, `brief/moodle-credential-safety`)
+
+- `supabase/functions/moodle-sync/index.ts` (`771a68a`) — `callMoodle` gains a
+  `failOnWarnings` option; a new exported pure function `warningRejection(data)` detects a
+  Moodle warnings-array rejection. Every password-setting call site in
+  `findOrCreateMoodleUser` (existing-user reset, initial create, both `ALREADY_EXISTS`
+  fallback resets, alternate-username create) now passes `failOnWarnings: true` and no
+  longer swallows the error — a rejected reset now throws, propagates to the main handler's
+  existing catch block, and is classified/retried/audited through the **already-working**
+  `moodle_enrollment_sync` RETRYING/FAILED state machine, `failed_syncs` mirror table,
+  `retry-worker` auto-sweep, and Retry Center UI. No new retry/visibility plumbing was
+  built — the fix makes the failure exist so the existing machinery can see it.
+- `supabase/functions/moodle-sync/moodle-sync.test.ts` (`771a68a`) — three new unit tests
+  against the exported `warningRejection`, covering the real-world rejection shape, a clean
+  success response, and an empty-warnings response.
+- `foundation/js/admin-shell.js` (`f21e3b1`) — added "Needs Attention" to the nav
+  (`needs-attention.html`, `SYSTEM_ADMIN_ROLES`). **Independently discovered while
+  researching this brief**: `needs-attention.html` and its `get_student_attention_flags`
+  RPC already existed, already computed a `moodle_synced_no_login` flag, but the page was
+  never linked in `admin-shell.js`'s nav array — the one existing detection net for this
+  exact failure mode was unreachable by any admin. UI-only change.
+- `supabase/migrations/202607131700_moodle_no_login_flag_threshold.sql` (`c90157c`) — the
+  `moodle_synced_no_login` flag fired immediately on every `SYNCED` row with no minimum
+  age, which likely trained admins to ignore it as noise even if they'd found the page.
+  Added a 48h threshold, aligned with `student-engagement-monitor`'s
+  `processMoodleNoLogin` (3 days) so the two "no login" checks agree on cadence.
+- `supabase/functions/retry-worker/index.ts` + `supabase/migrations/202607131800_moodle_sync_status_permanently_failed.sql`
+  (`1f9394b`) — two adjacent schema-drift bugs found in the same retry pathway while
+  researching this brief, fixed with user's explicit go-ahead (asked, not assumed):
+  (1) `retry-worker`'s `email_queue` retry branch read/wrote a column named `attempts` that
+  does not exist on `email_queue` (real column is `retry_count`) — the Retry Center's Retry
+  button on a stuck email was plausibly broken. (2) `moodle_enrollment_sync`'s `sync_status`
+  CHECK constraint never listed `PERMANENTLY_FAILED`, though `moodle-sync/index.ts` writes
+  that value when `retry_count` is exceeded — those specific updates were plausibly
+  rejected. Both fixed additively/idempotently.
+
+### EXPLICITLY DEFERRED (user decision, not in this brief)
+
+Resend only confirms "the API call to Resend succeeded," not "the email was delivered" —
+`email_queue.status = 'Sent'` conflates the two, there's no Resend webhook receiver
+anywhere in the codebase, and no delivery-confirmation column exists. User chose to defer
+this to its own follow-up brief rather than bundle a new public webhook endpoint (needs
+signature verification, a new table) into this fix. That gap remains open.
+
+### VERIFICATION GAP — could not execute tests in this environment
+
+`deno` is not installed in this dev environment and `supabase test` requires Docker, which
+is also unavailable here. The new/changed TypeScript was sanity-checked by running it
+through `tsc --noEmit` (via a `typescript` install found under `netlify-cli`'s
+`node_modules`) — zero new syntax/type errors introduced in the edited regions (pre-existing,
+unrelated type-inference errors in `patchSyncRow` and Deno-only `.ts`-extension imports are
+present in both the before and after versions). **The actual Moodle-warnings-rejection
+behavior was not exercised against a live or mocked Moodle instance.**
+Run before merge: `deno test supabase/functions/moodle-sync/moodle-sync.test.ts`, and per
+the plan's verification checklist, exercise `moodle-sync` against both a normal successful
+case (confirm behavioral parity — still reaches SYNCED, credentials email still sends) and
+a case that would trigger a Moodle password-policy warning (confirm it now lands in
+RETRYING/FAILED, not SYNCED, and produces no credentials email).
+
+### GATE
+
+Confirm before merging `brief/moodle-credential-safety` to `main`. This changes the
+control flow of a privileged, production credential-issuing edge function
+(`moodle-sync`) and a second privileged retry function (`retry-worker`) for a live system
+serving real students — and per the verification gap above, the core fix has not been
+exercised against a real or mocked Moodle response. Recommend running the manual
+verification checklist (or at minimum the `deno test` run) before merge if that's
+feasible; otherwise merging on code-review confidence alone is the tradeoff being made.
