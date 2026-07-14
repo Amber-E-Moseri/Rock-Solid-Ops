@@ -250,10 +250,17 @@ cannot collide. (Adopted after a session's commit landed on a parallel session's
 because both were operating in the same checkout.)
 
 Verify claims inherited from prior migration-log entries (e.g. "needs a rebuild," "reference
-implementation is proven") before acting on them — this repo has twice had stale/overstated
-descriptions corrected only after someone actually checked (the Nexus push-sender claim, and
+implementation is proven") before acting on them — this repo has had stale/overstated
+descriptions corrected only after someone actually checked (the Nexus push-sender claim,
 `rocksolid-management.html`'s CSS-token claim, which turned out to be a two-variable fix plus
-an unrelated pre-commit-hook violation the log entry never mentioned).
+an unrelated pre-commit-hook violation the log entry never mentioned, and `constraints.md.txt`
+being described as having "different structure" from `constraints.md` when it didn't).
+
+When comparing file contents for a tracking/duplicate decision (is this file stale, is it a
+real duplicate, did a rename preserve content), diff whitespace- and encoding-insensitively
+(`diff -b`, or equivalent) before concluding two files differ. Two of the corrections above
+trace back to exactly this: a plain `diff` treating every line as changed because of
+CRLF/LF or BOM noise, not real content drift.
 
 ---
 
