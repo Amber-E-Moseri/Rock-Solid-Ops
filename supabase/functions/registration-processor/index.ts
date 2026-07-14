@@ -490,11 +490,24 @@ Deno.serve(async (req) => {
     }
 
     let templateKey = "";
+    let statusMessage = "";
     if (registrationStatusTyped === "DUPLICATE") templateKey = "duplicate_registration";
-    if (registrationStatusTyped === "PENDING" && availabilityStatusTyped === "NO_MATCHING_TIME") templateKey = "no_suitable_times";
-    if (registrationStatusTyped === "WAITLISTED" && (availabilityStatusTyped === "CLASS_FULL" || availabilityStatusTyped === "NO_CLASS_AVAILABLE")) templateKey = "no_class_available";
-    if (registrationStatusTyped === "REVIEW") templateKey = "registration_under_review";
-    if (registrationStatusTyped === "WAITLISTED" && !templateKey) templateKey = "waitlist_confirmation";
+    if (registrationStatusTyped === "PENDING" && availabilityStatusTyped === "NO_MATCHING_TIME") {
+      templateKey = "registration_status_update";
+      statusMessage = "We received your availability preference and are working on a class time that fits your schedule.";
+    }
+    if (registrationStatusTyped === "WAITLISTED" && (availabilityStatusTyped === "CLASS_FULL" || availabilityStatusTyped === "NO_CLASS_AVAILABLE")) {
+      templateKey = "registration_status_update";
+      statusMessage = "You are on our waitlist while we work to open a class for your fellowship. We'll update you as soon as one is available.";
+    }
+    if (registrationStatusTyped === "REVIEW") {
+      templateKey = "registration_status_update";
+      statusMessage = "Your registration is currently under review by our team, and we will update you shortly with next steps.";
+    }
+    if (registrationStatusTyped === "WAITLISTED" && !templateKey) {
+      templateKey = "registration_status_update";
+      statusMessage = "We received your registration and are actively working on your placement. You are on our waitlist, and we will update you as soon as a suitable class opens.";
+    }
 
     console.log("EMAIL_TEMPLATE_SELECTED", {
       email,
@@ -503,6 +516,8 @@ Deno.serve(async (req) => {
       templateKey,
     });
 
+    // Note: email-sender resolves subject from the notification_templates row only —
+    // email_queue.subject is not read at send time, kept here for readability/debugging.
     const emailQueuePayload = {
       recipient_email: email,
       recipient_name: full_name,
@@ -512,14 +527,8 @@ Deno.serve(async (req) => {
           ? "Welcome to Foundation School"
           : templateKey === "duplicate_registration"
           ? "We received your additional registration"
-          : templateKey === "no_suitable_times"
-          ? "We are working on a class time for you"
-          : templateKey === "no_class_available"
-          ? "We are preparing your class placement"
-          : templateKey === "registration_under_review"
-          ? "Your registration is under review"
-          : templateKey === "waitlist_confirmation"
-          ? "You are on our waitlist"
+          : templateKey === "registration_status_update"
+          ? "An update on your Foundation School registration"
           : "Your Foundation School registration update",
       status: "Pending",
       trace_id: flowTraceId,
@@ -561,8 +570,7 @@ Deno.serve(async (req) => {
           "",
         availability:
           body.availability || "",
-        waitlist_message:
-          "We received your registration and are actively working on your placement. You are on our waitlist, and we will update you as soon as a suitable class opens.",
+        status_message: statusMessage,
         template_key: templateKey,
       },
     };

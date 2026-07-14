@@ -77,9 +77,33 @@ export async function performAction(teacherId, action, reason, actorEmail, teach
     actor_email: actorEmail, details: { reason }, created_at: now,
   });
 
-  const emailTemplates = { activate: 'teacher_approved', reject: 'teacher_rejected', suspend: 'teacher_suspended', unsuspend: 'teacher_reactivated' };
-  if (emailTemplates[action]) {
-    // Email would be queued here in production
+  const statusEmailMap = {
+    activate:   { template_key: 'teacher_status_positive', scenario_label: 'approved' },
+    unsuspend:  { template_key: 'teacher_status_positive', scenario_label: 'reactivated' },
+    reject:     { template_key: 'teacher_status_negative', scenario_label: 'rejected' },
+    suspend:    { template_key: 'teacher_status_negative', scenario_label: 'suspended' },
+  };
+  const statusEmail = statusEmailMap[action];
+  if (statusEmail) {
+    const { data: teacherRow } = await supabase.from('teachers')
+      .select('full_name, email').eq('teacher_id', teacherId).maybeSingle();
+    if (teacherRow?.email) {
+      const isPositive = statusEmail.template_key === 'teacher_status_positive';
+      await supabase.from('email_queue').insert({
+        recipient_email: teacherRow.email,
+        recipient_name: teacherRow.full_name || '',
+        template_key: statusEmail.template_key,
+        subject: 'An update on your Foundation School teacher account',
+        status: 'Pending',
+        payload: {
+          first_name: String(teacherRow.full_name || 'Teacher').split(/\s+/)[0],
+          scenario_label: statusEmail.scenario_label,
+          ...(isPositive
+            ? { cta_label: 'Log In to Teacher Portal', cta_url: 'https://rocksolidsuite.netlify.app/foundation/auth/login.html' }
+            : { reason: reason || 'No additional reason was provided.' }),
+        },
+      });
+    }
   }
 }
 

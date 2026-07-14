@@ -228,9 +228,35 @@ export async function duplicateClass({ source, actorEmail }) {
   return newId;
 }
 
-export async function softDeleteClass(coId) {
+export async function softDeleteClass(coId, { teacherName, day, classTime, actorEmail } = {}) {
+  const { data: enrolledRows } = await supabase.from('applicants')
+    .select('id,full_name,email').eq('class_option_id', coId).eq('registration_status', 'ASSIGNED');
+
   const { error } = await supabase.from('class_options').update({ deleted_at: new Date().toISOString(), active: false }).eq('class_option_id', coId);
   if (error) throw error;
+
+  const emailRows = (enrolledRows || []).map((ap) => ({
+    recipient_email: ap.email,
+    recipient_name: ap.full_name || '',
+    template_key: 'class_slot_cancelled',
+    subject: 'Important: Your Foundation School class has been cancelled',
+    status: 'Pending',
+    payload: {
+      first_name: String(ap.full_name || 'Student').split(/\s+/)[0],
+      full_name: ap.full_name,
+      teacher_name: teacherName || '',
+      class_day: day || '',
+      class_time: classTime || '',
+    },
+  }));
+  if (emailRows.length) await supabase.from('email_queue').insert(emailRows);
+
+  await supabase.from('audit_logs').insert({
+    actor_email: actorEmail || null, action: 'CLASS_OPTION_CANCELLED', entity_type: 'class_option', entity_id: coId,
+    status: 'SUCCESS', details: { notification_sent: emailRows.length > 0, notified_count: emailRows.length }, created_at: new Date().toISOString(),
+  });
+
+  return { notifSent: emailRows.length > 0 };
 }
 
 export async function massSetActive(ids, active) {

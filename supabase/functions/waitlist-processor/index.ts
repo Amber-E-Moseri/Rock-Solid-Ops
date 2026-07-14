@@ -4,7 +4,6 @@ import { buildClassAvailableDedupeKey, CANONICAL_TEMPLATE_KEY } from "./dedupe.t
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const MOODLE_URL = "https://rocksolid.lwcanada.org";
 // Same selection-link base the DB trigger path uses (202605191920 / 202607141000).
 const SELECTION_URL_BASE = "https://rocksolidsuite.netlify.app/foundation/registration/class-selection.html?token=";
 
@@ -141,7 +140,7 @@ async function notifyClassNowAvailable(slot: Slot, classInfo: ClassInfo, results
       .single();
 
     if (tokenErr || !tokenRow?.token) {
-      results.errors.push(`class_available token ${app.id}: ${tokenErr?.message || "no token returned"}`);
+      results.errors.push(`classes_now_available token ${app.id}: ${tokenErr?.message || "no token returned"}`);
       continue;
     }
 
@@ -154,7 +153,7 @@ async function notifyClassNowAvailable(slot: Slot, classInfo: ClassInfo, results
       dedupe_key: dedupeKey,
       recipient_email: String(app.email || "").trim().toLowerCase(),
       applicant_id: app.id,
-      event_type: "class_now_available",
+      event_type: "CLASS_OPTIONS_AVAILABLE",
       template_key: CANONICAL_TEMPLATE_KEY,
       scheduled_for: new Date().toISOString(),
       status: "PENDING",
@@ -162,6 +161,7 @@ async function notifyClassNowAvailable(slot: Slot, classInfo: ClassInfo, results
         first_name: firstName,
         full_name: app.full_name,
         email: app.email,
+        selection_url: selectionUrl,
         class_day: classDay,
         class_time: classTime,
         class_label: `${classDay}${classTime ? ` at ${classTime}` : ""}`,
@@ -169,14 +169,12 @@ async function notifyClassNowAvailable(slot: Slot, classInfo: ClassInfo, results
         fellowship_code: app.fellowship_code || "",
         class_option_id: slot.class_option_id,
         batch_id: slot.batch_id,
-        moodle_url: MOODLE_URL,
-        selection_url: selectionUrl,
         expires_days: 7,
       },
     }, { onConflict: "dedupe_key", ignoreDuplicates: true }).select("id");
 
     if (queueRes.error) {
-      results.errors.push(`class_available queue ${app.id}: ${queueRes.error.message}`);
+      results.errors.push(`classes_now_available queue ${app.id}: ${queueRes.error.message}`);
       continue;
     }
 

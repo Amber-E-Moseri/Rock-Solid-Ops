@@ -51,7 +51,7 @@ function buildSubjectFromTemplate(templateKey: string): string {
     attendance_reminder: "Attendance reminder - {{class_name}} Session {{session_number}}",
     attendance_escalation: "Missing attendance - {{teacher_name}} {{class_name}}",
     moodle_login_reminder: "Your Foundation School class has started - log in to Moodle",
-    class_now_available: "Good news - a class is now available for you",
+    classes_now_available: "Good news - a class is now available for you",
   };
   return map[templateKey] || "Foundation School Notification";
 }

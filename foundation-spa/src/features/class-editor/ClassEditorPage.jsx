@@ -231,7 +231,12 @@ export default function ClassEditorPage() {
                 const count = await countEnrolled(selected.class_option_id);
                 setConfirm({
                   message: count > 0 ? `${count} student(s) are enrolled in this class. Soft-delete anyway?` : `Soft-delete class ${selected.class_option_id}?`,
-                  onYes: () => run(() => softDeleteClass(selected.class_option_id), `Class ${selected.class_option_id} deleted.`),
+                  onYes: () => run(() => softDeleteClass(selected.class_option_id, {
+                    teacherName: selected.teacher_name,
+                    day: selected.day,
+                    classTime: selected.class_time,
+                    actorEmail: profile?.email,
+                  }), `Class ${selected.class_option_id} deleted.`),
                 });
               }}
             />
