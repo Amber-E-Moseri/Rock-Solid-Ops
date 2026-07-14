@@ -117,7 +117,28 @@ async function classify403Cause(response: Response): Promise<{ code: MoodleFailu
   return { code: "MOODLE_403_UNKNOWN", retryable: false, detail: "HTTP 403 — cause could not be determined" };
 }
 
-async function callMoodle(url: string, token: string, wsfunction: string, params: Record<string, string>, timeoutMs = 12000) {
+// Moodle reports a rejected user-write (e.g. a password failing the site's
+// password policy) via a `warnings` array with no top-level `exception` —
+// an HTTP 200 that looks identical to success unless the caller checks for it.
+// Pure/exported so it's unit-testable without mocking fetch.
+export function warningRejection(data: unknown): { code: string; detail: string } | null {
+  const warnings = (data as { warnings?: unknown })?.warnings;
+  if (!Array.isArray(warnings) || warnings.length === 0) return null;
+  const w = warnings[0] as { warningcode?: unknown; message?: unknown };
+  return {
+    code: String(w?.warningcode || "unknown"),
+    detail: String(w?.message || JSON.stringify(w)),
+  };
+}
+
+async function callMoodle(
+  url: string,
+  token: string,
+  wsfunction: string,
+  params: Record<string, string>,
+  timeoutMs = 12000,
+  opts: { failOnWarnings?: boolean } = {},
+) {
   const body = new URLSearchParams({
     wstoken: token,
     wsfunction,
@@ -148,6 +169,16 @@ async function callMoodle(url: string, token: string, wsfunction: string, params
     throw new Error(`Moodle ${wsfunction}: ${data.message || data.exception}`);
   }
 
+  if (opts.failOnWarnings) {
+    const rejection = warningRejection(data);
+    if (rejection) {
+      throw Object.assign(
+        new Error(`MOODLE_WARNING_REJECTED: ${wsfunction} — ${rejection.code}: ${rejection.detail}`),
+        { moodleWarnings: (data as { warnings?: unknown }).warnings },
+      );
+    }
+  }
+
   return data;
 }
 
@@ -162,15 +193,14 @@ async function findOrCreateMoodleUser(moodleUrl: string, moodleToken: string, em
 
   const existing = Array.isArray(found?.users) ? found.users[0] : null;
   if (existing?.id) {
-    // Reset password so we always have a usable temp password to send
-    try {
-      await callMoodle(moodleUrl, moodleToken, "core_user_update_users", {
-        "users[0][id]": String(existing.id),
-        "users[0][password]": tempPassword,
-      });
-    } catch (resetErr) {
-      console.error("MOODLE_PASSWORD_RESET_FAILED", { email, error: resetErr });
-    }
+    // Reset password so we always have a usable temp password to send.
+    // failOnWarnings: true — a rejected password (e.g. failing Moodle's site
+    // password policy) must not be treated as success; let it throw so the
+    // row is marked RETRYING/FAILED instead of SYNCED with a dead password.
+    await callMoodle(moodleUrl, moodleToken, "core_user_update_users", {
+      "users[0][id]": String(existing.id),
+      "users[0][password]": tempPassword,
+    }, 12000, { failOnWarnings: true });
     return { userId: String(existing.id), tempPassword, usernameUsed: String(existing.username || username) };
   }
 
@@ -184,7 +214,7 @@ async function findOrCreateMoodleUser(moodleUrl: string, moodleToken: string, em
       "users[0][email]": email,
       "users[0][auth]": "manual",
       "users[0][password]": tempPassword,
-    });
+    }, 12000, { failOnWarnings: true });
 
     const createdId = Array.isArray(created) ? created[0]?.id : null;
     if (!createdId) throw new Error("Moodle user creation returned no id");
@@ -199,12 +229,10 @@ async function findOrCreateMoodleUser(moodleUrl: string, moodleToken: string, em
       });
       const fallback = Array.isArray(foundAgain?.users) ? foundAgain.users[0] : null;
       if (fallback?.id) {
-        try {
-          await callMoodle(moodleUrl, moodleToken, "core_user_update_users", {
-            "users[0][id]": String(fallback.id),
-            "users[0][password]": tempPassword,
-          });
-        } catch (_) {}
+        await callMoodle(moodleUrl, moodleToken, "core_user_update_users", {
+          "users[0][id]": String(fallback.id),
+          "users[0][password]": tempPassword,
+        }, 12000, { failOnWarnings: true });
         return { userId: String(fallback.id), tempPassword, usernameUsed: String(fallback.username || username) };
       }
 
@@ -215,12 +243,10 @@ async function findOrCreateMoodleUser(moodleUrl: string, moodleToken: string, em
       });
       const fallbackByUsername = Array.isArray(foundByUsername?.users) ? foundByUsername.users[0] : null;
       if (fallbackByUsername?.id) {
-        try {
-          await callMoodle(moodleUrl, moodleToken, "core_user_update_users", {
-            "users[0][id]": String(fallbackByUsername.id),
-            "users[0][password]": tempPassword,
-          });
-        } catch (_) {}
+        await callMoodle(moodleUrl, moodleToken, "core_user_update_users", {
+          "users[0][id]": String(fallbackByUsername.id),
+          "users[0][password]": tempPassword,
+        }, 12000, { failOnWarnings: true });
         return { userId: String(fallbackByUsername.id), tempPassword, usernameUsed: String(fallbackByUsername.username || username) };
       }
 
@@ -233,7 +259,7 @@ async function findOrCreateMoodleUser(moodleUrl: string, moodleToken: string, em
         "users[0][email]": email,
         "users[0][auth]": "manual",
         "users[0][password]": tempPassword,
-      });
+      }, 12000, { failOnWarnings: true });
       const retriedId = Array.isArray(retried) ? retried[0]?.id : null;
       if (retriedId) return { userId: String(retriedId), tempPassword, usernameUsed: altUsername };
     }
