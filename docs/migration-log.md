@@ -2165,3 +2165,93 @@ serving real students — and per the verification gap above, the core fix has n
 exercised against a real or mocked Moodle response. Recommend running the manual
 verification checklist (or at minimum the `deno test` run) before merge if that's
 feasible; otherwise merging on code-review confidence alone is the tradeoff being made.
+
+---
+
+## 2026-07-13 — Moodle credential safety net: verification pass + a second silent-failure bug found
+
+### GATE STATUS UPDATE — the two adjacent schema-drift fixes are merged; the core fix is still held
+
+The `email_queue` `retry_count`/`attempts` column fix and the `PERMANENTLY_FAILED` CHECK
+constraint were split onto their own branch (`brief/moodle-retry-schema-fixes`) and merged
+to `main` directly (commit `e5e8cb0`, fast-forward, no conflicts). They're fully isolated
+from the Moodle warnings-detection logic and were already separately authorized. The prior
+GATE text above (which still says "and a second privileged retry function (`retry-worker`)")
+is now stale on that point — `retry-worker` is done and merged; **only the `moodle-sync`
+warnings-detection core fix, the nav link, and the attention-flags RPC fix (below) remain
+gated on `brief/moodle-credential-safety`.**
+
+### VERIFICATION UPDATE — real test execution, not just tsc
+
+`deno` was installable in this environment via `scoop install deno` (no Docker/admin
+needed). Full `deno test` fails on an unrelated dependency-resolution error (a transitive
+`npm:openai` type reference several layers deep in a `jsr` package pulled in only because
+type-checking walks the whole module graph). Running with `--no-check --allow-net` (skips
+type-checking, still executes real code) works cleanly:
+
+```
+running 4 tests from ./supabase/functions/moodle-sync/moodle-sync.test.ts
+WAITLISTED -> Moodle exclusion: only ASSIGNED jobs are kept for sync ... ok
+warningRejection: a Moodle password-policy warning is detected as a rejection ... ok
+warningRejection: a clean success response (no warnings) is not treated as a rejection ... ok
+warningRejection: an empty warnings array is not treated as a rejection ... ok
+ok | 4 passed | 0 failed
+```
+
+This is real evidence the detection logic correctly handles the response shape it was
+written against. It is explicitly **not** ground-truth verification that Moodle's real
+rejection response matches that shape — the test fixture was written from general Moodle
+web-service convention, not from an observed real response. No non-production Moodle
+instance exists anywhere in this codebase/docs to test against (confirmed by grep across
+`foundation/docs/`, `CLAUDE.md`, both `.env.example` files, and every function referencing
+Moodle — `rocksolid.lwcanada.org` is hardcoded everywhere as the only instance, and it's
+production), and there is no direct database connection available in this environment to
+search `audit_logs`/`failed_syncs` for a real historical rejection to use as a fixture
+instead. Two read-only queries were handed to the user to run themselves for the actual
+operational question this raises — how many other students, if any, are currently sitting
+in the same silently-broken state as the reported case.
+
+### FINDING — a second, independent silent-failure bug, found while sanity-checking the user's query
+
+The user's first attempt at the "who else is affected" query failed: `sg.student_email`
+does not exist. Checking the real schema (`202605201100_student_grades.sql`) confirmed
+`student_grades` has never had that column — it exists only on the unrelated
+`student_engagement_log` table. The exact same invalid reference is present in the
+**already-shipped, currently-live** `get_student_attention_flags` RPC
+(`202605220011_needs_attention_rpcs.sql:146`, in the `moodle_no_login` CTE), which wraps
+its entire `RETURN QUERY` in a blanket `EXCEPTION WHEN OTHERS THEN RETURN` (lines 200-202).
+
+Net effect: **every call to this function since it was created in mid-May has thrown on
+that reference and silently returned zero rows for all five flag types** —
+`inactive_no_attendance`, `repeat_absence_3_plus`, `moodle_synced_no_login`,
+`stalled_no_milestones_4_weeks`, and `waitlist_over_14_days` — not just the Moodle one.
+The entire Needs Attention student-flags surface has never actually produced a result in
+production. This means today's earlier nav-link fix, on its own, would have shipped a page
+that's reachable but permanently empty — the underlying computation was silently broken
+independent of the nav/discoverability issue.
+
+User's explicit decision (asked, not assumed): fix now, same branch, rather than file
+separately — the migration in this branch (`202607131700_moodle_no_login_flag_threshold.sql`)
+already does a `CREATE OR REPLACE` of this exact function body, so folding in the one-line
+removal of the invalid clause was the only way the already-built nav link + threshold work
+does anything at all. Commit `57fa0bd`. The two remaining match conditions
+(`applicant_id`/`student_id`) were already sufficient; nothing else about matching logic
+changed. Per the additive-migrations convention, the original
+`202605220011_needs_attention_rpcs.sql` file was left untouched — this new migration's
+`CREATE OR REPLACE` supersedes it, as it already did for the threshold change.
+
+Not checked in this pass: whether `get_teacher_attention_flags` or
+`get_system_attention_flags` (same migration file, not touched by this brief) have similar
+latent bugs. Out of scope here; flagging as a candidate for a future audit rather than
+expanding this brief further.
+
+### GATE (still standing)
+
+`brief/moodle-credential-safety` remains held pending the user's own review of the two
+read-only SQL queries against the live database (who else is in the same synced-but-silent
+state; any historical audit_logs evidence of a Moodle password rejection). The `moodle-sync`
+core warnings-detection fix has real test coverage now but no ground-truth verification
+against actual Moodle behavior. Everything else on this branch (nav link, RPC bug fix,
+threshold) is UI/RPC-only and lower risk, but is being held together with the core fix
+per the user's standing instruction not to merge this branch until the Moodle question is
+resolved.
