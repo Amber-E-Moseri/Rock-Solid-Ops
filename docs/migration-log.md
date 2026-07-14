@@ -1447,3 +1447,54 @@ overstating this brief's coverage.
 Confirm before merging `brief/mailchimp-ripout` to `main`. Removes a production integration
 point (`mailchimp-sync`, its call site) and touches the live email/registration pipeline
 (`registration-processor/index.ts`).
+
+---
+
+## 2026-07-13 — Fixed ai/ directory git tracking (`brief/ai-docs-fix`)
+
+A read-only audit (this session) confirmed: the four current, actively-used docs in `ai/` —
+`ai-workflow.md`, `constraints.md`, `review-findings.md`, `statuses.md`, all last modified
+2026-07-09 — were **untracked in git**. Git only had their stale `.txt`-suffixed counterparts
+(dated 2026-05-06 through 2026-05-18) under version control. Net effect: a fresh clone of
+this repo got the wrong, out-of-date version of every one of these docs — including
+`constraints.md`, cited repeatedly across recent briefs as the edge-function source of truth.
+Same risk class as `foundation-spa/` sitting untracked (flagged and fixed in an earlier
+brief), just smaller in size.
+
+### Step 1 — confirmed before changing anything
+
+Diffed each `.md` against its `.txt` counterpart with `diff -b` (whitespace-insensitive) —
+the initial plain `diff` showed every line as changed on all four pairs, which turned out to
+be line-ending noise, not real content drift (same false-alarm pattern as the CRLF issue
+caught during the C.1/C.2 split). The real difference, all four pairs:
+
+- `ai-workflow.md.txt` / `.md`: identical body content. `.txt` has one extra leading
+  self-referential title line ("ai-workflow.md" + blank line) the `.md` doesn't have.
+- `constraints.md.txt` / `.md`: identical body content. `.txt` has the same leading title
+  line, plus a BOM character before it. Also corrects an overstated claim in this log's own
+  Mailchimp-removal entry above, which described `constraints.md.txt` as having "different
+  structure" — that comparison was run without `-b` and was wrong; the two are effectively
+  the same document.
+- `review-findings.md.txt` / `.md`: identical except the same leading title line, plus one
+  mojibake character (`�`, a broken em-dash) that the `.md` version already has fixed to `—`.
+- `statuses.md.txt` / `.md`: identical except the same leading title line and one trailing
+  blank-line difference.
+
+Git's own rename-similarity detection independently agreed (98-99% similarity on all four
+pairs once staged as add+remove). Confirmed via repo-wide grep: nothing references the
+`.txt` filenames except this log's own historical prose (no CI config exists in this repo at
+all) — safe to remove with no dangling reference.
+
+### Step 2 — executed (commit `8ddd739`)
+
+- Tracked the four current `.md` files for the first time.
+- Removed the four stale `.txt` duplicates in the same commit (git recorded as renames, not
+  independent add/delete, given the near-total content overlap).
+- Left `AI_CONTEXT.md`, `backend-decision.md`, `refactor-roadmap.md`, `security-config.md`
+  untouched — already tracked, not part of this duplicate-pair pattern.
+
+### GATE
+
+Confirm before merging `brief/ai-docs-fix` to `main`. Low risk (docs-only, no code/schema
+touched) but changes what every future session reads as the canonical constraints/statuses
+reference, so flagging per standing policy rather than treating as a default-safe merge.
