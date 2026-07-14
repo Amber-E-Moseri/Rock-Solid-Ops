@@ -239,6 +239,12 @@ collisions on the same working tree.
    Worktree-per-brief protects in-progress branch work from cross-session interference, but
    `main` itself is still a shared, unprotected merge point — a same-day collision there
    (a commit landing mid-session, from outside it) has already happened once.
+7. **Any explicit human hold or gate must be recorded durably in the repo, not just in chat.**
+   Add or update a file-based marker the next session will see without conversational context:
+   append the hold to `docs/migration-log.md` and, if the branch must not be merged yet,
+   add/update an entry in `docs/BRANCH_HOLDS.md`. Sessions do not share chat history; a hold
+   that exists only in one conversation is invisible to every other session and must be
+   treated as missing until written to the repo.
 
 ### Use a dedicated worktree per brief (standing rule, adopted 2026-07-13)
 

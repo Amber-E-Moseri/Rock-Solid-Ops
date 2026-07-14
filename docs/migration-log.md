@@ -1553,3 +1553,169 @@ Recommendation (not acted on, per this brief's stop-after-triage instruction): c
 commit-as-is — reads as complete and internally consistent — with the caveat that nothing
 here was exercised this session (no dry run against the config table), so commit-as-WIP is
 the more conservative version of the same call if a verification pass is wanted first.
+
+---
+
+## 2026-07-13 — HOLD recorded durably for `brief/moodle-credential-safety`
+
+### HOLD
+
+HOLD — this branch is blocked pending operator review of two live-database SQL queries.
+Do not merge. Do not consider the existing test-verification/manual-verification gate as
+the only open gate — this SQL-query hold is separate and takes priority.
+
+Important correction: the current checked-in `brief/moodle-credential-safety`
+`docs/migration-log.md` entry says two read-only queries were handed to the operator, but it
+does **not** preserve their SQL text verbatim. The exact query bodies were therefore not
+durably recorded in-repo at the time the hold was set. To prevent that omission from being
+repeated, the hold is being restated here with reconstructed query text based on the branch's
+documented intent and current branch code/schema.
+
+### QUERIES
+
+```sql
+-- Query 1: other students currently in the same synced-but-silent state
+-- Matches the branch's fixed moodle_no_login logic: ASSIGNED applicant, moodle_enrollment_sync
+-- row marked SYNCED for >48h, and no matching student_grades activity by applicant_id/student_id.
+SELECT
+  ms.id,
+  ms.applicant_id,
+  ms.student_id,
+  ms.email,
+  ms.full_name,
+  ms.batch_id,
+  ms.class_option_id,
+  ms.course_id,
+  ms.moodle_user_id,
+  ms.sync_status,
+  ms.synced_at,
+  ms.created_at,
+  ms.updated_at
+FROM public.moodle_enrollment_sync ms
+JOIN public.applicants a
+  ON a.id = ms.applicant_id
+WHERE upper(COALESCE(ms.sync_status, '')) = 'SYNCED'
+  AND COALESCE(a.registration_status, a.status) = 'ASSIGNED'
+  AND ms.synced_at < now() - interval '48 hours'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM public.student_grades sg
+    WHERE sg.applicant_id::text = a.id::text
+       OR sg.student_id::text = a.id::text
+  )
+ORDER BY ms.synced_at DESC NULLS LAST, ms.created_at DESC;
+```
+
+```sql
+-- Query 2: historical audit-log evidence of a Moodle password rejection
+-- moodle-sync on this branch logs these as MOODLE_SYNC_FAILED on entity_type
+-- moodle_enrollment_sync, with MOODLE_WARNING_REJECTED in the details payload.
+SELECT
+  al.id,
+  al.logged_at,
+  al.entity_id,
+  al.action,
+  al.status,
+  al.details
+FROM public.audit_logs al
+WHERE al.entity_type = 'moodle_enrollment_sync'
+  AND al.action = 'MOODLE_SYNC_FAILED'
+  AND (
+    COALESCE(al.details->>'message', '') ILIKE '%MOODLE_WARNING_REJECTED%'
+    OR COALESCE(al.details->>'reason', '') ILIKE '%MOODLE_WARNING_REJECTED%'
+    OR al.details::text ILIKE '%password%'
+    OR al.details::text ILIKE '%warning%'
+  )
+ORDER BY al.logged_at DESC;
+```
+
+### STATUS
+
+- I did **not** run either query here. No live project DB access is configured in this
+  environment, and running against a local/sandbox database would not answer the incident
+  question.
+- As of the branch's own latest migration-log entry (`1b217d2`, 2026-07-13), the separate
+  test/verification gate still stands too: `deno test --no-check --allow-net` passed for the
+  branch's `moodle-sync` tests, but the fix still has no ground-truth verification against a
+  real Moodle rejection response.
+- `docs/BRANCH_HOLDS.md` now also carries this hold so a future session can see it without
+  scrolling the full append-only log.
+
+---
+
+## 2026-07-13 — `brief/moodle-credential-safety`: SQL-query hold resolved; test-verification gate still open
+
+### HOLD STATUS UPDATE
+
+The SQL-query hold on `brief/moodle-credential-safety` is now **resolved**. This closes
+**gate 1 of 2**, not the whole branch.
+
+What was resolved:
+- The operator ran both hold queries directly against the real project database.
+- Query 1 ("SYNCED with no grades activity") returned **9 students** spanning
+  **2026-05-17 through 2026-06-28**, plus **4 separate data-integrity rows** with
+  `sync_status = 'SYNCED'` and `synced_at IS NULL`.
+- Query 2 confirmed the broader mechanism is real on a Moodle
+  `core_user_create_users` rejection path — it logged, retried, and was caught correctly
+  there — but did **not** directly hit the exact silent `core_user_update_users`
+  password-reset bug this branch fixes. That non-hit is expected: the silent path being fixed
+  here logged nothing by design.
+- The operator then manually verified the other affected students' Moodle logins and confirmed
+  that only `taquangminh081` needed a manual credential fix. The rest have working credentials.
+
+Conclusion: this is now confirmed as an **isolated incident**, not a systemic active-incident
+outbreak requiring broad student outreach.
+
+### REMAINING GATE (still open)
+
+The branch's separate pre-existing test-verification gate remains open and was **not** resolved
+by the SQL review above.
+
+What would actually close that remaining gate:
+- Ground-truth verification of the `moodle-sync` warnings-detection fix against a **real Moodle
+  rejection response**, not only the synthetic test fixture currently in the branch.
+- The earlier branch finding still stands: there is **no non-production/staging Moodle instance**
+  documented anywhere in this repo, and the only known Moodle instance in repo state is
+  production.
+
+Operator decision needed before any merge decision on this branch:
+1. Find a safe way to verify against a real Moodle rejection response.
+2. Accept the current synthetic-fixture-only verification, now that the SQL review has shown
+   this is a low-frequency isolated edge case rather than a broad systemic incident.
+3. Choose some other explicit verification/gate path.
+
+Do not merge `brief/moodle-credential-safety` until that second gate is explicitly resolved.
+
+### SEPARATE OPEN ISSUE (not part of the resolved hold)
+
+The SQL review also surfaced a separate data-integrity issue that remains **open** and
+unaddressed:
+- 4 rows in `moodle_enrollment_sync` with `sync_status = 'SYNCED'` but `synced_at IS NULL`
+- duplicate emails with differing `moodle_user_id` values
+
+This is **not** part of the resolved SQL-query hold for the silent password-reset incident.
+Logging it here explicitly so it is not lost now that the main incident is classified.
+
+### SANITY CHECK — does the early-warning loop actually close?
+
+Branch state and current `main` state diverge here:
+
+- On `brief/moodle-credential-safety`, yes: the branch has all three pieces needed for the
+  warning loop to work together.
+  - `f21e3b1` adds the "Needs Attention" nav entry in `admin-shell.js`.
+  - `c90157c` adds the 48-hour threshold for `moodle_synced_no_login`.
+  - `57fa0bd` removes the invalid `student_grades.student_email` reference that had caused
+    `get_student_attention_flags()` to throw and silently return zero rows for every flag type.
+  - `needs-attention.html` already calls `get_student_attention_flags` and renders the
+    `moodle_synced_no_login` rows under the "No Moodle Login" label.
+- On the current checked-out `main`, **no**: the early-warning chain is not fully live today.
+  - `foundation/staff/needs-attention.html` exists and renders the RPC output.
+  - But current `main` `foundation/js/admin-shell.js` still has **no** "Needs Attention"
+    nav item.
+  - And current `main` `supabase/migrations/202605220011_needs_attention_rpcs.sql` still
+    contains the invalid `sg.student_email` clause, so the underlying RPC remains the
+    silently-broken version in repo state here.
+
+So the correct statement is: **if this branch merged as-is, a taquangminh081-shaped case would
+surface through the Needs Attention path; on current `main`, that loop is still not fully
+closed yet.**
