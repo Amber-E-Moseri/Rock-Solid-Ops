@@ -2396,3 +2396,93 @@ this":**
 **Status: gate still open.** This is Phase A only, per the brief's explicit stop-and-report
 instruction — no code changed, no live check run. Waiting on the operator to choose between
 path 1 (run the live probe) and path 2 (accept current evidence and close the gate).
+
+---
+
+## 2026-07-14 — Three more unwired-but-real templates identified (extends the reserved-templates entry above)
+
+Same category as the "Reserved templates explicitly unwired" entry above: real, seeded
+content, zero live producer, kept active (not deactivated) per that entry's precedent.
+
+- `class_reminder_7_day`: reserved; no producer currently schedules it.
+- `class_reminder_1_day`: reserved; no producer currently schedules it.
+- `class_reminder_2_hour`: reserved; no producer currently schedules it.
+
+Found during the notification-template inventory/cleanup audit (see the entry below this
+one). Not deactivated, consistent with the reasoning in the 2026-07-14 entry above.
+
+---
+
+## 2026-07-14 — Notification template inventory + safe cleanup (`brief/notification-template-audit`)
+
+### DECISION
+
+1. Full inventory of all 43 `notification_templates` rows delivered as a new "Template
+   Inventory" section in `foundation/docs/NOTIFICATION_PIPELINE.md`, not a new standalone
+   doc — that file is already the canonical reference for this subsystem, and this repo
+   already has doc-sprawl (part of why the template count itself felt excessive).
+2. Only the 10 confirmed-dead legacy stub templates were deactivated
+   (`202607142000_deactivate_dead_legacy_template_stubs.sql`, `active = false`, not deleted).
+   Everything else found — including three real-but-unwired templates (entry immediately
+   above) and every duplicate/broken-delivery/dead-machinery finding below — is documented
+   only, per explicit scope confirmation from the operator.
+3. `classes_now_available` vs `class_now_available` is explicitly out of scope: already being
+   fixed on the unmerged `brief/waitlist-dedup-consolidation` branch. Noted in the doc as
+   pending that branch's merge, not re-examined here.
+
+### EVIDENCE
+
+**The 10 dead stubs** (`WELCOME`, `CLASS_ASSIGNED`, `TEACHER_ROSTER_DAILY`,
+`TEACHER_ROSTER_WEEKLY`, `WEEK3_FOLLOWUP`, `WEEK6_FOLLOWUP`, `ATTENDANCE_FLAG_CLASS1`,
+`ATTENDANCE_FLAG_REPEAT`, `GRADUATION_READY`, `TRANSITION_OVERDUE`) were promoted into the
+canonical `notification_templates` table by a one-time migration
+(`202605221030_consolidate_template_sources.sql`) that copied rows from the dead
+`email_templates` table wherever the key didn't already exist. All 10 have empty `body_html`
+and zero producers anywhere in the codebase — verified by grepping every `supabase/functions/`
+edge function and every `foundation/`/`foundation-spa/` JS file that queues email. Two are
+near-duplicate keys of real live templates: `WELCOME` (dupe of `foundation_welcome`) and
+`CLASS_ASSIGNED` (dupe of `class_assigned`) — same purpose, different casing, one dead. Two
+other rows promoted by the same migration (`attendance_reminder`, `attendance_escalation`)
+were explicitly excluded from deactivation — they're real, live templates wired to
+`supabase/functions/attendance-reminder/index.ts`'s daily cron, not stubs.
+
+**Three more real-but-unwired templates** (`class_reminder_7_day`, `class_reminder_1_day`,
+`class_reminder_2_hour`) — documented in the entry above, not deactivated, following the exact
+precedent already set for `class_slot_cancelled`/`waitlist_promoted`/`engagement_final_notice`.
+A fourth, `makeup_reminder`, was also found to have zero producers anywhere and had never been
+documented as reserved before — flagged for the first time in the new doc section.
+
+**Flag-only findings** (documented in `NOTIFICATION_PIPELINE.md`'s new "Known issues"
+subsection, not acted on): `registration_under_review` vs `registration_under_review_checkin`
+naming confusion (different real purposes); `engagement_never_started`/`engagement_dropped_off`
+having two uncoordinated producers (daily cron + a manual "Send Check-in" button with no shared
+dedupe — same duplicate-risk shape as the waitlist bug fixed elsewhere); `direct_message`
+shared by two unrelated features (in-app messaging + admin broadcast modal).
+
+**Out-of-scope findings, explicitly not touched**: `campaign`/`report`/`announcement` have
+wired producers but no `notification_templates` row at all — `email-sender`'s `resolveContent`
+throws `"No template found"` for each, so every queued send currently lands `Failed`. The SPA
+teacher-status-email feature (`teacherManagement.js:80-83`) builds a template map but never
+inserts into `email_queue` — a comment reads *"Email would be queued here in production"* —
+so those emails only send from the legacy page. The `notification-dispatcher`/
+`notification_rules` machinery is entirely dead — zero live producers reach it (this corrects
+the 2026-07-13 Email Pipeline Audit's belief that one producer used it; that producer actually
+inserts directly and coincidentally shares an `event_type` name with an orphaned rule row).
+`class-selection`'s `notify_waitlisted` action is unreachable dead code. `missed-class-detector`
+has no confirmed cron trigger anywhere in the repo despite docs claiming one exists.
+`phase2-processor`'s `foundation_welcome` call site is likely dead (its own registration path
+returns 410).
+
+**New conflict found, not resolved here**: `brief/email-template-consolidation` (unmerged,
+migration `202607131901_retire_class_now_available_and_waitlist_promoted.sql`, verified)
+deactivates `waitlist_promoted` as "orphaned." This directly conflicts with the existing
+2026-07-14 "Reserved templates explicitly unwired" entry, which keeps the same template
+active/reserved. Both are correct about the underlying fact (no producer exists); they
+disagree on what to do about it. Flagged in the new doc section for whoever merges either
+branch first to resolve.
+
+### GATE
+
+Migration `202607142000` applied on `brief/notification-template-audit` only — not merged to
+`main`. Verification queries (row-level confirmation the 10 keys are deactivated and nothing
+else moved) provided to the operator to run against the live DB before any merge decision.
