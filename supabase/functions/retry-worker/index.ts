@@ -266,7 +266,7 @@ async function applyRetry(
   if (source === "email_queue") {
     const { data: row, error: readErr } = await db
       .from("email_queue")
-      .select("id,status,attempts")
+      .select("id,status,retry_count")
       .eq("id", id)
       .maybeSingle();
     if (readErr) throw readErr;
@@ -281,7 +281,8 @@ async function applyRetry(
         status: "Pending",
         error_message: null,
         last_error: null,
-        attempts: Number(row.attempts || 0) + 1,
+        retry_count: Number(row.retry_count || 0) + 1,
+        last_retry_at: now,
         updated_at: now,
       })
       .eq("id", id);
