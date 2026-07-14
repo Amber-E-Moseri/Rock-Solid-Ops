@@ -232,6 +232,13 @@ collisions on the same working tree.
 5. If a security boundary (RLS, edge-function auth, role checks) is touched, present a gate
    for confirmation before merging — see `docs/migration-log.md` for the gate format used in
    prior briefs.
+6. **Before merging, confirm `main` hasn't moved**: run `git log main -1` (or equivalent) and
+   check its tip against what you last synced your branch against. If it's moved, rebase your
+   branch onto the new tip and re-verify isolation (the same diff-check used for the C.1/C.2
+   split) before merging — don't merge against a stale assumption of what `main` contains.
+   Worktree-per-brief protects in-progress branch work from cross-session interference, but
+   `main` itself is still a shared, unprotected merge point — a same-day collision there
+   (a commit landing mid-session, from outside it) has already happened once.
 
 ### Use a dedicated worktree per brief (standing rule, adopted 2026-07-13)
 
