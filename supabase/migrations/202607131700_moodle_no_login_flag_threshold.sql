@@ -3,6 +3,20 @@
 -- admins to ignore it as noise. Add a 48h minimum-age threshold, aligning
 -- with student-engagement-monitor's processMoodleNoLogin (3 days) so the
 -- two "no login" checks agree on cadence rather than firing independently.
+--
+-- Also fixes a latent bug found while verifying this brief:
+-- 202605220011_needs_attention_rpcs.sql's moodle_no_login CTE referenced
+-- student_grades.student_email, a column that has never existed on
+-- student_grades (it only exists on the unrelated student_engagement_log
+-- table). Because the whole RETURN QUERY is one statement wrapped in
+-- `EXCEPTION WHEN OTHERS THEN RETURN`, every call to this function has been
+-- throwing on that reference and silently returning ZERO rows for ALL FIVE
+-- flag types (not just moodle_synced_no_login) since the function was
+-- created — the entire Needs Attention student-flags surface has never
+-- actually worked in production. Dropped the invalid clause; the other two
+-- match conditions (applicant_id/student_id) were already sufficient and
+-- unaffected.
+--
 -- Function body is otherwise unchanged from 202605220011_needs_attention_rpcs.sql.
 
 CREATE OR REPLACE FUNCTION public.get_student_attention_flags(p_batch_id text DEFAULT NULL)
@@ -127,7 +141,6 @@ BEGIN
       SELECT 1 FROM student_grades sg
       WHERE sg.applicant_id::text = s.applicant_id
          OR sg.student_id::text = s.applicant_id
-         OR (s.email <> '' AND lower(sg.student_email) = lower(s.email))
     )
   ),
   stalled AS (
