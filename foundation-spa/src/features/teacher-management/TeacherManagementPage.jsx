@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchTeachers, filterTeachers, performAction, createTeacherDirect, linkTeacherAuth, unlinkTeacherAuth, fmtDate, STATUS_TABS } from './lib/teacherManagement.js';
+import { fetchTeachers, filterTeachers, performAction, createTeacherDirect, linkTeacherAuth, unlinkTeacherAuth, fetchFellowshipOptions, GROUP_OPTIONS, SUBGROUP_OPTIONS, fmtDate, STATUS_TABS } from './lib/teacherManagement.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { PageHeader, Toolbar, SearchInput, Skeleton, EmptyState, Badge, Button, Modal, ErrorBanner } from '../../components/ui/index.js';
@@ -23,6 +23,8 @@ export default function TeacherManagementPage() {
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['teacher-mgmt'], queryFn: fetchTeachers, staleTime: 60_000 });
   const teachers = data?.teachers ?? [];
   const classMap = data?.classMap ?? new Map();
+
+  const { data: fellowships } = useQuery({ queryKey: ['teacher-mgmt-fellowships'], queryFn: fetchFellowshipOptions, staleTime: 300_000 });
 
   const filtered = useMemo(
     () => filterTeachers(teachers, { tab, search, group, subgroup }),
@@ -132,6 +134,7 @@ export default function TeacherManagementPage() {
 
       {/* Add teacher modal */}
       {addModal && <AddTeacherModal
+        fellowships={fellowships ?? []}
         onClose={() => setAddModal(false)}
         onAdd={async (params) => {
           try {
@@ -179,7 +182,7 @@ function ActionReasonModal({ action, teacher, onClose, onConfirm }) {
   const minLen = ['suspend', 'deactivate'].includes(action) ? 10 : 5;
   const titles = { reject: 'Reject Teacher', suspend: 'Suspend Teacher', inactivate: 'Inactivate Teacher', deactivate: 'Deactivate Teacher' };
   return (
-    <Modal title={titles[action] || action} onClose={onClose} footer={
+    <Modal open title={titles[action] || action} onClose={onClose} footer={
       <>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <Button variant="danger" onClick={() => onConfirm(reason)} disabled={reason.length < minLen}>Confirm</Button>
@@ -193,7 +196,7 @@ function ActionReasonModal({ action, teacher, onClose, onConfirm }) {
   );
 }
 
-function AddTeacherModal({ onClose, onAdd }) {
+function AddTeacherModal({ fellowships, onClose, onAdd }) {
   const [form, setForm] = useState({ full_name: '', email: '', temp_password: '', phone: '', group_id: '', subgroup_id: '', fellowship_code: '', notes: '' });
   const [showPw, setShowPw] = useState(false);
   const [result, setResult] = useState(null);
@@ -209,7 +212,7 @@ function AddTeacherModal({ onClose, onAdd }) {
   }
 
   return (
-    <Modal title="Add Teacher" onClose={onClose} footer={
+    <Modal open title="Add Teacher" onClose={onClose} footer={
       result ? <Button variant="ghost" onClick={onClose}>Close</Button> : (
         <>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
@@ -238,9 +241,24 @@ function AddTeacherModal({ onClose, onAdd }) {
             </div>
           </label>
           <label className="rso-field"><span>Phone</span><input className="rso-input" value={form.phone} onChange={(e) => set('phone', e.target.value)} /></label>
-          <label className="rso-field"><span>Group ID</span><input className="rso-input" value={form.group_id} onChange={(e) => set('group_id', e.target.value)} /></label>
-          <label className="rso-field"><span>Subgroup ID</span><input className="rso-input" value={form.subgroup_id} onChange={(e) => set('subgroup_id', e.target.value)} /></label>
-          <label className="rso-field"><span>Fellowship Code</span><input className="rso-input" placeholder="e.g. UMANITOBA" value={form.fellowship_code} onChange={(e) => set('fellowship_code', e.target.value)} /></label>
+          <label className="rso-field"><span>Group ID</span>
+            <select className="rso-input" value={form.group_id} onChange={(e) => set('group_id', e.target.value)}>
+              <option value="">—</option>
+              {GROUP_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </label>
+          <label className="rso-field"><span>Subgroup ID</span>
+            <select className="rso-input" value={form.subgroup_id} onChange={(e) => set('subgroup_id', e.target.value)}>
+              <option value="">—</option>
+              {SUBGROUP_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </label>
+          <label className="rso-field"><span>Fellowship Code</span>
+            <select className="rso-input" value={form.fellowship_code} onChange={(e) => set('fellowship_code', e.target.value)}>
+              <option value="">—</option>
+              {fellowships.map((f) => <option key={f.fellowship_code} value={f.fellowship_code}>{f.fellowship_code}{f.campus_name ? ` — ${f.campus_name}` : ''}</option>)}
+            </select>
+          </label>
           <label className="rso-field" style={{ gridColumn: '1 / -1' }}><span>Notes</span><textarea className="rso-input" rows={2} value={form.notes} onChange={(e) => set('notes', e.target.value)} /></label>
         </div>
       )}
@@ -253,7 +271,7 @@ function LinkAuthModal({ teacher, onClose, onLink }) {
   const [allowRelink, setAllowRelink] = useState(false);
   const [saving, setSaving] = useState(false);
   return (
-    <Modal title="Link Teacher to Auth User" onClose={onClose} footer={
+    <Modal open title="Link Teacher to Auth User" onClose={onClose} footer={
       <>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <Button variant="primary" onClick={async () => { setSaving(true); try { await onLink(authUserId, allowRelink); } finally { setSaving(false); } }} disabled={saving || !authUserId}>
@@ -277,7 +295,7 @@ function UnlinkModal({ teacher, onClose, onUnlink }) {
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   return (
-    <Modal title="Unlink Teacher from Auth" onClose={onClose} footer={
+    <Modal open title="Unlink Teacher from Auth" onClose={onClose} footer={
       <>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <Button variant="danger" onClick={async () => { setSaving(true); try { await onUnlink(reason); } finally { setSaving(false); } }} disabled={saving}>
