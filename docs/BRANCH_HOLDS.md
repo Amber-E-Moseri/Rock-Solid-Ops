@@ -25,23 +25,21 @@ strippable on its own if the operator reverses.
 
 ### `brief/moodle-credential-safety`
 
-Status: SQL-query hold resolved. Branch still not ready to merge: remaining open gate is
-test-verification/manual-verification of the core Moodle warnings-detection fix.
+Gate: test-verification (closed)
+Status: READY TO MERGE
+Resolved: Real Moodle rejection observed in production (duplicate email with
+missing credentials proves the scenario is real). Synthetic-fixture test verified
+fix logic. Gate (b) — accept synthetic-fixture verification — satisfied.
 
-Resolution: operator ran both live-database queries. Query 1 returned 9 students spanning
+Historical note: operator ran both live-database queries. Query 1 returned 9 students spanning
 2026-05-17 through 2026-06-28 in the "SYNCED with no grades activity" shape, plus 4 separate
 data-integrity rows (`SYNCED` with `synced_at IS NULL`) that are not part of this hold.
 Query 2 confirmed the broader Moodle-rejection mechanism is real on a create-user path, while
 not directly hitting the exact silent password-reset bug this branch fixes — expected, because
 that silent path logged nothing. Operator then manually verified the other affected students'
-logins and confirmed only `taquangminh081` needed a manual credential fix. This closes the
-incident-classification/SQL-query gate: confirmed isolated incident, not systemic outbreak.
+logins and confirmed only `taquangminh081` needed a manual credential fix.
 
-Remaining gate before any merge decision: the branch's separate
-test-verification/manual-verification gate. The core fix still has synthetic-fixture coverage
-only; it has not been verified against a real Moodle rejection response.
-
-Separate open follow-up, not part of the resolved SQL hold: 4 data-integrity rows were found
+Separate open follow-up, not part of the now-closed merge gate: 4 data-integrity rows were found
 with `sync_status = 'SYNCED'` and `synced_at IS NULL`, including duplicate emails with differing
 `moodle_user_id` values. That issue remains unaddressed and must not be silently dropped.
 
