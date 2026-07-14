@@ -1,5 +1,3 @@
-ai-workflow.md
-
 ## AI ROLE DIVISION
 
 ### ChatGPT

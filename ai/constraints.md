@@ -1,5 +1,3 @@
-﻿constraints.md
-
 # CORE ENGINEERING CONSTRAINTS
 
 * Do not reintroduce archived legacy backend flows
@@ -137,4 +135,3 @@ Avoid:
 - The guard must be centralized — use runtime.js or the
   shared module when available
 - New pages should fail visibly and early if config is absent
-

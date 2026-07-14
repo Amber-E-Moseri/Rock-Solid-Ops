@@ -1,5 +1,3 @@
-statuses.md
-
 # REGISTRATION STATUSES
 
 PENDING
@@ -123,4 +121,3 @@ notification-retry-helper — RETRY HELPER ONLY
   Used by Retry Center only
   Must not be given a cron schedule
 # sender-worker deleted 2026-05-18 — reconcile-stuck.sql archived in git history.
-

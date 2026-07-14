@@ -1,5 +1,3 @@
-review-findings.md
-
 # Engineering Review Findings
 
 ## Platform Summary
@@ -122,7 +120,7 @@ Resolved:
 
 ---
 
-### Session 4 Update — Operational Trace MVP (May 2026)
+### Session 4 Update â€” Operational Trace MVP (May 2026)
 
 Completed:
 - Added SQL RPC `public.get_operational_trace(...)` for admin-facing trace retrieval.
@@ -146,4 +144,3 @@ Hardening follow-up:
 - RPC updated to `SECURITY DEFINER` with `search_path = public`.
 - Execute restricted to `authenticated`.
 - Frontend now hides Operational Trace panel when admin verification fails.
-
