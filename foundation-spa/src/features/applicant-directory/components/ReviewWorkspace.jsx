@@ -76,7 +76,7 @@ export default function ReviewWorkspace({ model, rows, canDecide, onResolveDupli
   const isDuplicateGroup = compareGroup.length > 1;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 340px) 1fr', gap: 16, alignItems: 'start' }}>
+    <div className="rso-master-detail">
       {/* Queue */}
       <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', background: 'var(--surface)', overflow: 'hidden' }}>
         <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>
@@ -140,7 +140,7 @@ export default function ReviewWorkspace({ model, rows, canDecide, onResolveDupli
               : 'Review this applicant and choose the next action.'}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+          <div className="rso-form-grid" style={{ marginBottom: 14 }}>
             <CompareCard app={incoming} kicker="New submission" badge="Incoming" badgeVariant="info" fieldRows={fieldRows} side="left" selected={String(selected.id) === String(incoming?.id)} />
             <CompareCard app={existing} kicker={`Existing record${existing?.id ? ` · #${String(existing.id).slice(0, 4)}` : ''}`} badge={existing?.class_option_id ? 'Assigned' : 'Current'} badgeVariant={existing?.class_option_id ? 'success' : 'neutral'} fieldRows={fieldRows} side="right" selected={String(selected.id) === String(existing?.id)} />
           </div>

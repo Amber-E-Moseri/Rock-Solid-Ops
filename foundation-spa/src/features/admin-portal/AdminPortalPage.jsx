@@ -43,7 +43,7 @@ export default function AdminPortalPage() {
   ] : [];
 
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
+    <div className="rso-stack">
       <PageHeader title={`${greeting()}, ${firstName}`} subtitle={(stats.data?.pending ?? 0) > 0 ? `${stats.data.pending} registration(s) to review` : 'Everything is up to date'} />
 
       {/* KPIs */}

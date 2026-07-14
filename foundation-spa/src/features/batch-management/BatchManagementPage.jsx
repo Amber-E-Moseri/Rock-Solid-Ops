@@ -206,7 +206,7 @@ export default function BatchManagementPage() {
 
       {/* Confirm Modal */}
       {confirmModal && (
-        <Modal title={`${confirmModal.action.charAt(0).toUpperCase() + confirmModal.action.slice(1)} Batch`} onClose={() => setConfirmModal(null)} footer={
+        <Modal open title={`${confirmModal.action.charAt(0).toUpperCase() + confirmModal.action.slice(1)} Batch`} onClose={() => setConfirmModal(null)} footer={
           <>
             <Button variant="ghost" onClick={() => setConfirmModal(null)}>Cancel</Button>
             <Button variant="danger" onClick={handleConfirmAction}>Confirm</Button>
@@ -234,13 +234,13 @@ function BatchModal({ batch, subgroups, moodleCourses, onClose, onSave, saving }
   });
   const set = (k, val) => setV((p) => ({ ...p, [k]: val }));
   return (
-    <Modal title={batch ? 'Edit Batch' : 'Create Batch'} onClose={onClose} footer={
+    <Modal open title={batch ? 'Edit Batch' : 'Create Batch'} onClose={onClose} footer={
       <>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <Button variant="primary" onClick={() => onSave(v)} disabled={saving || !v.batch_id || !v.batch_name}>{saving ? 'Saving…' : 'Save'}</Button>
       </>
     }>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+      <div className="rso-form-grid">
         <label className="rso-field"><span>Batch ID</span><input className="rso-input" value={v.batch_id} onChange={(e) => set('batch_id', e.target.value)} disabled={!!batch} /></label>
         <label className="rso-field"><span>Batch Name</span><input className="rso-input" value={v.batch_name} onChange={(e) => set('batch_name', e.target.value)} /></label>
         <label className="rso-field"><span>Fellowship</span><input className="rso-input" value={v.fellowship_group} onChange={(e) => set('fellowship_group', e.target.value)} /></label>
@@ -273,7 +273,7 @@ function RolloverModal({ source, onClose, onRollover }) {
   const set = (k, val) => setV((p) => ({ ...p, [k]: val }));
   const [saving, setSaving] = useState(false);
   return (
-    <Modal title="Rollover Batch" onClose={onClose} footer={
+    <Modal open title="Rollover Batch" onClose={onClose} footer={
       <>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <Button variant="primary" onClick={async () => { setSaving(true); try { await onRollover({ ...v, capacity: source.capacity, fellowship_group: source.fellowship_group, subgroup: source.subgroup, subgroup_id: source.subgroup_id, notes: source.notes }, v.message); } finally { setSaving(false); } }} disabled={saving || !v.batch_id || !v.batch_name}>
@@ -299,7 +299,7 @@ function AnnounceModal({ batch, onClose, onSend }) {
   const [sendTo, setSendTo] = useState('students');
   const [saving, setSaving] = useState(false);
   return (
-    <Modal title="Announce to Batch" onClose={onClose} footer={
+    <Modal open title="Announce to Batch" onClose={onClose} footer={
       <>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <Button variant="primary" onClick={async () => { setSaving(true); try { await onSend(subject, message, sendTo); } finally { setSaving(false); } }} disabled={saving || !subject || !message}>

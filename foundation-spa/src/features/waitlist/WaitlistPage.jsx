@@ -126,16 +126,16 @@ export default function WaitlistPage() {
 
   if (isLoading) {
     return (
-      <div style={{ display: 'grid', gap: 16 }}>
+      <div className="rso-stack">
         <Skeleton style={{ height: 40 }} />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} style={{ height: 70 }} />)}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} style={{ height: 70 }} />)}</div>
         <Skeleton style={{ height: 300 }} />
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
+    <div className="rso-stack">
       <PageHeader
         title="Waiting Students"
         actions={
@@ -162,14 +162,16 @@ export default function WaitlistPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 14, padding: 4, width: 'fit-content' }}>
+      <div className="rso-pill-row" style={{ width: 'fit-content' }}>
         <button
+          type="button"
           onClick={() => setActiveTab('students')}
-          style={tabStyle(activeTab === 'students')}
+          className={`rso-pill${activeTab === 'students' ? ' active' : ''}`}
         >Waiting Students</button>
         <button
+          type="button"
           onClick={() => setActiveTab('capacity')}
-          style={tabStyle(activeTab === 'capacity')}
+          className={`rso-pill${activeTab === 'capacity' ? ' active' : ''}`}
         >Class Capacity</button>
       </div>
 
@@ -386,20 +388,6 @@ export default function WaitlistPage() {
       )}
     </div>
   );
-}
-
-function tabStyle(active) {
-  return {
-    border: 'none',
-    background: active ? '#fff' : 'transparent',
-    color: active ? 'var(--primary)' : 'var(--muted)',
-    borderRadius: 10,
-    padding: '7px 18px',
-    fontWeight: 700,
-    fontSize: 13,
-    cursor: 'pointer',
-    boxShadow: active ? '0 1px 4px rgba(76,42,146,.14)' : 'none',
-  };
 }
 
 function SummaryCard({ label, value, accent }) {
