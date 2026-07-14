@@ -13,6 +13,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
+  const [resetMsg, setResetMsg] = useState('');
+  const [resetPending, setResetPending] = useState(false);
   const navigate = useNavigate();
   const [params] = useSearchParams();
 
@@ -33,6 +35,26 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleForgotPassword(e) {
+    e.preventDefault();
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setResetMsg('Enter your email address first.');
+      return;
+    }
+    setResetPending(true);
+    setResetMsg('Sending reset link...');
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+      redirectTo: `${window.location.origin}/auth/reset-password`,
+    });
+    setResetPending(false);
+    if (resetError) {
+      setResetMsg('Could not send reset link. Please try again or contact support.');
+      return;
+    }
+    setResetMsg('Check your email for a reset link.');
   }
 
   return (
@@ -123,11 +145,39 @@ export default function LoginPage() {
           >
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
+          <button
+            type="button"
+            onClick={handleForgotPassword}
+            disabled={resetPending}
+            style={forgotButtonStyle}
+          >
+            Forgot password?
+          </button>
         </form>
+
+        {resetMsg && (
+          <p style={{ color: 'var(--muted)', fontSize: 13, margin: '12px 0 0', lineHeight: 1.5 }}>
+            {resetMsg}
+          </p>
+        )}
       </div>
     </div>
   );
 }
+
+const forgotButtonStyle = {
+  appearance: 'none',
+  background: 'transparent',
+  border: 0,
+  color: 'var(--primary)',
+  textDecoration: 'underline',
+  padding: 0,
+  marginTop: 2,
+  cursor: 'pointer',
+  fontSize: 13,
+  fontWeight: 500,
+  alignSelf: 'flex-start',
+};
 
 const inputStyle = {
   padding: '9px 12px',

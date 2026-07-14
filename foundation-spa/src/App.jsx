@@ -16,6 +16,7 @@ const queryClient = new QueryClient({
 
 // Lazy page imports — expand as portals are migrated
 const LoginPage          = lazy(() => import('./features/auth/LoginPage.jsx'));
+const ResetPasswordPage  = lazy(() => import('./features/auth/ResetPasswordPage.jsx'));
 const AuditLogPage       = lazy(() => import('./features/audit-log/AuditLogPage.jsx'));
 const AdminActivityPage  = lazy(() => import('./features/admin-activity/AdminActivityPage.jsx'));
 const RoleAuditPage      = lazy(() => import('./features/role-audit/RoleAuditPage.jsx'));
@@ -82,6 +83,7 @@ export default function App() {
             <Routes>
               {/* Public */}
               <Route path="/auth/login" element={<LoginPage />} />
+              <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
               <Route path="/auth/*" element={<Navigate to="/auth/login" replace />} />
 
               {/* Design system showcase (dev only) */}
