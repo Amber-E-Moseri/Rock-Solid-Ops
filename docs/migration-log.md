@@ -1829,3 +1829,65 @@ and should be narrowed or removed. Reasoning:
 Audit only — no fixes applied in this pass, per the brief's Phase A scope. Both findings
 (`get_teacher_attention_flags` broken, `get_system_attention_flags` clean) and the
 exception-handling recommendation are reported for a follow-up decision/fix pass.
+
+---
+
+## 2026-07-14 — `get_teacher_attention_flags` fixed (Phase B, migration applied — GATE)
+
+Follow-up to the Phase A audit above. Branch `brief/fix-teacher-attention-flags`, migration
+`supabase/migrations/202607142100_fix_teacher_attention_flags.sql`.
+
+**What was broken:** `class_metrics`'s `expected_sessions` calculation did
+`extract(epoch FROM (LEAST(COALESCE(end_date, now()::date), now()::date) - start_date)) / 604800`.
+`batches.start_date`/`end_date` are `date`, and Postgres `date - date` returns `integer` (a day
+count), not `interval` — `extract(epoch FROM <integer>)` has no matching overload (`SQLSTATE
+42883`), thrown on every call. The blanket `EXCEPTION WHEN OTHERS THEN RETURN` swallowed it,
+so all three flag types (`overdue_attendance_submission`, `teacher_neglect`,
+`teacher_unlinked_auth`) returned zero rows for every call since the function was created
+(`202605220011`, 2026-05-22) — confirmed live in the Phase A audit.
+
+**How it was fixed:**
+1. Date arithmetic: since `date - date` is already an integer day count, dropped the
+   `extract(epoch FROM ...)/604800` round-trip entirely and divide the day count by `7`
+   directly — same `floor(days/7)+1` semantics, no type gymnastics. (The brief's suggested
+   `(date - date)::interval` cast does not work: Postgres has no `integer → interval` cast;
+   confirmed live — `cannot cast type integer to interval`, `SQLSTATE 42846`.)
+2. Exception handling: replaced the blanket swallow with an `INSERT INTO public.audit_logs
+   (actor_email, action, entity_type, entity_id, status, details, created_at)` call
+   (`action='ATTENTION_FLAGS_ERROR'`, `status='FAILED'`, `details` carries `SQLSTATE`/`SQLERRM`/
+   `p_batch_id`) before `RETURN`, matching the live `audit_logs` schema (no `actor_id` or
+   `logged_at` columns exist on `main` — those only appear in an older, superseded migration).
+
+**The logging paid for itself immediately.** After applying only the date-arithmetic fix, the
+function still returned zero rows. The new `audit_logs` entry showed why:
+`SQLSTATE 42702, "column reference \"teacher_id\" is ambiguous"`. `RETURNS TABLE (..., teacher_id
+text, full_name text, email text, ...)` makes `teacher_id`/`full_name`/`email` PL/pgSQL
+OUT-parameter names in scope for the whole function body. The `overdue` and `neglect` CTEs
+selected and grouped by those same column names *unqualified* from `class_expectation`,
+colliding with the OUT parameters. This bug has existed since the function's creation too — it
+was invisible before because Postgres's query-analysis phase hit the `extract(epoch ...)` type
+error first, before it ever reached the ambiguous-reference check further down in the same
+statement. Fixed by qualifying every such reference with the CTE alias (`c.teacher_id`,
+`c.full_name`, `c.email`) in both branches. `unlinked` was already qualified (`t.teacher_id`
+etc.) and was never affected.
+
+**Verified live** (`supabase db query --linked`, `foundation-school` project
+`xelpsttqhrcqmttmjory`) after both fixes: `select * from get_teacher_attention_flags();`
+returns 10 real rows — 3 `overdue_attendance_submission`, 7 `teacher_neglect`, 0
+`teacher_unlinked_auth`. The zero for `teacher_unlinked_auth` is a genuine result, not a
+swallowed error: confirmed separately that 0 active teachers currently have a null
+`teacher_user_id`. No `ATTENTION_FLAGS_ERROR` row was written on the successful run.
+
+**New exception-handling approach:** narrowed from silent-swallow to log-then-return-empty.
+This does not fully solve the "one bad branch hides the others" structural issue named in the
+Phase A exception-handling reasoning (a fatal error anywhere in the single `UNION ALL`
+statement still empties the whole result) — that would need per-branch statements/RPCs, which
+is a larger structural change intentionally left out of this fix. What it does fix: a future
+regression will leave a trace in `audit_logs` instead of looking identical to "nothing to
+report."
+
+**GATE:** this is a fix to a broken alerting RPC on `main`, applied directly to the live
+`foundation-school` project via `supabase db query --linked` (not via `db push`, which also
+wanted to reconcile several unrelated older migrations, one of which fails against current
+schema — out of scope for this brief and not touched). Migration file is staged on
+`brief/fix-teacher-attention-flags` pending merge confirmation.
