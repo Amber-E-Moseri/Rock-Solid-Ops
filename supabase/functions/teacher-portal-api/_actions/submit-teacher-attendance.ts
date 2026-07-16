@@ -13,6 +13,7 @@ export async function submitTeacherAttendanceAction(ctx: ActionContext): Promise
       const classSession = String(params.classSession || "").trim();
       const classDate = parseDate(params.classDate);
       const records = Array.isArray(params.records) ? params.records : [];
+      const guestRecords = Array.isArray(params.guestRecords) ? params.guestRecords : [];
 
       const classSessions = classSession
         .split(",")
@@ -382,6 +383,42 @@ export async function submitTeacherAttendanceAction(ctx: ActionContext): Promise
         }
       }
 
+      // Guest attendance — written to attendance_records (canonical table with guest support).
+      // No student_id, no PII lookup; only name is stored. Class ownership already verified above.
+      let guestInserted = 0;
+      if (guestRecords.length) {
+        const guestRows = guestRecords.flatMap((g) => {
+          const guestName = String(g.guestName || "").trim().slice(0, 200);
+          if (!guestName) return [];
+          return classSessions.map((session) => ({
+            class_option_id: classOptionId,
+            class_number: parseInt(session, 10) || 1,
+            class_date: classDate,
+            status: "present",
+            attendance_type: "guest",
+            guest_name: guestName,
+            guest_phone: String(g.guestPhone || "").trim().slice(0, 50) || null,
+            submitted_by: auth.user.id,
+          }));
+        });
+
+        if (guestRows.length) {
+          const guestDedupe = new Map<string, typeof guestRows[number]>();
+          for (const row of guestRows) {
+            const key = `${row.class_option_id}::${row.class_number}::${row.class_date}::${row.guest_name}`;
+            if (!guestDedupe.has(key)) guestDedupe.set(key, row);
+          }
+          const guestUpsertRes = await withTimeout(
+            db.from("attendance_records").upsert([...guestDedupe.values()], {
+              onConflict: "class_option_id,class_number,class_date,guest_name",
+            }),
+            "guest attendance upsert",
+          );
+          if (guestUpsertRes.error) throw new ApiError("INTERNAL_ERROR", "Failed to save guest attendance", 500);
+          guestInserted = guestDedupe.size;
+        }
+      }
+
       await writeAudit(db, {
         action: "ATTENDANCE_SUBMITTED",
         actorEmail: auth.teacher.email,
@@ -391,6 +428,7 @@ export async function submitTeacherAttendanceAction(ctx: ActionContext): Promise
         status: "ok",
         details: {
           inserted: uniqueInserts.length,
+          guestInserted,
           presentStudents: presentStudentIds.length,
           sessions: classSessions,
           classDate,
