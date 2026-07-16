@@ -90,7 +90,9 @@ export default function TeacherAttendancePage() {
   async function handleSubmit() {
     setLoading(true);
     try {
-      const records = roster.map((r) => ({
+      const rosterMembers = roster.filter((r) => !r.isGuest);
+      const guestMembers = roster.filter((r) => r.isGuest && attendance[r.id]);
+      const records = rosterMembers.map((r) => ({
         personId: r.id, studentId: r.studentId, applicantId: r.applicantId,
         personType: r.personType, fullName: r.fullName, email: r.email,
         fellowshipCode: r.fellowshipCode, sourceClassOptionId: r.sourceClassOptionId,
@@ -98,10 +100,14 @@ export default function TeacherAttendancePage() {
         attendanceStatus: attendance[r.id] ? 'Present' : 'Absent',
         source: r.source,
       }));
+      const guestRecords = guestMembers.map((r) => ({
+        guestName: r.fullName,
+        guestPhone: r.phone || '',
+      }));
       await submitAttendance({
         teacherId: selectedTeacher.teacherId, teacherName: selectedTeacher.fullName,
         classOptionId: selectedClass.classOptionId, classSession: sessions.join(','),
-        classDate, records,
+        classDate, records, guestRecords,
       });
       addToast('Attendance submitted', 'success');
 
@@ -326,9 +332,11 @@ export default function TeacherAttendancePage() {
               <div key={r.id} onClick={() => setAttendance((a) => ({ ...a, [r.id]: !a[r.id] }))}
                 className="rso-card" style={{ padding: '0.5rem 0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   borderLeft: `3px solid ${attendance[r.id] ? 'var(--color-success)' : 'var(--color-danger)'}` }}>
-                <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <span style={{ fontWeight: 600 }}>{r.fullName}</span>
-                  <span style={{ fontSize: '11px', color: 'var(--muted)', marginLeft: '0.5rem' }}>{r.personType}</span>
+                  {r.isGuest
+                    ? <Badge variant="neutral">Guest</Badge>
+                    : <span style={{ fontSize: '11px', color: 'var(--muted)' }}>{r.personType}</span>}
                 </div>
                 <Badge variant={attendance[r.id] ? 'success' : 'danger'}>{attendance[r.id] ? 'Present' : 'Absent'}</Badge>
               </div>
@@ -416,11 +424,12 @@ export default function TeacherAttendancePage() {
 }
 
 function AddPersonModal({ classOptionId, teacherId, sessions, onClose, onAdd, addToast }) {
+  const [tab, setTab] = useState('search'); // 'search' | 'guest'
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
-  const [enrollForm, setEnrollForm] = useState(false);
-  const [form, setForm] = useState({ full_name: '', email: '', phone: '' });
+  const [guestName, setGuestName] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
 
   async function doSearch() {
     if (!query || query.length < 2) return;
@@ -428,35 +437,63 @@ function AddPersonModal({ classOptionId, teacherId, sessions, onClose, onAdd, ad
     try {
       const r = await searchPerson(query, classOptionId, teacherId, sessions);
       setResults(r);
-      setEnrollForm(r.length === 0);
     } catch (e) { addToast(e.message, 'error'); }
     finally { setSearching(false); }
   }
 
+  const tabStyle = (t) => ({
+    padding: '0.35rem 0.75rem', borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+    fontWeight: tab === t ? 700 : 400, fontSize: '13px',
+    background: tab === t ? 'var(--primary)' : 'var(--surface)',
+    color: tab === t ? '#fff' : 'var(--text)',
+  });
+
   return (
-    <Modal title="Add Person" onClose={onClose}>
-      <div style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem' }}>
-        <input className="rso-input" style={{ flex: 1 }} placeholder="Search by name or email…" value={query}
-          onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doSearch()} />
-        <Button variant="primary" size="sm" onClick={doSearch} disabled={searching}>Search</Button>
+    <Modal title="Add Person" open onClose={onClose}>
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+        <button style={tabStyle('search')} onClick={() => setTab('search')}>Search Roster</button>
+        <button style={tabStyle('guest')} onClick={() => setTab('guest')}>Guest (visiting)</button>
       </div>
-      {results.map((r) => (
-        <div key={r.id} className="rso-card" onClick={() => onAdd({ ...r, source: 'Search' })}
-          style={{ padding: '0.5rem 0.75rem', cursor: 'pointer', marginBottom: '0.25rem' }}>
-          <span style={{ fontWeight: 600 }}>{r.fullName}</span>
-          <span style={{ fontSize: '11px', color: 'var(--muted)', marginLeft: '0.5rem' }}>{r.email} · {r.personType}</span>
-        </div>
-      ))}
-      {enrollForm && (
-        <div style={{ marginTop: '0.75rem', display: 'grid', gap: '0.5rem' }}>
-          <p style={{ fontSize: '13px', color: 'var(--muted)' }}>No results. Enroll a new person:</p>
-          <input className="rso-input" placeholder="Full Name" value={form.full_name} onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))} />
-          <input className="rso-input" placeholder="Email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
-          <input className="rso-input" placeholder="Phone (optional)" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
-          <Button variant="primary" size="sm" disabled={!form.full_name || !form.email} onClick={() => onAdd({
-            id: `ENROLL-${Date.now()}`, fullName: form.full_name, email: form.email,
-            personType: 'Student', source: 'Teacher Enrolled',
-          })}>Enroll & Add Present</Button>
+
+      {tab === 'search' && (
+        <>
+          <div style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem' }}>
+            <input className="rso-input" style={{ flex: 1 }} placeholder="Search by name or email…" value={query}
+              onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doSearch()} />
+            <Button variant="primary" size="sm" onClick={doSearch} disabled={searching}>Search</Button>
+          </div>
+          {results.map((r) => (
+            <div key={r.id} className="rso-card" onClick={() => onAdd({ ...r, source: 'Search' })}
+              style={{ padding: '0.5rem 0.75rem', cursor: 'pointer', marginBottom: '0.25rem' }}>
+              <span style={{ fontWeight: 600 }}>{r.fullName}</span>
+              <span style={{ fontSize: '11px', color: 'var(--muted)', marginLeft: '0.5rem' }}>{r.email} · {r.personType}</span>
+            </div>
+          ))}
+          {results.length === 0 && query.length >= 2 && !searching && (
+            <p style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '0.5rem' }}>
+              No roster match. Use "Guest" tab to record a visiting student's attendance.
+            </p>
+          )}
+        </>
+      )}
+
+      {tab === 'guest' && (
+        <div style={{ display: 'grid', gap: '0.5rem' }}>
+          <p style={{ fontSize: '13px', color: 'var(--muted)' }}>
+            Record that a visiting student attended. Only their name is saved — no account details.
+          </p>
+          <input className="rso-input" placeholder="Full Name *" value={guestName}
+            onChange={(e) => setGuestName(e.target.value)} />
+          <input className="rso-input" placeholder="Phone (optional)" value={guestPhone}
+            onChange={(e) => setGuestPhone(e.target.value)} />
+          <Button variant="primary" size="sm" disabled={!guestName.trim()} onClick={() => onAdd({
+            id: `GUEST-${Date.now()}`,
+            fullName: guestName.trim(),
+            phone: guestPhone.trim(),
+            isGuest: true,
+            personType: 'Guest',
+            source: 'Guest',
+          })}>Mark as Present</Button>
         </div>
       )}
     </Modal>
