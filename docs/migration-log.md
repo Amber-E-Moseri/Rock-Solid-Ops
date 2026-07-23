@@ -2486,3 +2486,57 @@ branch first to resolve.
 Migration `202607142000` applied on `brief/notification-template-audit` only — not merged to
 `main`. Verification queries (row-level confirmation the 10 keys are deactivated and nothing
 else moved) provided to the operator to run against the live DB before any merge decision.
+
+---
+
+## 2026-07-23 — `get_student_attention_flags` fixed (`brief/fix-student-attention-flags`)
+
+Follow-up to `brief/attention-flags-audit`'s finding (`66f5c18`, 2026-07-14): after the
+`student_grades.student_email` bug was fixed on `main` (`202607131700_moodle_no_login_flag_threshold.sql`,
+already merged), the student attention-flags RPC was still broken by a second, independent
+bug the audit found but did not fix (audit-only brief).
+
+**What was broken:** `get_student_attention_flags`'s `attendance_ordered` CTE ordered its
+`row_number()` window by `al.created_at`. `attendance_log` has no `created_at` column
+(`supabase/migrations/000_baseline_squash.sql:592-621`; its only timestamp column is
+`logged_at`) and no later migration adds one — confirmed by checking every
+`ALTER TABLE ... attendance_log` in the repo. The reference throws on every call; the blanket
+`EXCEPTION WHEN OTHERS THEN RETURN` swallowed it, so the function has silently returned zero
+rows for all five student flag types (`inactive_no_attendance`, `repeat_absence_3_plus`,
+`moodle_synced_no_login`, `stalled_no_milestones_4_weeks`, `waitlist_over_14_days`) since
+creation (`202605220011`, 2026-05-22) — the entire Needs Attention student-flags surface has
+never actually worked in production, matching the pattern already found and fixed in
+`get_teacher_attention_flags` (`202607142100`, Phase B entry above).
+
+**Fix:** `supabase/migrations/202607231200_fix_student_attention_flags.sql`. Ordering key
+changed from `al.created_at` to `al.logged_at` — same tiebreak purpose, correct column.
+Function body otherwise unchanged from `202607131700_moodle_no_login_flag_threshold.sql`.
+Also narrowed the exception handler to match the precedent set by the teacher-RPC fix:
+instead of silently returning empty, it now logs to `audit_logs`
+(`action='ATTENTION_FLAGS_ERROR'`, `entity_id='get_student_attention_flags'`, `status='FAILED'`,
+`details` carrying `SQLSTATE`/`SQLERRM`/`p_batch_id`) before `RETURN`, so a future regression
+is visible instead of looking identical to "no flags right now."
+
+**Not live-verified.** Same limitation documented in every prior audit/fix pass in this repo:
+this session's `supabase` CLI account (`sgfvholfqrzdirdwfrya` org) does not have access to the
+linked `foundation-school` project (`xelpsttqhrcqmttmjory`) — `supabase db query --linked`
+returns `403: Your account does not have the necessary privileges`. The SQL change is a
+single-column substitution reviewed line-by-line against the live schema (confirmed via
+`000_baseline_squash.sql`) and against the exact pattern already verified live for the sibling
+teacher-RPC fix; no other logic changed. Recommend the operator run
+`select * from get_student_attention_flags();` after this migration is applied, the same way
+the teacher-RPC fix was confirmed.
+
+**`get_system_attention_flags`** — not touched here. Confirmed clean by both the 2026-07-14
+audit-worktree pass and the separate, live-verified main-session Phase A audit above; no
+follow-up needed.
+
+**Scope note:** did not touch `registration-processor` or `moodle-sync` — this fix is confined
+to the `get_student_attention_flags` reporting RPC and its own `attendance_log`/`audit_logs`
+reads/writes.
+
+### GATE
+
+None required — this is a reporting-RPC bug fix with no RLS or auth-boundary change, same
+class as the already-merged `get_teacher_attention_flags` fix which needed none. Safe to merge
+same session per the standing branch-per-brief workflow.
