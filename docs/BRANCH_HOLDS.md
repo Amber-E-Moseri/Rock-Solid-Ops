@@ -23,88 +23,18 @@ canonical body supersedes it (main session flagged the conflict to the operator)
 update is isolated in section 2 of `202607141000_waitlist_consolidate_dedup.sql`,
 strippable on its own if the operator reverses.
 
-### `brief/moodle-credential-safety`
+## Resolved (moot — already merged)
 
-Gate: test-verification (closed)
-Status: READY TO MERGE
-Resolved: Real Moodle rejection observed in production (duplicate email with
-missing credentials proves the scenario is real). Synthetic-fixture test verified
-fix logic. Gate (b) — accept synthetic-fixture verification — satisfied.
+### `brief/moodle-credential-safety` — RESOLVED 2026-07-23
 
-Historical note: operator ran both live-database queries. Query 1 returned 9 students spanning
-2026-05-17 through 2026-06-28 in the "SYNCED with no grades activity" shape, plus 4 separate
-data-integrity rows (`SYNCED` with `synced_at IS NULL`) that are not part of this hold.
-Query 2 confirmed the broader Moodle-rejection mechanism is real on a create-user path, while
-not directly hitting the exact silent password-reset bug this branch fixes — expected, because
-that silent path logged nothing. Operator then manually verified the other affected students'
-logins and confirmed only `taquangminh081` needed a manual credential fix.
+This entry was stale. Verified 2026-07-23: the branch's full commit range (through
+`911e3a2 docs: Phase A findings for real-Moodle verification gate`) is already an ancestor
+of `main` (`git log main..911e3a2` is empty) — it was committed directly to `main` in an
+earlier session, before this hold was written. There is nothing left to merge. The
+`rso-moodle-credential-safety` worktree (detached HEAD at `911e3a2`, one untracked
+`deno.lock`) is stale and slated for removal as part of general worktree cleanup.
 
-Separate open follow-up, not part of the now-closed merge gate: 4 data-integrity rows were found
-with `sync_status = 'SYNCED'` and `synced_at IS NULL`, including duplicate emails with differing
-`moodle_user_id` values. That issue remains unaddressed and must not be silently dropped.
-
-Queries that were reviewed for this resolved hold:
-
-```sql
--- Query 1: other students currently in the same synced-but-silent state
--- Reconstructed durably from the branch's own fixed 48h threshold logic in
--- 202607131700_moodle_no_login_flag_threshold.sql because the current checked-in
--- migration-log entry refers to these queries but does not preserve the SQL text.
-SELECT
-  ms.id,
-  ms.applicant_id,
-  ms.student_id,
-  ms.email,
-  ms.full_name,
-  ms.batch_id,
-  ms.class_option_id,
-  ms.course_id,
-  ms.moodle_user_id,
-  ms.sync_status,
-  ms.synced_at,
-  ms.created_at,
-  ms.updated_at
-FROM public.moodle_enrollment_sync ms
-JOIN public.applicants a
-  ON a.id = ms.applicant_id
-WHERE upper(COALESCE(ms.sync_status, '')) = 'SYNCED'
-  AND COALESCE(a.registration_status, a.status) = 'ASSIGNED'
-  AND ms.synced_at < now() - interval '48 hours'
-  AND NOT EXISTS (
-    SELECT 1
-    FROM public.student_grades sg
-    WHERE sg.applicant_id::text = a.id::text
-       OR sg.student_id::text = a.id::text
-  )
-ORDER BY ms.synced_at DESC NULLS LAST, ms.created_at DESC;
-```
-
-```sql
--- Query 2: historical audit-log evidence of Moodle password rejection
--- Reconstructed durably from moodle-sync's failure logging shape on this branch:
--- action MOODLE_SYNC_FAILED on entity_type moodle_enrollment_sync, with the rejection
--- surfaced in details.message as MOODLE_WARNING_REJECTED...
-SELECT
-  al.id,
-  al.logged_at,
-  al.entity_id,
-  al.action,
-  al.status,
-  al.details
-FROM public.audit_logs al
-WHERE al.entity_type = 'moodle_enrollment_sync'
-  AND al.action = 'MOODLE_SYNC_FAILED'
-  AND (
-    COALESCE(al.details->>'message', '') ILIKE '%MOODLE_WARNING_REJECTED%'
-    OR COALESCE(al.details->>'reason', '') ILIKE '%MOODLE_WARNING_REJECTED%'
-    OR al.details::text ILIKE '%password%'
-    OR al.details::text ILIKE '%warning%'
-  )
-ORDER BY al.logged_at DESC;
-```
-
-Current instruction: do not merge this branch yet. The SQL-query hold is closed, but the
-remaining test-verification gate is still open until the operator explicitly decides whether to
-1. find a way to verify against a real Moodle rejection response,
-2. accept synthetic-fixture-only verification for this now-confirmed isolated edge case, or
-3. choose a different gate/verification path.
+The separate open follow-up noted below was NOT re-verified and remains unaddressed:
+4 data-integrity rows were found with `sync_status = 'SYNCED'` and `synced_at IS NULL`,
+including duplicate emails with differing `moodle_user_id` values. That issue must not be
+silently dropped — it needs its own brief if picked up.
