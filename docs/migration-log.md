@@ -2747,3 +2747,53 @@ The original `brief/pwa-push` branch and its worktree (`../rso-pwa-push`) are no
 superseded — every commit on it is accounted for (C.1 merged, C.2 re-homed, the worktree-rule
 commit already independently on `main`) — but left in place, not deleted, since removing it
 wasn't asked for in this brief's scope.
+
+---
+
+## 2026-07-23 — `brief/push-notifications` rebased onto current `main` and merged
+
+This branch was 50 commits behind `main` (diverged 2026-07-13). Rebased its own three commits
+(the two Phase C.2 feature commits plus this close-out doc commit) onto current `main` via
+`git rebase --onto`. The branch's own change set, isolated from `main`'s independent drift via
+`git diff $(git merge-base main HEAD)..HEAD`, was confirmed purely additive (1344 insertions,
+0 deletions) before rebasing — it does not modify or remove anything `main` already has.
+
+**Conflicts during rebase (2, both trivial):**
+1. `docs/migration-log.md` — pure append-vs-append on both sides; resolved by keeping both
+   entries in chronological order, no content lost.
+2. `supabase/functions/waitlist-processor/index.ts` — two independent new `import` lines added
+   at the same location (this branch's `push-notify.ts` import vs. `main`'s already-merged
+   `dedupe.ts` import from the waitlist-dedup-consolidation work); resolved by keeping both.
+   The two features touch disjoint parts of the file (dedupe logic vs. the push-notify call
+   site) — verified no logical overlap, not just a textual merge.
+
+**Touches `registration-processor/index.ts` (+22 lines).** Per the standing instruction not to
+let unrelated work interfere with the registration/Moodle processors, this was flagged to the
+operator before merging rather than merged silently. The change is a best-effort push
+notification fired only on `REVIEW`/`DUPLICATE` outcomes, after the registration decision is
+already made, wrapped in try/catch, and a no-op when VAPID isn't configured — it cannot affect
+the registration response. Operator reviewed and approved merging it as part of this brief.
+Does not touch `moodle-sync` at all (confirmed via the same isolated-diff check).
+
+**Found and fixed while verifying: `push-notify.test.ts`'s `fakeSub()` fixture was invalid.**
+It built `p256dh` from random bytes with the correct length and uncompressed-point prefix
+(`0x04`) but not an actual point on the P-256 curve — `crypto.subtle.importKey`'s ECDH
+validation rejects that, so `sendWebPush` threw on every call in the three tests that exercise
+it. Those tests were asserting values that happened to be `0` (the failure path), not actually
+exercising the success/expiry/dedupe paths they were named for — they had never actually
+passed since being written; `deno` wasn't runnable in this environment until a separate,
+later session installed it via `scoop`. Fixed by deriving `p256dh` from a real generated ECDH
+keypair (`fix(push): push-notify.test.ts fakeSub() generated an invalid EC point`). All 8
+tests across `webpush.test.ts` and `push-notify.test.ts` now pass for real
+(`deno test --no-check --allow-net --allow-env`).
+
+**Not independently re-verified in this pass:** the live crypto/VAPID-JWT verification and the
+in-browser roundtrip proof documented in the original Phase C.2 build entry above — those were
+browser-based checks from the original session and weren't repeated here. The Deno unit tests
+now passing is the verification performed this session.
+
+### GATE
+
+Registration-processor touch reviewed and approved by the operator (see above) — this was the
+only gate; no RLS/auth-boundary change otherwise. Merged to `main` same session per the
+standing branch-per-brief workflow.
