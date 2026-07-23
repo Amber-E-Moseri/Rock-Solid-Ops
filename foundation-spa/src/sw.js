@@ -123,6 +123,8 @@ self.addEventListener('fetch', (event) => {
       fetch(request).catch(() =>
         caches.match('/index.html', { ignoreSearch: true }).then(
           (cached) => cached || caches.match('/')
+        ).then(
+          (cached) => cached || Response.error()
         )
       )
     );
