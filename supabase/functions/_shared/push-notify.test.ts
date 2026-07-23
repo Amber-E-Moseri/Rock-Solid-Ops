@@ -32,12 +32,14 @@ function mockDb(rows: Array<{ user_id: string; push_subscription: unknown }>) {
   return db;
 }
 
-function fakeSub() {
+async function fakeSub() {
   // A structurally valid subscription so real encryption runs before the mocked fetch.
-  const p256dh = new Uint8Array(65);
-  p256dh[0] = 0x04;
-  crypto.getRandomValues(p256dh.subarray(1));
-  return { endpoint: "https://push.example.com/x", keys: { p256dh: bytesToB64url(p256dh), auth: bytesToB64url(crypto.getRandomValues(new Uint8Array(16))) } };
+  // p256dh must be a real point on the P-256 curve (ECDH import validates this) —
+  // random bytes with just the 0x04 uncompressed-point prefix are not, so derive it
+  // from an actual generated keypair rather than faking the bytes directly.
+  const pair = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+  const rawPublic = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));
+  return { endpoint: "https://push.example.com/x", keys: { p256dh: bytesToB64url(rawPublic), auth: bytesToB64url(crypto.getRandomValues(new Uint8Array(16))) } };
 }
 
 function withVapid() {
@@ -48,7 +50,7 @@ function withVapid() {
 
 Deno.test("skips (no-op, not error) when VAPID is unconfigured", async () => {
   ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT"].forEach((k) => Deno.env.delete(k));
-  const db = mockDb([{ user_id: "u1", push_subscription: fakeSub() }]);
+  const db = mockDb([{ user_id: "u1", push_subscription: await fakeSub() }]);
   const res = await notifyProfilesPush(db, ["u1"], { title: "T", body: "B" });
   assert(res.skipped);
   assertEquals(res.attempted, 0);
@@ -68,8 +70,8 @@ Deno.test("sends to subscribed profiles and counts 201 as sent", async () => {
   globalThis.fetch = () => Promise.resolve(new Response(null, { status: 201 }));
   try {
     const db = mockDb([
-      { user_id: "u1", push_subscription: fakeSub() },
-      { user_id: "u2", push_subscription: fakeSub() },
+      { user_id: "u1", push_subscription: await fakeSub() },
+      { user_id: "u2", push_subscription: await fakeSub() },
     ]);
     const res = await notifyProfilesPush(db, ["u1", "u2"], { title: "Reg", body: "ASSIGNED", type: "registration_status" });
     assertEquals(res.attempted, 2);
@@ -86,7 +88,7 @@ Deno.test("410 Gone marks subscription expired and clears it", async () => {
   const orig = globalThis.fetch;
   globalThis.fetch = () => Promise.resolve(new Response("gone", { status: 410 }));
   try {
-    const db = mockDb([{ user_id: "u1", push_subscription: fakeSub() }]);
+    const db = mockDb([{ user_id: "u1", push_subscription: await fakeSub() }]);
     const res = await notifyProfilesPush(db, ["u1"], { title: "T", body: "B" });
     assertEquals(res.expired, 1);
     assertEquals(res.sent, 0);
@@ -105,7 +107,7 @@ Deno.test("dedupes recipient ids", async () => {
   let calls = 0;
   globalThis.fetch = () => { calls += 1; return Promise.resolve(new Response(null, { status: 201 })); };
   try {
-    const db = mockDb([{ user_id: "u1", push_subscription: fakeSub() }]);
+    const db = mockDb([{ user_id: "u1", push_subscription: await fakeSub() }]);
     const res = await notifyProfilesPush(db, ["u1", "u1", "u1"], { title: "T", body: "B" });
     assertEquals(res.attempted, 1);
     assertEquals(calls, 1);
