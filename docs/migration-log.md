@@ -2551,7 +2551,7 @@ decisions named under GATE below rather than guessed into critical code.
 
 ### BUILT
 
-- **Migration `202607131700_profiles_push_subscription.sql`** — adds `push_subscription`
+- **Migration `202607231300_profiles_push_subscription.sql`** — adds `push_subscription`
   (jsonb), `push_subscribed_at` (timestamptz), `push_enabled` (bool default false) to
   `profiles`, plus a partial index. **No new RLS policies**: the existing
   `profiles_self_or_admin_(select|update)` already give exactly self-read/write + no
@@ -2641,7 +2641,7 @@ recipient. Item 5 (wiring) is now complete.
   after the availability upsert + audit, push admins "Availability submitted" →
   `/staff/availability-approval`. `db` there is service-role, so it can read admin subs.
 - **Attention flags → new `attention-flag-push-sweep` edge function** + migration
-  `202607131800_attention_flags_push_notified.sql` (adds `push_notified_at` + partial index).
+  `202607231301_attention_flags_push_notified.sql` (adds `push_notified_at` + partial index).
   Cron every 5 min (retry-worker pattern): selects unresolved flags with
   `push_notified_at IS NULL`, sends ONE batched nudge to admins with a per-type breakdown →
   `/staff/needs-attention`, then stamps `push_notified_at` so each flag nudges at most once.
@@ -2732,8 +2732,8 @@ Re-read the actual current state rather than reconfirming the prior analysis by 
 `brief/push-notifications` (worktree: `../rso-push-notifications`) is feature-complete and
 verified in isolation. Not merged — human-only steps remain:
 
-- [ ] Apply `202607131700_profiles_push_subscription.sql` and
-      `202607131800_attention_flags_push_notified.sql` to a real Postgres instance.
+- [ ] Apply `202607231300_profiles_push_subscription.sql` and
+      `202607231301_attention_flags_push_notified.sql` to a real Postgres instance.
 - [ ] Provision `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `VAPID_PUBLIC_KEY`, `ALLOWED_ORIGINS`
       as edge secrets.
 - [ ] Schedule `attention-flag-push-sweep` on `pg_cron`.
