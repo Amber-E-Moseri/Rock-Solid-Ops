@@ -2,6 +2,7 @@ import { ApiError } from "../_lib/errors.ts";
 import { json, normalizeTimeSlot, safeLower, withTimeout } from "../_lib/http.ts";
 import type { ActionContext } from "../_lib/types.ts";
 import { writeAudit } from "../_lib/teacher-auth.ts";
+import { notifyProfilesPush, resolveStaffRecipients } from "../../_shared/push-notify.ts";
 
 function normalizeCampusCodes(raw: unknown): string[] {
   const arr = Array.isArray(raw) ? raw : [];
@@ -114,6 +115,25 @@ export async function submitTeacherAvailabilityAction(ctx: ActionContext): Promi
     status: "ok",
     details: { upserted: inserts.length, slot_count: inserts.length },
   });
+
+  // Complementary push channel (PWA Phase C.2): nudge admins that a teacher
+  // submitted availability awaiting approval. Recipients = admins only
+  // (superadmin + admin) per the C.2 gate. `db` is service-role, so it can read
+  // admin subscriptions. Fire-and-forget: never affects the submission response.
+  try {
+    const admins = await resolveStaffRecipients(db, ["superadmin", "admin"]);
+    if (admins.length > 0) {
+      const who = String(auth?.teacher?.email || teacherEmail || "A teacher");
+      await notifyProfilesPush(db, admins, {
+        title: "Availability submitted",
+        body: `${who} submitted availability for approval.`,
+        url: "/staff/availability-approval",
+        type: "teacher_availability",
+      });
+    }
+  } catch (_pushErr) {
+    // Best-effort only.
+  }
 
   return json({ ok: true, data: { upserted: inserts.length } });
 }

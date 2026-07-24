@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { PushToggle } from '../pwa/PushToggle.jsx';
 import {
   LayoutDashboard, Shield, Calendar, Users, Clock, BookOpen,
   BarChart2, CheckSquare, CalendarCheck, TrendingUp, HelpCircle,
@@ -247,6 +248,7 @@ export default function Shell({ children, pageTitle }) {
           </div>
 
           <div className="topbar-right">
+            <PushToggle />
             <button className="icon-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Light mode' : 'Dark mode'} aria-label="Toggle theme">
               {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </button>

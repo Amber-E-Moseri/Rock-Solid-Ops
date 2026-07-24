@@ -2540,3 +2540,260 @@ reads/writes.
 None required — this is a reporting-RPC bug fix with no RLS or auth-boundary change, same
 class as the already-merged `get_teacher_attention_flags` fix which needed none. Safe to merge
 same session per the standing branch-per-brief workflow.
+
+---
+
+## 2026-07-13 — PWA Phase C.2: web push infrastructure (brief/pwa-push, C.2 gate)
+
+Phase C.2 of the PWA brief, built in the dedicated worktree (`../rso-pwa-push`). Adds the
+full web-push stack; the automatic-trigger wiring (item 5) is deliberately held for the two
+decisions named under GATE below rather than guessed into critical code.
+
+### BUILT
+
+- **Migration `202607131700_profiles_push_subscription.sql`** — adds `push_subscription`
+  (jsonb), `push_subscribed_at` (timestamptz), `push_enabled` (bool default false) to
+  `profiles`, plus a partial index. **No new RLS policies**: the existing
+  `profiles_self_or_admin_(select|update)` already give exactly self-read/write + no
+  cross-profile access; the self-role/activation triggers don't touch these columns.
+  Confirmed no broad/anon profiles read exists that would leak a subscription. Additive +
+  idempotent. (Not run against a live DB — no Postgres here.)
+- **New RSO VAPID keypair** generated (`npx web-push generate-vapid-keys`). Public key →
+  `VITE_VAPID_PUBLIC_KEY` in `foundation-spa/.env.local` (gitignored) and documented in
+  `.env.example`. **Private key is NOT committed and NOT in any client env** — it must be set
+  as an edge secret by the user (their infra): `supabase secrets set VAPID_PRIVATE_KEY=…`
+  plus `VAPID_SUBJECT=mailto:…`. Nexus's keys were not reused.
+- **Client subscribe flow** `foundation-spa/src/lib/webPush.js` — adapted from the Nexus
+  template to RSO's model: writes the subscription to `profiles` keyed by `user_id` (not a
+  `users` table), self-write via existing RLS. `subscribeToPush` / `unsubscribeFromPush` /
+  `getPushStatus` / `pushSupported`.
+- **Server sender core** `supabase/functions/_shared/webpush.ts` — built from the RFCs with
+  Web Crypto (no npm/Node-crypto dep that could break in the edge runtime), NOT ported from
+  Nexus's broken plaintext sender: VAPID (RFC 8292) ES256 JWT + `Authorization: vapid …`
+  header, and RFC 8291 aes128gcm payload encryption (ephemeral ECDH P-256 + HKDF key/nonce +
+  AES-128-GCM + aes128gcm framing). Handles 404/410 as "subscription gone".
+- **Fan-out helper** `_shared/push-notify.ts` — `notifyProfilesPush(db, userIds, message)`
+  (service-role; loads subscriptions, sends, clears 410/404-dead ones) and
+  `resolveStaffRecipients(db, roles)`. Fire-and-forget by contract: never throws into a
+  caller's flow, and no-ops (skipped) when VAPID isn't configured, so trigger points stay
+  safe pre-rollout.
+- **Sender edge function** `supabase/functions/send-push/index.ts` — the authenticated
+  callable surface: verifies a real user JWT and requires admin/superadmin (JWT caller
+  verification), uses `ALLOWED_ORIGINS` (never wildcard) via `_shared/http.ts`, audits each
+  send. For manual/test/broadcast sends; the automatic triggers will call the helper directly
+  (no edge-to-edge HTTP hop).
+
+### VERIFIED (crypto proven, not just asserted)
+
+Deno/Postgres are absent in this env, so the crypto was proven in-browser with the SAME Web
+Crypto API the edge runtime uses:
+- **VAPID JWT**: signed with the RSO private key (imported from d + x/y), then VERIFIED under
+  the public key alone (what FCM/Mozilla/Apple do) — valid P-256 point, 64-byte raw r||s
+  ES256 signature, correct aud/exp/sub, 3-part JWT.
+- **RFC 8291 aes128gcm**: full encrypt→decrypt roundtrip between two independent P-256
+  keypairs recovers the exact payload; AES-GCM tag verifies; last-record delimiter 0x02;
+  header framing rs=4096, keyid len 65.
+Deno unit tests written for CI (`_shared/webpush.test.ts`, `_shared/push-notify.test.ts`):
+JWT structure+verify, encrypt→decrypt roundtrip, and the fan-out matrix (sent / 410-expiry
+cleanup / VAPID-unconfigured skip / dedupe) with a mock DB and stubbed fetch.
+
+### GATE — two decisions before trigger wiring (item 5) and merge
+
+1. **Recipient role mapping (product decision).** Which staff roles should receive each push?
+   The mechanism (`resolveStaffRecipients` + `notifyProfilesPush`) is ready, but the brief
+   didn't specify recipients. Proposed defaults to confirm: registration status → admin +
+   superadmin + regional_secretary; teacher availability/waitlist → the availability-approver
+   roles (superadmin/admin/pastor/principal/regional_secretary). I did NOT inject push into
+   `registration-processor` (a release-blocker) on a guess.
+2. **"Attention flag raised" has no edge-function hook point (architecture decision).**
+   `attention_flags` rows are not INSERTed by any edge function (no INSERT found in functions
+   or migrations); flags surface via SECURITY DEFINER RPCs. So there's no natural place to
+   fire a push the way registration/waitlist have. Options: (a) a DB `AFTER INSERT` trigger on
+   `attention_flags` calling the sender via `pg_net`/`supabase_functions.http_request`;
+   (b) hook wherever flags originate once that path is identified; (c) a periodic sweep. Needs
+   a pick before wiring.
+
+### CANNOT VERIFY HERE (human step before ship)
+
+Migration apply (no Postgres); live push delivery end-to-end (subscribe → send → device
+receive) and real-device install, especially iOS Safari — no mobile hardware. The user must
+also set `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` / `ALLOWED_ORIGINS` as edge secrets and run the
+migration before any real send.
+
+---
+
+## 2026-07-13 — PWA Phase C.2: trigger wiring + attention sweep + push toggle (C.2 merge gate)
+
+Follow-up to the C.2 infrastructure entry above. The two gate decisions were answered:
+**recipients = admins only (superadmin + admin)** for all three push types, and
+**attention flags = a 5-minute periodic sweep** (retry-worker cron pattern), batched per
+recipient. Item 5 (wiring) is now complete.
+
+### WIRED (all fire-and-forget; a push failure can never affect the host flow)
+
+- **Registration status → `registration-processor`**: after the existing audit, for the two
+  staff-actionable outcomes (`REVIEW`, `DUPLICATE`) only, push admins "Registration needs
+  attention" → `/staff/applicant-directory`. Routine ASSIGNED/WAITLISTED do not push (noise).
+- **Waitlist movement → `waitlist-processor`**: after the run loop, ONE summary push per run
+  when `results.notified > 0` ("N waitlisted students matched a now-available class") →
+  `/staff/waitlist`. One push per run, not per student, to avoid fragmentation.
+- **Teacher availability → `teacher-portal-api/_actions/submit-teacher-availability.ts`**:
+  after the availability upsert + audit, push admins "Availability submitted" →
+  `/staff/availability-approval`. `db` there is service-role, so it can read admin subs.
+- **Attention flags → new `attention-flag-push-sweep` edge function** + migration
+  `202607131800_attention_flags_push_notified.sql` (adds `push_notified_at` + partial index).
+  Cron every 5 min (retry-worker pattern): selects unresolved flags with
+  `push_notified_at IS NULL`, sends ONE batched nudge to admins with a per-type breakdown →
+  `/staff/needs-attention`, then stamps `push_notified_at` so each flag nudges at most once.
+  If VAPID is unconfigured it no-ops WITHOUT stamping, so nudges begin once secrets are set.
+
+### CLIENT UI
+
+- `foundation-spa/src/components/pwa/PushToggle.jsx` — a topbar Bell/BellOff toggle (mounted
+  in `Shell.jsx` next to the theme toggle) that calls the `webPush.js` subscribe/unsubscribe
+  flow. Renders nothing where push is unsupported (no SW/PushManager/VAPID), so it degrades
+  cleanly. This is the entry point that lets a signed-in staff/teacher turn push on.
+
+### VERIFIED
+
+- SPA production build clean with the toggle wired into the Shell (2188 modules; SW + 63-entry
+  precache intact).
+- Client `applicationServerKey` conversion proven: the RSO VAPID public key decodes to a valid
+  65-byte uncompressed P-256 point (0x04 prefix) — what `PushManager.subscribe` requires.
+- Edge functions could NOT be run here (no Deno); import paths verified, logic reviewed. The
+  push toggle itself is behind auth (topbar renders only when signed in), so a live click-through
+  is a human step, like the card-with-data checks in Phase B.
+
+### STILL A HUMAN STEP BEFORE SHIP (unchanged from the infra entry)
+
+Apply both migrations; set `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` / `VAPID_PUBLIC_KEY` /
+`ALLOWED_ORIGINS` as edge secrets; schedule `attention-flag-push-sweep` on pg_cron; then a
+real-device pass (subscribe → trigger → device receives), especially iOS Safari installed to
+the home screen. No Postgres/Deno/mobile hardware in this environment.
+
+### GATE — confirm before merging brief/pwa-push to main
+
+C.2 complete (infra + wiring + UI). This branch touches `registration-processor` (a release-
+blocker) additively and adds one migration + one scheduled function. Final review requested
+before merge; on approval I merge brief/pwa-push → main, delete the branch, and remove the
+worktree.
+
+---
+
+## 2026-07-13 — C.1 merged to main, C.2 re-homed to brief/push-notifications (unmerged)
+
+Closes out the C.1/C.2 split. `brief/pwa-push` originally carried both phases on one branch;
+this entry records C.1 landing on `main` and C.2 moving to its own branch, verified
+independently rather than assumed to have carried over cleanly.
+
+### C.1 merge — sanity-checked post-merge, not just post-cherry-pick
+
+`brief/pwa-c1` (cherry-picked `307e63b` + `b9eeeaa` onto `main`, one append-only conflict in
+this file resolved by keeping both sides in chronological order) fast-forwarded into `main`
+at `5986db7`. Two things flagged as worth checking rather than assuming correct:
+- `CLAUDE.md` has exactly one "Use a dedicated worktree per brief" section (grep count: 1) —
+  confirms dropping `cb7f5fd` from the C.1 cherry-pick (its content had already reached `main`
+  independently via a different commit) left neither a gap nor a duplicate.
+- This log file has zero leftover `<<<<<<<`/`=======`/`>>>>>>>` markers and no duplicated
+  section headers post-resolution (1293 lines at that point, entries in chronological order).
+
+### C.2 re-homed: brief/push-notifications, off post-C.1 main
+
+Cherry-picked `1a45292` (VAPID/webpush infra) and `9ca1721` (trigger wiring + sweep +
+toggle) onto a fresh branch off `main` (5986db7). Both applied cleanly — `registration-
+processor/index.ts` auto-merged with no conflict (the email-audit `templateKey` fix and the
+push call block sit in disjoint regions of the file, as expected from the original file-list
+check). Isolation verified the same way as C.1: `git diff --stat main..brief/push-notifications`
+shows exactly 16 files, all push-related (`_shared/webpush.ts`, `_shared/push-notify.ts` +
+tests, `send-push`, `attention-flag-push-sweep`, the two migrations, `PushToggle.jsx`,
+`Shell.jsx`'s toggle mount, `webPush.js`, the three trigger call sites, `.env.example`) — no
+C.1 content, no unrelated work rode along.
+
+### Push-safety re-verified on this branch, not assumed to carry over
+
+Re-read the actual current state rather than reconfirming the prior analysis by assumption:
+- `registration-processor/index.ts:766-781` (shifted ~9 lines from pre-split due to the
+  interleaved email-audit fix earlier in the file) — the `try { resolveStaffRecipients(...);
+  notifyProfilesPush(...) } catch (_pushErr) {}` block is byte-identical to the pre-split
+  version, nested inside the handler's outer `try/catch` (closes at line 796).
+- `_shared/push-notify.ts` cherry-picked as a clean file creation (no merge). A first `diff`
+  against the original `1a45292` blob showed every line as changed — investigated rather than
+  reported as a real change: `core.autocrlf=true` on this Windows checkout converts LF→CRLF,
+  which is the entire difference (`diff -b` confirms content-identical). Worth recording as a
+  concrete instance of the "verify claims before acting on them" rule catching a false signal
+  before it became a false conclusion in this log.
+- Conclusion unchanged: `resolveStaffRecipients`/`notifyProfilesPush` are both `async`, so a
+  synchronous throw anywhere in their bodies becomes a rejected promise, never a raw exception
+  to the caller; combined with try/catch at every internal step plus the outer try/catch at
+  the call site, a push failure at any stage cannot block or break the registration response.
+
+### State: ready, not merged
+
+`brief/push-notifications` (worktree: `../rso-push-notifications`) is feature-complete and
+verified in isolation. Not merged — human-only steps remain:
+
+- [ ] Apply `202607131700_profiles_push_subscription.sql` and
+      `202607131800_attention_flags_push_notified.sql` to a real Postgres instance.
+- [ ] Provision `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `VAPID_PUBLIC_KEY`, `ALLOWED_ORIGINS`
+      as edge secrets.
+- [ ] Schedule `attention-flag-push-sweep` on `pg_cron`.
+- [ ] Real-device pass: subscribe → trigger → receive, on at least one Android and one iOS
+      device with the PWA installed to the home screen (iOS Safari push has installed-PWA-only
+      quirks that DevTools/emulation cannot reproduce).
+
+A separate gate/brief covers applying migrations and merging C.2 once the above are done.
+
+The original `brief/pwa-push` branch and its worktree (`../rso-pwa-push`) are now fully
+superseded — every commit on it is accounted for (C.1 merged, C.2 re-homed, the worktree-rule
+commit already independently on `main`) — but left in place, not deleted, since removing it
+wasn't asked for in this brief's scope.
+
+---
+
+## 2026-07-23 — `brief/push-notifications` rebased onto current `main` and merged
+
+This branch was 50 commits behind `main` (diverged 2026-07-13). Rebased its own three commits
+(the two Phase C.2 feature commits plus this close-out doc commit) onto current `main` via
+`git rebase --onto`. The branch's own change set, isolated from `main`'s independent drift via
+`git diff $(git merge-base main HEAD)..HEAD`, was confirmed purely additive (1344 insertions,
+0 deletions) before rebasing — it does not modify or remove anything `main` already has.
+
+**Conflicts during rebase (2, both trivial):**
+1. `docs/migration-log.md` — pure append-vs-append on both sides; resolved by keeping both
+   entries in chronological order, no content lost.
+2. `supabase/functions/waitlist-processor/index.ts` — two independent new `import` lines added
+   at the same location (this branch's `push-notify.ts` import vs. `main`'s already-merged
+   `dedupe.ts` import from the waitlist-dedup-consolidation work); resolved by keeping both.
+   The two features touch disjoint parts of the file (dedupe logic vs. the push-notify call
+   site) — verified no logical overlap, not just a textual merge.
+
+**Touches `registration-processor/index.ts` (+22 lines).** Per the standing instruction not to
+let unrelated work interfere with the registration/Moodle processors, this was flagged to the
+operator before merging rather than merged silently. The change is a best-effort push
+notification fired only on `REVIEW`/`DUPLICATE` outcomes, after the registration decision is
+already made, wrapped in try/catch, and a no-op when VAPID isn't configured — it cannot affect
+the registration response. Operator reviewed and approved merging it as part of this brief.
+Does not touch `moodle-sync` at all (confirmed via the same isolated-diff check).
+
+**Found and fixed while verifying: `push-notify.test.ts`'s `fakeSub()` fixture was invalid.**
+It built `p256dh` from random bytes with the correct length and uncompressed-point prefix
+(`0x04`) but not an actual point on the P-256 curve — `crypto.subtle.importKey`'s ECDH
+validation rejects that, so `sendWebPush` threw on every call in the three tests that exercise
+it. Those tests were asserting values that happened to be `0` (the failure path), not actually
+exercising the success/expiry/dedupe paths they were named for — they had never actually
+passed since being written; `deno` wasn't runnable in this environment until a separate,
+later session installed it via `scoop`. Fixed by deriving `p256dh` from a real generated ECDH
+keypair (`fix(push): push-notify.test.ts fakeSub() generated an invalid EC point`). All 8
+tests across `webpush.test.ts` and `push-notify.test.ts` now pass for real
+(`deno test --no-check --allow-net --allow-env`).
+
+**Not independently re-verified in this pass:** the live crypto/VAPID-JWT verification and the
+in-browser roundtrip proof documented in the original Phase C.2 build entry above — those were
+browser-based checks from the original session and weren't repeated here. The Deno unit tests
+now passing is the verification performed this session.
+
+### GATE
+
+Registration-processor touch reviewed and approved by the operator (see above) — this was the
+only gate; no RLS/auth-boundary change otherwise. Merged to `main` same session per the
+standing branch-per-brief workflow.
