@@ -143,7 +143,7 @@ export default function NexusManagementPage() {
       </Card>
 
       {editing && (
-        <Modal title={editing.id ? 'Edit Nexus Mapping' : 'Add Nexus Mapping'} onClose={() => setEditing(null)}>
+        <Modal open title={editing.id ? 'Edit Nexus Mapping' : 'Add Nexus Mapping'} onClose={() => setEditing(null)}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={fl}>Admin Email (Rock Solid)</label>

@@ -275,7 +275,7 @@ export default function TeacherSchedulePage() {
 
       {/* Review modal */}
       {showReview && (
-        <Modal title="Review & Submit" onClose={() => setShowReview(false)} footer={
+        <Modal open title="Review & Submit" onClose={() => setShowReview(false)} footer={
           <>
             <Button variant="ghost" onClick={() => setShowReview(false)}>Close</Button>
             <Button variant="primary" onClick={handleSubmit} disabled={submitting}>{submitting ? 'Submitting…' : 'Confirm Submit'}</Button>

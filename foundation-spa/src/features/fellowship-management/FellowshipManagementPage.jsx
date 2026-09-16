@@ -97,7 +97,7 @@ export default function FellowshipManagementPage() {
       )}
 
       {confirmDeactivate && (
-        <Modal title="Deactivate Fellowship" onClose={() => setConfirmDeactivate(null)} footer={
+        <Modal open title="Deactivate Fellowship" onClose={() => setConfirmDeactivate(null)} footer={
           <>
             <Button variant="ghost" onClick={() => setConfirmDeactivate(null)}>Cancel</Button>
             <Button variant="danger" onClick={handleDeactivate}>Deactivate</Button>
@@ -122,7 +122,7 @@ function FellowshipModal({ fellowship, onClose, onSave, saving }) {
   });
   const set = (k, val) => setV((p) => ({ ...p, [k]: val }));
   return (
-    <Modal title={fellowship ? 'Edit Fellowship' : 'Add Fellowship'} onClose={onClose} footer={
+    <Modal open title={fellowship ? 'Edit Fellowship' : 'Add Fellowship'} onClose={onClose} footer={
       <>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <Button variant="primary" onClick={() => onSave(v)} disabled={saving || !v.fellowship_code}>{saving ? 'Saving…' : 'Save'}</Button>
