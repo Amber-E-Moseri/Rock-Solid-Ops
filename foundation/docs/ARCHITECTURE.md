@@ -30,7 +30,7 @@
 - `moodle-sync` processes enrollment rows and classifies retryable vs non-retryable failures.
 - `retry-worker` supports:
   - manual admin retry/resolve operations
-  - scheduled auto sweep every 20 minutes (`*/20 * * * *`)
+  - scheduled auto sweep every hour (`0 * * * *`)
 - Auto sweep retries only retryable Moodle failures; non-retryable auth/WAF/mapping errors are not endlessly retried.
 
 ## Notification/Email Ops

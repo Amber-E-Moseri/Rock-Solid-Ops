@@ -23,7 +23,7 @@
 - Continue mobile density/readability refinements on operational pages where required.
 - Keep RLS and role-policy reviews aligned with any new operational tables.
 
-## Current Platform State — May 2026
+## Current Platform State ï¿½ May 2026
 - RLS hardening baseline completed (continue incremental policy audits as new flows ship).
 - CORS cleanup baseline completed.
 - Attendance dedupe baseline completed.
@@ -57,7 +57,7 @@
 - 2026-05-24: `class-editor` table now includes per-class `Enrolled` totals from `applicants` with `registration_status = ASSIGNED`.
 - 2026-05-13: Keep Supabase `registration-processor` as canonical and only active registration processor. `phase2-processor` registration path is hard-disabled with a 410 guard.
 - 2026-05-13: Treat dual endpoint configuration as a release blocker. Legacy `APPS_SCRIPT_URL` was removed from `registration-form.html`.
-- 2026-05-13: Ensure scheduled invocation of `retry-worker` every 20 minutes is active in deployed project. Confirmed active in `supabase/functions/retry-worker/config.toml` (no change required).
+- 2026-05-13: Ensure scheduled invocation of `retry-worker` is active in deployed project. Confirmed active in `supabase/functions/retry-worker/config.toml` (`0 * * * *`, hourly; no change required).
 - 2026-05-13: `sender-worker` must remain unscheduled. Confirmed no cron entry exists (no change required).
 - 2026-05-14: `sender-worker` deprecation intent recorded. Follow-up required: verify runtime function file/state and update this note to match the current repository/deployed artifact.
 

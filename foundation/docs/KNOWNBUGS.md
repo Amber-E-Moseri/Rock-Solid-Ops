@@ -15,11 +15,6 @@
 ### Multi-Campus Labeling Bug
 - Calendar header sometimes shows only the last selected campus.
 
-## Teacher Portal
-### Invalid `teacher_assignments` Table Query
-- `foundation/teacher/roster.html` still queries `teacher_assignments`, which does not exist in the canonical schema.
-- Impact: roster load can fail for teachers/admin viewers until query is switched to `class_options`/teacher-portal-api assignment lookup.
-
 ## Mobile UI Issues
 ### Grid Overflow
 - Large tables overflow badly on mobile.
@@ -55,13 +50,13 @@ instance blocked the request from Supabase Edge Functions before it reached Mood
 Detected by: `CF-Ray` header present, `Server: cloudflare` header, or response body
 contains "cloudflare" text without a JSON `exception` key.
 
-**Retryable:** Yes — WAF blocks are transient and the retry-worker will attempt again.
+**Retryable:** Yes ï¿½ WAF blocks are transient and the retry-worker will attempt again.
 However, repeated blocks mean the WAF rule is persistent and must be fixed at the source.
 
 **Hostinger/Moodle admin steps:**
 1. Log into your Hostinger hPanel.
 2. Go to **Security ? WAF** (or **Advanced ? Web Application Firewall** depending on plan).
-3. Look for blocked requests in the WAF log — filter by the Supabase Edge Function IP range
+3. Look for blocked requests in the WAF log ï¿½ filter by the Supabase Edge Function IP range
    or by the Moodle endpoint path (`/webservice/rest/server.php`).
 4. Add an exception/whitelist rule for requests to `/webservice/rest/server.php` from
    Supabase's IP ranges, OR whitelist by the `User-Agent` header sent by the function.
@@ -73,7 +68,7 @@ Hostinger support chat at hpanel.hostinger.com ? Help ? Live Chat. Ask specifica
 > site from a Supabase integration. Requests are being blocked by the WAF. Can you help me
 > add a WAF exception for this path or whitelist the Supabase IP ranges?"
 
-Hostinger's WAF is managed at the hosting level, not from within Moodle — Moodle admins
+Hostinger's WAF is managed at the hosting level, not from within Moodle ï¿½ Moodle admins
 cannot fix a WAF block from the Moodle admin panel.
 
 ---
@@ -84,7 +79,7 @@ cannot fix a WAF block from the Moodle admin panel.
 The Moodle REST web service protocol is not enabled. The request reached Moodle but
 Moodle rejected it because the REST protocol plugin is turned off.
 
-**Retryable:** No — this is a configuration error. All requests will fail until fixed.
+**Retryable:** No ï¿½ this is a configuration error. All requests will fail until fixed.
 
 **Moodle admin steps:**
 1. Log into Moodle as site administrator.
@@ -105,7 +100,7 @@ The web service token is valid and reached Moodle, but the integration user's to
 not have permission to call the required web service function (`core_user_get_users`,
 `core_user_create_users`, or `enrol_manual_enrol_users`).
 
-**Retryable:** No — this is a permissions configuration error.
+**Retryable:** No ï¿½ this is a permissions configuration error.
 
 **Moodle admin steps:**
 1. Log into Moodle as site administrator.
@@ -135,10 +130,10 @@ Also verify the Manual Enrolments plugin is enabled:
 **What it means:**
 A 403 response was received from the Moodle endpoint, but none of the known signatures
 matched (no WAF headers, no "cloudflare" in body, no Moodle exception JSON). This is an
-unclassified 403 — could be a server-level access restriction, `.htaccess` rule, or IP
+unclassified 403 ï¿½ could be a server-level access restriction, `.htaccess` rule, or IP
 block set at the web server (Apache/Nginx) level rather than the WAF.
 
-**Retryable:** No — treated as non-retryable until the root cause is identified.
+**Retryable:** No ï¿½ treated as non-retryable until the root cause is identified.
 
 **Diagnostic steps:**
 1. Run Check 1 from `foundation/docs/moodle-test.md` manually with `curl -v` (verbose) to
@@ -151,7 +146,7 @@ block set at the web server (Apache/Nginx) level rather than the WAF.
 **Who to contact at Hostinger:**
 Hostinger support chat ? ask:
 > "My Moodle `/webservice/rest/server.php` endpoint is returning HTTP 403 to external
-> POST requests. This is not a WAF block — can you check if there are server-level
+> POST requests. This is not a WAF block ï¿½ can you check if there are server-level
 > Apache/Nginx restrictions or `.htaccess` rules blocking access to this path?"
 
 

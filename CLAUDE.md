@@ -167,7 +167,7 @@ entire page's JS in one pass.
 
 ## Retry and queue rules
 
-- `retry-worker` runs on a 20-minute cron. Do not add a second retry scheduler.
+- `retry-worker` runs on an hourly cron (`0 * * * *`). Do not add a second retry scheduler.
 - Retryable: network timeouts, transient DB errors, rate limits.
 - Non-retryable: auth failures, WAF blocks, missing Moodle mapping, invalid input.
 - Moodle HTTP 403 / WAF failures are classified as non-retryable — do not loop on them.
