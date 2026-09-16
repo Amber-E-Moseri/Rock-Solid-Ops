@@ -198,8 +198,7 @@ export default function GraduationStatusPage() {
       )}
 
       {/* Override modal */}
-      {overrideTarget && (
-        <Modal title={`Override — ${overrideTarget.full_name || overrideTarget.email}`} onClose={() => setOverrideTarget(null)}>
+      <Modal open={!!overrideTarget} title={overrideTarget ? `Override — ${overrideTarget.full_name || overrideTarget.email}` : ''} onClose={() => setOverrideTarget(null)}>
           <div style={{ display: 'grid', gap: 12 }}>
             <div>
               <label style={formLabel}>Decision</label>
@@ -219,7 +218,6 @@ export default function GraduationStatusPage() {
             </div>
           </div>
         </Modal>
-      )}
     </div>
   );
 }

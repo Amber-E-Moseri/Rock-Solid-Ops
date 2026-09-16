@@ -112,17 +112,17 @@ export default function MakeupManagementPage() {
         </div>
       )}
 
-      {completeModal && (
-        <Modal title="Mark Makeup Complete" onClose={() => setCompleteModal(null)} footer={
-          <>
-            <Button variant="ghost" onClick={() => setCompleteModal(null)}>Cancel</Button>
-            <Button variant="primary" onClick={handleComplete}>Confirm</Button>
-          </>
-        }>
+      <Modal open={!!completeModal} title="Mark Makeup Complete" onClose={() => setCompleteModal(null)} footer={
+        completeModal && <>
+          <Button variant="ghost" onClick={() => setCompleteModal(null)}>Cancel</Button>
+          <Button variant="primary" onClick={handleComplete}>Confirm</Button>
+        </>
+      }>
+        {completeModal && <>
           <p>Mark makeup for <strong>{completeModal.students?.full_name}</strong> (class: {completeModal.class_missed}) as completed?</p>
           <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '0.5rem' }}>This will also update attendance records and re-evaluate graduation eligibility.</p>
-        </Modal>
-      )}
+        </>}
+      </Modal>
 
       {extendModal && <ExtendModal item={extendModal} onClose={() => setExtendModal(null)} onSave={async (deadline, reason) => {
         try {
@@ -140,7 +140,7 @@ function ExtendModal({ item, onClose, onSave }) {
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   return (
-    <Modal title="Extend Deadline" onClose={onClose} footer={
+    <Modal open={true} title="Extend Deadline" onClose={onClose} footer={
       <>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <Button variant="primary" onClick={async () => { setSaving(true); try { await onSave(deadline, reason); } finally { setSaving(false); } }} disabled={saving || !deadline || !reason}>
