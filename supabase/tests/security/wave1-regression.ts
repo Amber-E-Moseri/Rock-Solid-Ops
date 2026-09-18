@@ -45,9 +45,18 @@ const PASSWORD = `W1Reg${TS}x`;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const DB_CONTAINER = "supabase_db_supabase_foundation";
+
 async function psql(sql: string): Promise<string> {
-  const cmd = new Deno.Command("psql", {
-    args: [DB_URL, "-t", "-A", "-c", sql],
+  // Call docker exec directly — avoids Windows CMD batch-file argument
+  // escaping limitations (parentheses in SQL signatures cause "batch file
+  // arguments are invalid" when going through a .cmd wrapper).
+  const cmd = new Deno.Command("docker", {
+    args: [
+      "exec", "-i", DB_CONTAINER,
+      "psql", "-U", "postgres", "-d", "postgres", "-t", "-A", "-c", sql,
+    ],
+    stdin: "null",
     stdout: "piped",
     stderr: "piped",
   });
@@ -184,11 +193,15 @@ async function suiteAcl(): Promise<void> {
   const gradAuth = await psql(
     `SELECT has_function_privilege('authenticated', 'public.${gradSig}', 'EXECUTE');`,
   );
+  // proacl check: PUBLIC EXECUTE looks like "{=X/" or ",=X/" at an ACL entry
+  // boundary. "postgres=X/postgres" etc. are role-specific grants, not PUBLIC.
   const gradPub = await psql(
-    `SELECT proacl FROM pg_proc WHERE proname='override_graduation_eligibility' LIMIT 1;`,
+    `SELECT p.proacl FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace ` +
+    `WHERE n.nspname = 'public' AND p.proname = 'override_graduation_eligibility' ` +
+    `AND pg_catalog.pg_get_function_identity_arguments(p.oid) LIKE '%uuid%boolean%';`,
   );
   assert(SUITE, "graduation anon=NO", gradAnon.trim() === "f");
-  assert(SUITE, "graduation public=NO", !gradPub.includes("=X/"));
+  assert(SUITE, "graduation public=NO", !/(?:\{|,)=X\//.test(gradPub));
   assert(SUITE, "graduation authenticated=YES", gradAuth.trim() === "t");
 
   // Stale audit policy absent
@@ -209,13 +222,16 @@ async function suiteTeacher(
     10,
   );
 
+  // Use 8-param overload with p_fellowship_code: null to force unambiguous overload
+  // resolution (PostgREST returns 300 when both overloads match via defaults).
+  // null fellowship_code skips the fellowship_map FK check inside the function.
   const payload = {
     p_full_name: `W1Reg Teacher ${TS}`,
     p_email: `w1reg-teacher-${TS}@invalid.local`,
     p_phone: "555-0100",
     p_group_id: "CE",
     p_subgroup_id: "CESGA",
-    p_fellowship_code: "UM",
+    p_fellowship_code: null as unknown as string,
     p_notes: "wave1 regression",
     p_actor_email: ids.admin.email,
   };
@@ -262,13 +278,11 @@ async function suiteGraduation(
   const appEmail = `w1reg-app-${TS}@invalid.local`;
   await psql(
     `INSERT INTO public.batches (batch_id, batch_name, status, start_date, end_date, registration_open, active)
-     VALUES ('${batchId}', 'W1Reg Batch ${TS}', 'Draft', '2026-01-01', '2026-12-31', false, false)
-     ON CONFLICT (batch_id) DO NOTHING;`,
+     VALUES ('${batchId}', 'W1Reg Batch ${TS}', 'Draft', '2026-01-01', '2026-12-31', false, false);`,
   );
   await psql(
     `INSERT INTO public.applicants (email, first_name, last_name)
-     VALUES ('${appEmail}', 'W1Reg', 'Applicant')
-     ON CONFLICT (email) DO NOTHING;`,
+     VALUES ('${appEmail}', 'W1Reg', 'Applicant');`,
   );
   const appId = await psql(
     `SELECT id FROM public.applicants WHERE email = '${appEmail}' LIMIT 1;`,

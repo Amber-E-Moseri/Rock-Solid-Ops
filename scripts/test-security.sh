@@ -5,7 +5,7 @@
 #   - local Supabase running (supabase start)
 #   - SUPABASE_SERVICE_ROLE_KEY and SUPABASE_ANON_KEY set in env
 #     (run: eval "$(supabase status --output env)" to populate them)
-#   - psql available on PATH
+#   - docker available on PATH (psql is invoked inside the Supabase container)
 #   - LOCAL_INTEGRATION_TEST=true set (confirms intent to run live tests)
 #
 # Also runs the Nexus upstream isolation test.
@@ -36,7 +36,7 @@ cd "$ROOT"
 deno run \
   --allow-net \
   --allow-env \
-  --allow-run=psql \
+  --allow-run=docker \
   supabase/tests/security/wave1-regression.ts
 SECURITY_EXIT=$?
 

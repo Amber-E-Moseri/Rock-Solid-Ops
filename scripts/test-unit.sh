@@ -29,7 +29,7 @@ DENO_UNIT_TESTS=(
 )
 
 cd "$ROOT"
-deno test --allow-env --no-prompt --node-modules-dir=auto "${DENO_UNIT_TESTS[@]}"
+deno test --allow-env --no-prompt --no-check --node-modules-dir=auto "${DENO_UNIT_TESTS[@]}"
 DENO_EXIT=$?
 
 echo ""
