@@ -39,7 +39,7 @@ begin
             t.teacher_user_id = auth.uid()
             or (
               t.teacher_user_id is null
-              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>''email'', '''')))
+              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>'email', '')))
             )
           )
       )
@@ -64,7 +64,7 @@ begin
             t.teacher_user_id = auth.uid()
             or (
               t.teacher_user_id is null
-              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>''email'', '''')))
+              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>'email', '')))
             )
           )
       )
@@ -89,7 +89,7 @@ begin
             t.teacher_user_id = auth.uid()
             or (
               t.teacher_user_id is null
-              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>''email'', '''')))
+              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>'email', '')))
             )
           )
       )
@@ -118,7 +118,7 @@ begin
             t.teacher_user_id = auth.uid()
             or (
               t.teacher_user_id is null
-              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>''email'', '''')))
+              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>'email', '')))
             )
           )
       )
@@ -141,7 +141,7 @@ begin
             t.teacher_user_id = auth.uid()
             or (
               t.teacher_user_id is null
-              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>''email'', '''')))
+              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>'email', '')))
             )
           )
       )
@@ -164,7 +164,7 @@ begin
             t.teacher_user_id = auth.uid()
             or (
               t.teacher_user_id is null
-              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>''email'', '''')))
+              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>'email', '')))
             )
           )
       )
@@ -181,7 +181,7 @@ begin
             t.teacher_user_id = auth.uid()
             or (
               t.teacher_user_id is null
-              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>''email'', '''')))
+              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>'email', '')))
             )
           )
       )
@@ -207,7 +207,7 @@ begin
             t.teacher_user_id = auth.uid()
             or (
               t.teacher_user_id is null
-              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>''email'', '''')))
+              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>'email', '')))
             )
           )
       )
@@ -229,7 +229,7 @@ begin
             t.teacher_user_id = auth.uid()
             or (
               t.teacher_user_id is null
-              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>''email'', '''')))
+              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>'email', '')))
             )
           )
       )
@@ -254,7 +254,7 @@ begin
             t.teacher_user_id = auth.uid()
             or (
               t.teacher_user_id is null
-              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>''email'', '''')))
+              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>'email', '')))
             )
           )
       )
@@ -275,7 +275,7 @@ begin
               t.teacher_user_id = auth.uid()
               or (
                 t.teacher_user_id is null
-                and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>''email'', '''')))
+                and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>'email', '')))
               )
             )
         )
@@ -297,7 +297,7 @@ begin
             t.teacher_user_id = auth.uid()
             or (
               t.teacher_user_id is null
-              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>''email'', '''')))
+              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>'email', '')))
             )
           )
       )
@@ -311,7 +311,7 @@ begin
             t.teacher_user_id = auth.uid()
             or (
               t.teacher_user_id is null
-              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>''email'', '''')))
+              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>'email', '')))
             )
           )
       )
@@ -336,7 +336,7 @@ begin
             t.teacher_user_id = auth.uid()
             or (
               t.teacher_user_id is null
-              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>''email'', '''')))
+              and lower(trim(coalesce(t.email, ''))) = lower(trim(coalesce(auth.jwt()->>'email', '')))
             )
           )
       )

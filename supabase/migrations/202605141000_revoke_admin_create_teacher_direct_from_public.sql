@@ -17,16 +17,27 @@
 BEGIN;
 
 -- Signature 1 (7 parameters): from original migration 202605140001
-REVOKE EXECUTE ON FUNCTION public.admin_create_teacher_direct(
-  text, text, text, text, text, text, text
-) FROM public;
+-- Guard with function-existence check to handle migration ordering
+DO $$
+BEGIN
+  IF to_regprocedure('public.admin_create_teacher_direct(text,text,text,text,text,text,text)') IS NOT NULL THEN
+    REVOKE EXECUTE ON FUNCTION public.admin_create_teacher_direct(
+      text, text, text, text, text, text, text
+    ) FROM public;
+  END IF;
+END $$;
 
 -- Signature 2 (8 parameters): from migration 202605161510 (added fellowship_code)
-REVOKE EXECUTE ON FUNCTION public.admin_create_teacher_direct(
-  text, text, text, text, text, text, text, text
-) FROM public;
+-- Guard with function-existence check: this signature is created later, so it may not exist yet
+DO $$
+BEGIN
+  IF to_regprocedure('public.admin_create_teacher_direct(text,text,text,text,text,text,text,text)') IS NOT NULL THEN
+    REVOKE EXECUTE ON FUNCTION public.admin_create_teacher_direct(
+      text, text, text, text, text, text, text, text
+    ) FROM public;
+  END IF;
+END $$;
 
--- Idempotent: if a future schema refactor removes these functions, the migration
--- will be harmless (Postgres ignores REVOKE on non-existent objects by default).
+-- Idempotent: guarded revokes only execute if the function signatures exist.
 
 COMMIT;

@@ -229,7 +229,7 @@ ON public.applicants
 FOR INSERT TO anon
 WITH CHECK (
   coalesce(trim(email), '') <> ''
-  AND coalesce(trim(full_name), '') <> ''
+  AND coalesce(trim(first_name), '') <> ''
 );
 
 -- -------------------------------------------------------------

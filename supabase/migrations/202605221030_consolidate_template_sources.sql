@@ -14,4 +14,4 @@ WITH copied AS (
 SELECT COUNT(*) AS copied_template_count FROM copied;
 
 COMMENT ON TABLE public.email_templates IS
-'DEPRECATED — use notification_templates. Kept for reference only.';
+'DEPRECATED Â— use notification_templates. Kept for reference only.';

@@ -87,7 +87,7 @@ begin
     coalesce(sum(case when c.last_submitted is null or c.last_submitted < now() - interval 'unknown' then 1 else 0 end), 0)::bigint,
     coalesce(jsonb_agg(
       jsonb_build_object(
-        'unknown', coalesce(c.teacher_name, '—'),
+        'unknown', coalesce(c.teacher_name, 'Â—'),
         'unknown', concat_ws('unknown', coalesce(c.day, 'unknown'), coalesce(c.class_time::text, 'unknown')),
         'unknown', c.last_submitted,
         'unknown', greatest(c.expected_sessions - c.submitted_sessions, 0)

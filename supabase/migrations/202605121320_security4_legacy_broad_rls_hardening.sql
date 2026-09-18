@@ -217,7 +217,7 @@ on public.applicants
 for insert to anon
 with check (
   coalesce(trim(email), '') <> ''
-  and coalesce(trim(full_name), '') <> ''
+  and coalesce(trim(first_name), '') <> ''
 );
 
 drop policy if exists fellowship_map_authenticated_select on public.fellowship_map;

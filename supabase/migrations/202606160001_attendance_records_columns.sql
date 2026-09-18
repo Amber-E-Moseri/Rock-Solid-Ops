@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS public.attendance_records (
 );
 
 -- Add columns with IF NOT EXISTS so the migration is re-runnable
+ALTER TABLE public.attendance_records ADD COLUMN IF NOT EXISTS applicant_id    text NOT NULL DEFAULT '';
 ALTER TABLE public.attendance_records ADD COLUMN IF NOT EXISTS class_option_id text;
 ALTER TABLE public.attendance_records ADD COLUMN IF NOT EXISTS batch_id        text;
 ALTER TABLE public.attendance_records ADD COLUMN IF NOT EXISTS session_date    date;
@@ -25,6 +26,7 @@ ALTER TABLE public.attendance_records ADD COLUMN IF NOT EXISTS created_at      t
 ALTER TABLE public.attendance_records ADD COLUMN IF NOT EXISTS updated_at      timestamptz DEFAULT now();
 
 -- Unique constraint for upsert (ON CONFLICT)
+-- Only add if all required columns exist
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -33,6 +35,11 @@ BEGIN
       AND table_name = 'attendance_records'
       AND constraint_type = 'UNIQUE'
       AND constraint_name = 'attendance_records_uq'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'attendance_records'
+      AND column_name IN ('applicant_id', 'class_option_id', 'session_date', 'class_session')
   ) THEN
     ALTER TABLE public.attendance_records
       ADD CONSTRAINT attendance_records_uq

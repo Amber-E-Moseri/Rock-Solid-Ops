@@ -1621,13 +1621,18 @@ END $$;
 -- Used by batch write policies. Checks the admin_users table for the
 -- current authenticated user. SECURITY DEFINER so the function can
 -- read admin_users regardless of calling user's RLS context.
+-- If admin_users does not exist, returns FALSE (safe default).
 
 CREATE OR REPLACE FUNCTION is_superadmin()
-RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM admin_users
-    WHERE auth_user_id = auth.uid() AND role = 'superadmin'
-  )
+RETURNS BOOLEAN LANGUAGE plpgsql STABLE SECURITY DEFINER AS $$
+DECLARE
+  v_result BOOLEAN := FALSE;
+BEGIN
+  IF to_regclass('public.admin_users') IS NOT NULL THEN
+    EXECUTE 'SELECT EXISTS (SELECT 1 FROM admin_users WHERE auth_user_id = auth.uid() AND role = ''superadmin'')' INTO v_result;
+  END IF;
+  RETURN v_result;
+END;
 $$;
 
 

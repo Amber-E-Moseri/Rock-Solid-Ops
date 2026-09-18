@@ -1,4 +1,7 @@
 -- ── 1. get_capacity_summary — add applicant_count ─────────────────────────────
+-- Drop first to handle signature changes (return type)
+DROP FUNCTION IF EXISTS public.get_capacity_summary(text, text[]);
+
 CREATE OR REPLACE FUNCTION public.get_capacity_summary(
   p_batch_id  text    DEFAULT NULL,
   p_subgroups text[]  DEFAULT NULL
@@ -65,6 +68,9 @@ GRANT EXECUTE ON FUNCTION public.get_capacity_summary(text, text[]) TO authentic
 
 
 -- ── 2. get_escalation_details — per-task view with person + class detail ───────
+-- Drop first to handle signature changes (return type)
+DROP FUNCTION IF EXISTS public.get_escalation_details(text[], int);
+
 CREATE OR REPLACE FUNCTION public.get_escalation_details(
   p_subgroups text[] DEFAULT NULL,
   p_limit     int    DEFAULT 100

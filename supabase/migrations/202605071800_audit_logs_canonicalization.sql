@@ -10,6 +10,18 @@ BEGIN
   END IF;
 END $$;
 
+-- Schema reconciliation: Ensure renamed audit_log matches the fresh-create schema
+DO $$
+BEGIN
+  IF to_regclass('public.audit_logs') IS NOT NULL THEN
+    ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS actor_email text NULL;
+    ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS actor_id text NULL;
+    ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS status text NULL;
+    ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS details jsonb NOT NULL DEFAULT '{}'::jsonb;
+    ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+  END IF;
+END $$;
+
 DO $$
 BEGIN
   IF to_regclass('public.audit_logs') IS NULL THEN

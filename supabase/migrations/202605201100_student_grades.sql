@@ -26,8 +26,8 @@ ALTER TABLE public.student_grades ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "admin_manage_student_grades"
   ON public.student_grades
   FOR ALL
-  USING (is_admin_like())
-  WITH CHECK (is_admin_like());
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
 
 -- Teachers can read grades for students in their assigned classes
 CREATE POLICY "teacher_read_student_grades"

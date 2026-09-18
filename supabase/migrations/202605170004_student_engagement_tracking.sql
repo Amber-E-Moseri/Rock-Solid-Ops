@@ -60,14 +60,20 @@ create policy "engagement_config_select" on public.student_engagement_config
 -- Apply this migration manually via the Supabase SQL editor after setting the key.
 -- DO NOT commit the key to version control.
 
-select cron.schedule(
-  'student-engagement-monitor',
-  '0 7 * * *',
-  $$
-    select net.http_post(
-      url     := 'https://xelpsttqhrcqmttmjory.supabase.co/functions/v1/student-engagement-monitor',
-      headers := '{"Content-Type":"application/json","Authorization":"Bearer <SERVICE_ROLE_KEY>"}'::jsonb,
-      body    := '{}'::jsonb
-    )
-  $$
-);
+-- Only schedule the cron job if pg_cron extension is available
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_namespace WHERE nspname = 'cron'
+  ) THEN
+    RAISE NOTICE 'pg_cron extension not available; skipping student engagement monitor schedule';
+    RETURN;
+  END IF;
+
+  -- Schedule via format() to safely quote the SQL
+  EXECUTE format('SELECT cron.schedule(%L, %L, %L)',
+    'student-engagement-monitor',
+    '0 7 * * *',
+    'select net.http_post(url := ''https://xelpsttqhrcqmttmjory.supabase.co/functions/v1/student-engagement-monitor'', headers := ''{"Content-Type":"application/json","Authorization":"Bearer <SERVICE_ROLE_KEY>"}''::jsonb, body := ''{}''::jsonb)'
+  );
+END $$;

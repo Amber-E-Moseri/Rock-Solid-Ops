@@ -1,5 +1,8 @@
 -- Hotfix: ensure registration funnel RPC exists with the exact signature expected by dashboard.
 
+-- Drop first to handle signature changes (parameter defaults)
+DROP FUNCTION IF EXISTS public.get_registration_funnel(text);
+
 create or replace function public.get_registration_funnel(
   p_batch_id text
 )

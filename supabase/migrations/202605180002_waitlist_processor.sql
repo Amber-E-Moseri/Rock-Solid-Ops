@@ -70,15 +70,19 @@ ON CONFLICT (template_key) DO UPDATE
       body_html = EXCLUDED.body_html,
       active    = EXCLUDED.active;
 
--- Cron: run waitlist-processor every 15 minutes
-SELECT cron.schedule(
-  'waitlist-processor',
-  '*/15 * * * *',
-  $$
-    SELECT net.http_post(
-      url     := 'https://xelpsttqhrcqmttmjory.supabase.co/functions/v1/waitlist-processor',
-      headers := '{"Content-Type":"application/json","Authorization":"Bearer <SERVICE_ROLE_KEY>"}'::jsonb,
-      body    := '{}'::jsonb
-    )
-  $$
-);
+-- Cron: run waitlist-processor every 15 minutes (only if pg_cron is available)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_namespace WHERE nspname = 'cron'
+  ) THEN
+    RAISE NOTICE 'pg_cron extension not available; skipping waitlist-processor schedule';
+    RETURN;
+  END IF;
+
+  EXECUTE format('SELECT cron.schedule(%L, %L, %L)',
+    'waitlist-processor',
+    '*/15 * * * *',
+    'SELECT net.http_post(url := ''https://xelpsttqhrcqmttmjory.supabase.co/functions/v1/waitlist-processor'', headers := ''{"Content-Type":"application/json","Authorization":"Bearer <SERVICE_ROLE_KEY>"}''::jsonb, body := ''{}''::jsonb)'
+  );
+END $$;

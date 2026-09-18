@@ -1,4 +1,4 @@
-﻿CREATE OR REPLACE FUNCTION public.sync_applicant_to_students()
+CREATE OR REPLACE FUNCTION public.sync_applicant_to_students()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -40,7 +40,7 @@ BEGIN
       updated_at
     ) VALUES (
       NEW.id::text,
-      COALESCE(NULLIF(NEW.full_name, ''), TRIM(CONCAT(COALESCE(NEW.first_name, ''), ' ', COALESCE(NEW.last_name, '')))),
+      TRIM(CONCAT(COALESCE(NEW.first_name, ''), ' ', COALESCE(NEW.last_name, ''))),
       NEW.email,
       NEW.phone,
       NEW.group_id,
@@ -87,7 +87,7 @@ INSERT INTO public.students (
 )
 SELECT DISTINCT ON (a.email)
   a.id::text,
-  COALESCE(NULLIF(a.full_name, ''), TRIM(CONCAT(COALESCE(a.first_name, ''), ' ', COALESCE(a.last_name, '')))),
+  TRIM(CONCAT(COALESCE(a.first_name, ''), ' ', COALESCE(a.last_name, ''))),
   a.email,
   a.phone,
   a.group_id,

@@ -1,4 +1,4 @@
-﻿-- Add reminder templates and ensure scheduled_notifications dedupe support.
+-- Add reminder templates and ensure scheduled_notifications dedupe support.
 
 insert into public.notification_templates (template_key, subject, body_html, active)
 values

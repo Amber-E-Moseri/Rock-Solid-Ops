@@ -1,3 +1,6 @@
+-- Drop first to handle signature changes
+DROP FUNCTION IF EXISTS public.get_active_certified_teachers_count();
+
 CREATE OR REPLACE FUNCTION public.get_active_certified_teachers_count()
 RETURNS bigint
 LANGUAGE sql
@@ -12,6 +15,9 @@ AS $$
 $$;
 
 GRANT EXECUTE ON FUNCTION public.get_active_certified_teachers_count() TO authenticated;
+
+-- Drop first to handle signature changes
+DROP FUNCTION IF EXISTS public.get_currently_teaching_count(text);
 
 CREATE OR REPLACE FUNCTION public.get_currently_teaching_count(p_batch_id text)
 RETURNS bigint
@@ -29,6 +35,9 @@ AS $$
 $$;
 
 GRANT EXECUTE ON FUNCTION public.get_currently_teaching_count(text) TO authenticated;
+
+-- Drop first to handle signature changes
+DROP FUNCTION IF EXISTS public.get_registration_funnel(text);
 
 CREATE OR REPLACE FUNCTION public.get_registration_funnel(
   p_batch_id text DEFAULT NULL

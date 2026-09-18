@@ -136,7 +136,7 @@ begin
   for v_app in
     select
       a.id,
-      a.full_name,
+      trim(concat(coalesce(a.first_name, ''), ' ', coalesce(a.last_name, ''))) as full_name,
       a.email,
       upper(trim(coalesce(a.fellowship_code, ''))) as fellowship_code,
       a.batch_id

@@ -84,7 +84,7 @@ begin
         or coalesce(new.is_active, true) <> coalesce(old.is_active, true)
         or coalesce(new.active, true) <> coalesce(old.active, true)
       then
-        raise permission_denied('Profile owners cannot change role or activation state. Contact an administrator.');
+        raise insufficient_privilege using message = 'Profile owners cannot change role or activation state. Contact an administrator.';
       end if;
     end if;
   end if;
