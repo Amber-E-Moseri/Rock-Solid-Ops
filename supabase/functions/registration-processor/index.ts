@@ -172,9 +172,34 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Registration without a batch is not meaningful: there is no intake to enroll into.
+    // Return a controlled 400 rather than creating a partially-committed applicant row.
+    if (!batch_id) {
+      return jsonResponse({ ok: false, error: "Registration is not currently open.", code: "NO_ACTIVE_BATCH" }, 400);
+    }
+
+    // ── Campus registration gate (server-side; direct POST cannot bypass) ──
+    // Authoritative key: the submitted fellowship_code resolved against
+    // batch_campus_registration_settings for the active batch.
+    // Fail-open semantics: missing setting row means campus is open.
+    if (fellowship_code) {
+      const { data: campusSettings } = await db
+        .from("batch_campus_registration_settings")
+        .select("registration_open")
+        .eq("batch_id", batch_id)
+        .eq("fellowship_code", fellowship_code)
+        .maybeSingle();
+      if (campusSettings !== null && campusSettings.registration_open === false) {
+        return jsonResponse({
+          ok: false,
+          error: "Registration for your campus is currently closed.",
+          code: "CAMPUS_CLOSED",
+        }, 400);
+      }
+    }
+
     // ── Layer 3: Double-click / resubmission guard ────────────────────────
-    // Scope to batch when known; fall back to email-only when no batch could
-    // be resolved (edge case: no active batch configured yet).
+    // batch_id is always non-null here (early-return gate above ensures it).
     let recentQuery = db
       .from("applicants")
       .select("id")
