@@ -92,7 +92,10 @@ export async function assignApplicant(
   const batchId = String(context?.batchId || applicant.batch_id || "").trim() || await findActiveBatchId(db);
 
   const slot = await resolveClassSlot(db, classOptionIdClean, batchId);
-  if (slot?.max_capacity !== null && Number(slot.current_enrolment || 0) >= Number(slot.max_capacity)) {
+  // slot is null when no class_slots record exists for this class+batch.
+  // The old condition used slot?.max_capacity (undefined) !== null (true), then accessed
+  // slot.current_enrolment on a null reference. Guard with slot != null first.
+  if (slot != null && slot.max_capacity != null && Number(slot.current_enrolment || 0) >= Number(slot.max_capacity)) {
     throw new Error(`Class is full for class_option_id=${classOptionIdClean} batch_id=${batchId}`);
   }
 
