@@ -409,3 +409,59 @@ Deno.test("Campus gate invariant: gate fires before applicant write (direct POST
   if (!r.blocked) throw new Error("Campus-closed must block even on direct POST");
   if (r.code !== "CAMPUS_CLOSED") throw new Error(`Expected CAMPUS_CLOSED, got ${r.code}`);
 });
+
+// ─── Capacity race downgrade (concurrency fix) ───────────────────────────────
+// Mirrors the processor's handling of insert_applicant_reserve_slot() results.
+// When two concurrent ASSIGNED requests race, the loser receives CLASS_FULL
+// from the RPC (which serialized them via FOR UPDATE) and must be downgraded
+// to WAITLISTED before insertion.  This mirrors the exact branch logic in
+// the index.ts else-block.
+
+function capacityRaceDowngrade(
+  rpcResult: { ok: boolean; reason?: string; applicant_id?: string } | null,
+  rpcError: unknown,
+  currentStatus: string,
+): { status: string; felledBack: boolean } {
+  if (rpcError) return { status: currentStatus, felledBack: false };
+  if (rpcResult?.ok === false && rpcResult?.reason === "CLASS_FULL") {
+    return { status: "WAITLISTED", felledBack: false };
+  }
+  if (rpcResult?.ok === false) {
+    // NO_SLOT or unexpected: fall through to direct insert, status unchanged.
+    return { status: currentStatus, felledBack: true };
+  }
+  if (rpcResult?.ok === true) {
+    return { status: currentStatus, felledBack: false };
+  }
+  return { status: currentStatus, felledBack: false };
+}
+
+Deno.test("Capacity race: RPC CLASS_FULL → downgrade to WAITLISTED", () => {
+  const r = capacityRaceDowngrade({ ok: false, reason: "CLASS_FULL" }, null, "ASSIGNED");
+  if (r.status !== "WAITLISTED") throw new Error(`Expected WAITLISTED, got ${r.status}`);
+  if (r.felledBack) throw new Error("Should not fall back on CLASS_FULL — explicit downgrade");
+});
+
+Deno.test("Capacity race: RPC NO_SLOT → fallthrough to direct insert, status unchanged", () => {
+  const r = capacityRaceDowngrade({ ok: false, reason: "NO_SLOT" }, null, "ASSIGNED");
+  if (r.status !== "ASSIGNED") throw new Error(`Expected ASSIGNED (unchanged), got ${r.status}`);
+  if (!r.felledBack) throw new Error("Expected fall-back flag for NO_SLOT");
+});
+
+Deno.test("Capacity race: RPC ok=true → status unchanged, no fallback", () => {
+  const r = capacityRaceDowngrade({ ok: true, applicant_id: "abc" }, null, "ASSIGNED");
+  if (r.status !== "ASSIGNED") throw new Error(`Expected ASSIGNED, got ${r.status}`);
+  if (r.felledBack) throw new Error("Should not fall back on success");
+});
+
+Deno.test("Capacity race: RPC error → status unchanged (error handled by caller)", () => {
+  const r = capacityRaceDowngrade(null, new Error("db error"), "ASSIGNED");
+  if (r.status !== "ASSIGNED") throw new Error(`Expected ASSIGNED (unchanged), got ${r.status}`);
+});
+
+Deno.test("Capacity race invariant: CLASS_FULL downgrade sets WAITLISTED not PENDING", () => {
+  // Downgraded applicant must enter the retry queue, not pend without a class.
+  const r = capacityRaceDowngrade({ ok: false, reason: "CLASS_FULL" }, null, "ASSIGNED");
+  if (r.status === "PENDING") throw new Error("Concurrent loser must be WAITLISTED not PENDING");
+  if (r.status !== "WAITLISTED") throw new Error(`Expected WAITLISTED, got ${r.status}`);
+});

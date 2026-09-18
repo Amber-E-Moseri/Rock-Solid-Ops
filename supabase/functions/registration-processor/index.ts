@@ -466,14 +466,74 @@ Deno.serve(async (req) => {
         applicant = existingApplicant as Record<string, unknown> | null;
       }
     } else {
-      ({
-        data: applicant,
-        error: applicantError,
-      } = await db
-        .from("applicants")
-        .insert(applicantInsertWithDuplicateFlags)
-        .select("*")
-        .single());
+      // For ASSIGNED registrations with a known class+batch: use the atomic RPC.
+      // It acquires SELECT ... FOR UPDATE on class_slots, rechecks capacity under
+      // the lock, and inserts the applicant in the same transaction.  A concurrent
+      // request that arrives while the lock is held must wait, then re-reads the
+      // trigger-incremented counter — closing the TOCTOU race.
+      if (registrationStatusTyped === "ASSIGNED" && class_option_id && batch_id) {
+        const { data: rpcResult, error: rpcError } = await db.rpc(
+          "insert_applicant_reserve_slot",
+          { p_applicant: applicantInsertWithDuplicateFlags },
+        );
+        if (rpcError) {
+          applicantError = rpcError;
+        } else if (rpcResult?.ok === false && rpcResult?.reason === "CLASS_FULL") {
+          // Concurrent request filled the slot between our stale read and the lock.
+          // Downgrade to WAITLISTED so this applicant enters the retry queue.
+          registrationStatusTyped = "WAITLISTED";
+          availabilityStatusTyped = "CLASS_FULL";
+          waitlistedAt = new Date().toISOString();
+          assignedAt = null;
+          ({
+            data: applicant,
+            error: applicantError,
+          } = await db
+            .from("applicants")
+            .insert({
+              ...applicantInsertWithDuplicateFlags,
+              registration_status: "WAITLISTED",
+              availability_status: "CLASS_FULL",
+              status: "Waitlisted",
+              assigned_at: null,
+              waitlisted_at: waitlistedAt,
+              retry_assignment: true,
+            })
+            .select("*")
+            .single());
+        } else if (rpcResult?.ok === false) {
+          // NO_SLOT or unexpected result — fall through to direct insert.
+          ({
+            data: applicant,
+            error: applicantError,
+          } = await db
+            .from("applicants")
+            .insert(applicantInsertWithDuplicateFlags)
+            .select("*")
+            .single());
+        } else if (rpcResult?.ok === true) {
+          // RPC inserted the row; fetch the full record.
+          ({
+            data: applicant,
+            error: applicantError,
+          } = await db
+            .from("applicants")
+            .select("*")
+            .eq("id", rpcResult.applicant_id)
+            .single());
+        }
+      } else {
+        // Non-ASSIGNED paths (WAITLISTED, DUPLICATE, REVIEW, PENDING):
+        // no capacity lock needed, use direct insert.
+        ({
+          data: applicant,
+          error: applicantError,
+        } = await db
+          .from("applicants")
+          .insert(applicantInsertWithDuplicateFlags)
+          .select("*")
+          .single());
+      }
 
       if (applicantError) {
         const msg = JSON.stringify(applicantError);
