@@ -155,15 +155,36 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: false, error: "INVALID_PHONE", code: "VALIDATION" }, 400);
     }
 
+    // ── Resolve active batch when form did not supply one ─────────────────
+    // The public registration form always sends batch_id: null. Without a
+    // batch_id the double-click guard and same-batch duplicate check both
+    // malfunction, and applicant records lose their batch association.
+    if (!batch_id) {
+      const { data: activeBatch } = await db
+        .from("batches")
+        .select("batch_id")
+        .or("active.eq.true,registration_open.eq.true")
+        .order("start_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (activeBatch?.batch_id) {
+        batch_id = String(activeBatch.batch_id).trim() || null;
+      }
+    }
+
     // ── Layer 3: Double-click / resubmission guard ────────────────────────
-    const { data: recentSubmission } = await db
+    // Scope to batch when known; fall back to email-only when no batch could
+    // be resolved (edge case: no active batch configured yet).
+    let recentQuery = db
       .from("applicants")
       .select("id")
       .eq("email", email)
-      .eq("batch_id", batch_id || "")
       .gt("created_at", new Date(Date.now() - 5 * 60 * 1000).toISOString())
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+    if (batch_id) {
+      recentQuery = recentQuery.eq("batch_id", batch_id);
+    }
+    const { data: recentSubmission } = await recentQuery.maybeSingle();
 
     if (recentSubmission) {
       return jsonResponse({
@@ -277,18 +298,42 @@ Deno.serve(async (req) => {
         reviewNotes = classOptionError ? "Could not safely validate selected class option." : "Selected class option no longer exists.";
       } else {
         const maxCapacity = Number(classOptionRow.max_capacity || 0);
-        const { count: assignedCount, error: assignedCountError } = await db
-          .from("applicants")
-          .select("*", { count: "exact", head: true })
-          .eq("class_option_id", class_option_id)
-          .eq("registration_status", "ASSIGNED");
-        if (assignedCountError) {
-          registrationStatus = "REVIEW";
-          availabilityStatus = "MANUAL_REVIEW_REQUIRED";
-          reviewedAt = nowIso;
-          reviewNotes = "Could not validate class capacity safely.";
-        } else {
-          classIsFull = maxCapacity > 0 && Number(assignedCount || 0) >= maxCapacity;
+        // Prefer class_slots (batch-scoped, authoritative) when batch is known.
+        // Fall back to counting assigned applicants when no slot record exists.
+        let capacityChecked = false;
+        if (batch_id) {
+          const { data: slotRow, error: slotErr } = await db
+            .from("class_slots")
+            .select("current_enrolment,max_capacity")
+            .eq("class_option_id", class_option_id)
+            .eq("batch_id", batch_id)
+            .eq("status", "Active")
+            .maybeSingle();
+          if (!slotErr && slotRow) {
+            const slotMax = Number(slotRow.max_capacity ?? maxCapacity);
+            const slotCur = Number(slotRow.current_enrolment ?? 0);
+            classIsFull = slotMax > 0 && slotCur >= slotMax;
+            capacityChecked = true;
+          }
+        }
+        if (!capacityChecked) {
+          const { count: assignedCount, error: assignedCountError } = await db
+            .from("applicants")
+            .select("*", { count: "exact", head: true })
+            .eq("class_option_id", class_option_id)
+            .eq("registration_status", "ASSIGNED");
+          if (assignedCountError) {
+            registrationStatus = "REVIEW";
+            availabilityStatus = "MANUAL_REVIEW_REQUIRED";
+            reviewedAt = nowIso;
+            reviewNotes = "Could not validate class capacity safely.";
+            capacityChecked = true;
+          } else {
+            classIsFull = maxCapacity > 0 && Number(assignedCount || 0) >= maxCapacity;
+            capacityChecked = true;
+          }
+        }
+        if (capacityChecked && registrationStatus === "PENDING") {
           if (classIsFull) {
             registrationStatus = "WAITLISTED";
             availabilityStatus = "CLASS_FULL";
