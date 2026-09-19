@@ -1,26 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-// WAVE 1: Fixed CORS to use single origin per request instead of comma-separated
-// This matches HTTP spec and prevents ambiguity in browser CORS handling
-const ALLOWED_ORIGINS = new Set([
-  "https://rocksolidsuite.netlify.app",
-  "https://rocksolid.lwcanada.org",
-  "http://localhost:3000", // dev environment
-  "http://127.0.0.1:3000", // local testing
-]);
-
-function getCORSHeaders(requestOrigin: string | null) {
-  const origin = requestOrigin || "https://rocksolidsuite.netlify.app"; // fallback
-  const acao = ALLOWED_ORIGINS.has(origin) ? origin : "";
-
-  return {
-    "Access-Control-Allow-Origin": acao,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Vary": "Origin",
-  };
-}
+import { getCORSHeaders } from "./cors.ts";
 
 function json(body: unknown, status = 200, corsHeaders: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
