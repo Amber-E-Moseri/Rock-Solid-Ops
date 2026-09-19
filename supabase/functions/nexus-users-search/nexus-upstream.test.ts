@@ -220,6 +220,7 @@ async function main(): Promise<void> {
   const createdIds: string[] = [];
   let edgeProc: Deno.ChildProcess | undefined;
   let mockServer: Deno.HttpServer | undefined;
+  let certPass = false;
 
   try {
     // ── Step 1: Start mock Nexus ──────────────────────────────
@@ -331,6 +332,7 @@ async function main(): Promise<void> {
       "  supabase/functions/nexus-users-search/nexus-upstream.test.ts (created)",
     );
 
+    certPass = pass;
     console.log(out.join("\n"));
   } finally {
     // ── Cleanup ───────────────────────────────────────────────
@@ -355,6 +357,10 @@ async function main(): Promise<void> {
         // best-effort
       }
     }
+  }
+
+  if (!certPass) {
+    Deno.exit(1);
   }
 }
 
