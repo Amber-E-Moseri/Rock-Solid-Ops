@@ -24,6 +24,7 @@ DENO_UNIT_TESTS=(
   "supabase/functions/teacher-portal-api/class-ownership.test.ts"
   "supabase/functions/teacher-portal-api/teacher-auth.test.ts"
   "supabase/functions/waitlist-processor/waitlist-dedup.test.ts"
+  "supabase/functions/registration-processor/registration-processor.test.ts"
   # moodle-sync/moodle-sync.test.ts excluded: pre-existing type errors +
   # top-level Deno.serve() in index.ts prevents import (tracked separately)
 )
