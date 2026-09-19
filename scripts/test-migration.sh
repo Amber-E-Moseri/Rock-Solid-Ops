@@ -103,6 +103,51 @@ else
   FAIL=1
 fi
 
+# Invariant 6: every known email_queue producer has both the canonical
+# notification_templates row and the legacy email_templates FK row.
+echo -n "  [6] email_queue template FK seed durable: "
+MISSING=$(run_sql "
+WITH required(template_key) AS (
+  VALUES
+    ('attendance_escalation'),
+    ('attendance_reminder'),
+    ('batch_rollover_notice'),
+    ('campaign'),
+    ('class_assigned'),
+    ('class_assigned_confirmation'),
+    ('class_reassignment_notice'),
+    ('class_slot_cancelled'),
+    ('class_time_changed'),
+    ('classes_now_available'),
+    ('direct_message'),
+    ('duplicate_registration'),
+    ('foundation_welcome'),
+    ('missed_class_checkin'),
+    ('moodle_credentials'),
+    ('moodle_login_reminder'),
+    ('registration_status_update'),
+    ('registration_under_review_checkin'),
+    ('report'),
+    ('teacher_status_negative'),
+    ('teacher_status_positive')
+)
+SELECT string_agg(r.template_key, ', ' ORDER BY r.template_key)
+FROM required r
+LEFT JOIN public.notification_templates nt
+  ON nt.template_key = r.template_key
+LEFT JOIN public.email_templates et
+  ON et.template_key = r.template_key
+WHERE nt.template_key IS NULL
+   OR et.template_key IS NULL;
+" | tr -d '\r')
+MISSING=$(echo "$MISSING" | xargs)
+if [ -z "$MISSING" ]; then
+  echo "PRESENT (PASS)"
+else
+  echo "MISSING: $MISSING (FAIL)"
+  FAIL=1
+fi
+
 echo ""
 if [ "${FAIL:-0}" -ne 0 ]; then
   echo "RESULT: FAIL"
