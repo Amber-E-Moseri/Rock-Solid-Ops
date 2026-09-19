@@ -157,7 +157,6 @@ export async function createStaffDirectAction(
         full_name: fullName,
         role: targetRole,
         is_active: true,
-        active: true,
         updated_at: now,
       },
       { onConflict: "user_id" },
@@ -186,9 +185,9 @@ export async function createStaffDirectAction(
     await admin.from("audit_logs").insert({
       action: "staff_created_direct",
       actor_id: auth?.user?.id || null,
-      target_id: userId,
+      entity_id: userId,
       entity_type: "profile",
-      metadata: {
+      details: {
         email,
         role: targetRole,
         created_by: actorEmail,

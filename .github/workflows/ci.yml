@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Only one CI run per branch at a time; newer pushes cancel in-flight runs.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ──────────────────────────────────────────────────────────────
+  # Job 1: Unit tests — no DB, no Docker required.
+  # Runs Deno edge-function unit tests and foundation-spa Vitest.
+  # ──────────────────────────────────────────────────────────────
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: foundation-spa/package-lock.json
+
+      - name: Install foundation-spa deps
+        working-directory: foundation-spa
+        run: npm ci
+
+      - name: Run unit tests
+        run: bash scripts/test-unit.sh
+
+  # ──────────────────────────────────────────────────────────────
+  # Job 2: Migration gate — db reset + schema invariant check.
+  # Verifies the full migration chain replays cleanly from zero
+  # and that Wave 1 security invariants survive the reset.
+  # ──────────────────────────────────────────────────────────────
+  migration:
+    name: Migration gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Install psql client
+        run: sudo apt-get install -y postgresql-client
+
+      - name: Start local Supabase
+        run: supabase start
+
+      - name: Run migration gate
+        env:
+          LOCAL_INTEGRATION_TEST: "true"
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: bash scripts/test-migration.sh
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop
+
+  # ──────────────────────────────────────────────────────────────
+  # Job 3: Security regression — Wave 1 authorization boundaries.
+  # Requires a running local Supabase and the local dev keys.
+  # Keys are deterministic (fixed local dev values, not production).
+  # No production credentials are used or needed.
+  # ──────────────────────────────────────────────────────────────
+  security:
+    name: Security regression
+    runs-on: ubuntu-latest
+    # Security job depends on migration passing so we know the DB is clean.
+    needs: [migration]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Install psql client
+        run: sudo apt-get install -y postgresql-client
+
+      - name: Start local Supabase
+        run: supabase start
+
+      - name: Export local dev keys into env
+        # These are the deterministic local dev keys produced by `supabase start`.
+        # They are not production secrets — they only work against the local stack.
+        run: |
+          eval "$(supabase status --output env)"
+          echo "SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
+          echo "SUPABASE_ANON_KEY=$ANON_KEY" >> "$GITHUB_ENV"
+          DB_CONTAINER=$(docker ps --filter "name=supabase_db" --format "{{.Names}}" | head -1)
+          echo "DB_CONTAINER=$DB_CONTAINER" >> "$GITHUB_ENV"
+
+      - name: Run security regression
+        env:
+          LOCAL_INTEGRATION_TEST: "true"
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+        run: bash scripts/test-security.sh
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop

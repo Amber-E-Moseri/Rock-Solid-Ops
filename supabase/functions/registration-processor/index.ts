@@ -155,15 +155,61 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: false, error: "INVALID_PHONE", code: "VALIDATION" }, 400);
     }
 
+    // ── Resolve active batch when form did not supply one ─────────────────
+    // The public registration form always sends batch_id: null. Without a
+    // batch_id the double-click guard and same-batch duplicate check both
+    // malfunction, and applicant records lose their batch association.
+    if (!batch_id) {
+      const { data: activeBatch } = await db
+        .from("batches")
+        .select("batch_id")
+        .or("active.eq.true,registration_open.eq.true")
+        .order("start_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (activeBatch?.batch_id) {
+        batch_id = String(activeBatch.batch_id).trim() || null;
+      }
+    }
+
+    // Registration without a batch is not meaningful: there is no intake to enroll into.
+    // Return a controlled 400 rather than creating a partially-committed applicant row.
+    if (!batch_id) {
+      return jsonResponse({ ok: false, error: "Registration is not currently open.", code: "NO_ACTIVE_BATCH" }, 400);
+    }
+
+    // ── Campus registration gate (server-side; direct POST cannot bypass) ──
+    // Authoritative key: the submitted fellowship_code resolved against
+    // batch_campus_registration_settings for the active batch.
+    // Fail-open semantics: missing setting row means campus is open.
+    if (fellowship_code) {
+      const { data: campusSettings } = await db
+        .from("batch_campus_registration_settings")
+        .select("registration_open")
+        .eq("batch_id", batch_id)
+        .eq("fellowship_code", fellowship_code)
+        .maybeSingle();
+      if (campusSettings !== null && campusSettings.registration_open === false) {
+        return jsonResponse({
+          ok: false,
+          error: "Registration for your campus is currently closed.",
+          code: "CAMPUS_CLOSED",
+        }, 400);
+      }
+    }
+
     // ── Layer 3: Double-click / resubmission guard ────────────────────────
-    const { data: recentSubmission } = await db
+    // batch_id is always non-null here (early-return gate above ensures it).
+    let recentQuery = db
       .from("applicants")
       .select("id")
       .eq("email", email)
-      .eq("batch_id", batch_id || "")
       .gt("created_at", new Date(Date.now() - 5 * 60 * 1000).toISOString())
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+    if (batch_id) {
+      recentQuery = recentQuery.eq("batch_id", batch_id);
+    }
+    const { data: recentSubmission } = await recentQuery.maybeSingle();
 
     if (recentSubmission) {
       return jsonResponse({
@@ -277,18 +323,42 @@ Deno.serve(async (req) => {
         reviewNotes = classOptionError ? "Could not safely validate selected class option." : "Selected class option no longer exists.";
       } else {
         const maxCapacity = Number(classOptionRow.max_capacity || 0);
-        const { count: assignedCount, error: assignedCountError } = await db
-          .from("applicants")
-          .select("*", { count: "exact", head: true })
-          .eq("class_option_id", class_option_id)
-          .eq("registration_status", "ASSIGNED");
-        if (assignedCountError) {
-          registrationStatus = "REVIEW";
-          availabilityStatus = "MANUAL_REVIEW_REQUIRED";
-          reviewedAt = nowIso;
-          reviewNotes = "Could not validate class capacity safely.";
-        } else {
-          classIsFull = maxCapacity > 0 && Number(assignedCount || 0) >= maxCapacity;
+        // Prefer class_slots (batch-scoped, authoritative) when batch is known.
+        // Fall back to counting assigned applicants when no slot record exists.
+        let capacityChecked = false;
+        if (batch_id) {
+          const { data: slotRow, error: slotErr } = await db
+            .from("class_slots")
+            .select("current_enrolment,max_capacity")
+            .eq("class_option_id", class_option_id)
+            .eq("batch_id", batch_id)
+            .eq("status", "Active")
+            .maybeSingle();
+          if (!slotErr && slotRow) {
+            const slotMax = Number(slotRow.max_capacity ?? maxCapacity);
+            const slotCur = Number(slotRow.current_enrolment ?? 0);
+            classIsFull = slotMax > 0 && slotCur >= slotMax;
+            capacityChecked = true;
+          }
+        }
+        if (!capacityChecked) {
+          const { count: assignedCount, error: assignedCountError } = await db
+            .from("applicants")
+            .select("*", { count: "exact", head: true })
+            .eq("class_option_id", class_option_id)
+            .eq("registration_status", "ASSIGNED");
+          if (assignedCountError) {
+            registrationStatus = "REVIEW";
+            availabilityStatus = "MANUAL_REVIEW_REQUIRED";
+            reviewedAt = nowIso;
+            reviewNotes = "Could not validate class capacity safely.";
+            capacityChecked = true;
+          } else {
+            classIsFull = maxCapacity > 0 && Number(assignedCount || 0) >= maxCapacity;
+            capacityChecked = true;
+          }
+        }
+        if (capacityChecked && registrationStatus === "PENDING") {
           if (classIsFull) {
             registrationStatus = "WAITLISTED";
             availabilityStatus = "CLASS_FULL";
@@ -396,14 +466,74 @@ Deno.serve(async (req) => {
         applicant = existingApplicant as Record<string, unknown> | null;
       }
     } else {
-      ({
-        data: applicant,
-        error: applicantError,
-      } = await db
-        .from("applicants")
-        .insert(applicantInsertWithDuplicateFlags)
-        .select("*")
-        .single());
+      // For ASSIGNED registrations with a known class+batch: use the atomic RPC.
+      // It acquires SELECT ... FOR UPDATE on class_slots, rechecks capacity under
+      // the lock, and inserts the applicant in the same transaction.  A concurrent
+      // request that arrives while the lock is held must wait, then re-reads the
+      // trigger-incremented counter — closing the TOCTOU race.
+      if (registrationStatusTyped === "ASSIGNED" && class_option_id && batch_id) {
+        const { data: rpcResult, error: rpcError } = await db.rpc(
+          "insert_applicant_reserve_slot",
+          { p_applicant: applicantInsertWithDuplicateFlags },
+        );
+        if (rpcError) {
+          applicantError = rpcError;
+        } else if (rpcResult?.ok === false && rpcResult?.reason === "CLASS_FULL") {
+          // Concurrent request filled the slot between our stale read and the lock.
+          // Downgrade to WAITLISTED so this applicant enters the retry queue.
+          registrationStatusTyped = "WAITLISTED";
+          availabilityStatusTyped = "CLASS_FULL";
+          waitlistedAt = new Date().toISOString();
+          assignedAt = null;
+          ({
+            data: applicant,
+            error: applicantError,
+          } = await db
+            .from("applicants")
+            .insert({
+              ...applicantInsertWithDuplicateFlags,
+              registration_status: "WAITLISTED",
+              availability_status: "CLASS_FULL",
+              status: "Waitlisted",
+              assigned_at: null,
+              waitlisted_at: waitlistedAt,
+              retry_assignment: true,
+            })
+            .select("*")
+            .single());
+        } else if (rpcResult?.ok === false) {
+          // NO_SLOT or unexpected result — fall through to direct insert.
+          ({
+            data: applicant,
+            error: applicantError,
+          } = await db
+            .from("applicants")
+            .insert(applicantInsertWithDuplicateFlags)
+            .select("*")
+            .single());
+        } else if (rpcResult?.ok === true) {
+          // RPC inserted the row; fetch the full record.
+          ({
+            data: applicant,
+            error: applicantError,
+          } = await db
+            .from("applicants")
+            .select("*")
+            .eq("id", rpcResult.applicant_id)
+            .single());
+        }
+      } else {
+        // Non-ASSIGNED paths (WAITLISTED, DUPLICATE, REVIEW, PENDING):
+        // no capacity lock needed, use direct insert.
+        ({
+          data: applicant,
+          error: applicantError,
+        } = await db
+          .from("applicants")
+          .insert(applicantInsertWithDuplicateFlags)
+          .select("*")
+          .single());
+      }
 
       if (applicantError) {
         const msg = JSON.stringify(applicantError);
