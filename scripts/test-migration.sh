@@ -12,10 +12,15 @@
 #   - LOCAL_INTEGRATION_TEST=true
 #
 # WARNING: db reset drops and recreates the local database. All local data is lost.
+#
+# SUPABASE_PROJECT_DIR (optional): path to the Supabase project root that owns the
+# running local stack. Defaults to this script's repo root. Override locally when
+# the Supabase stack is tied to a different worktree (e.g. the main checkout).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SUPABASE_PROJECT_DIR="${SUPABASE_PROJECT_DIR:-$ROOT}"
 
 if [ "${LOCAL_INTEGRATION_TEST:-}" != "true" ]; then
   echo "ERROR: Set LOCAL_INTEGRATION_TEST=true to run migration tests."
@@ -26,10 +31,20 @@ fi
 DATABASE_URL="${DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:54322/postgres}"
 export DATABASE_URL
 
+# DB_CONTAINER: run SQL via docker exec when psql is not on the host PATH.
+DB_CONTAINER="${DB_CONTAINER:-supabase_db_supabase_foundation}"
+run_sql() {
+  if command -v psql >/dev/null 2>&1; then
+    psql "$DATABASE_URL" -t -A -c "$1" 2>&1
+  else
+    docker exec -i "$DB_CONTAINER" psql -U postgres -d postgres -t -A -c "$1" 2>&1
+  fi
+}
+
 echo "========================================"
 echo "TEST:MIGRATION — db reset from zero"
 echo "========================================"
-cd "$ROOT"
+cd "$SUPABASE_PROJECT_DIR"
 supabase db reset --local
 echo "  db reset: OK"
 
@@ -40,9 +55,7 @@ echo "========================================"
 
 # Invariant 1: anon must NOT have EXECUTE on override_graduation_eligibility
 echo -n "  [1] anon EXECUTE on override_graduation_eligibility: "
-RESULT=$(psql "$DATABASE_URL" -t -c \
-  "SELECT has_function_privilege('anon', 'public.override_graduation_eligibility(uuid,text,boolean,text)', 'EXECUTE');" \
-  2>&1 | tr -d '[:space:]')
+RESULT=$(run_sql "SELECT has_function_privilege('anon', 'public.override_graduation_eligibility(uuid,text,boolean,text)', 'EXECUTE');" | tr -d '[:space:]')
 if [ "$RESULT" = "f" ]; then
   echo "REVOKED (PASS)"
 else
@@ -52,9 +65,7 @@ fi
 
 # Invariant 2: anon must NOT have EXECUTE on admin_create_teacher_direct
 echo -n "  [2] anon EXECUTE on admin_create_teacher_direct: "
-RESULT=$(psql "$DATABASE_URL" -t -c \
-  "SELECT has_function_privilege('anon', 'public.admin_create_teacher_direct(text,text,text,text,text,text,text,text)', 'EXECUTE');" \
-  2>&1 | tr -d '[:space:]')
+RESULT=$(run_sql "SELECT has_function_privilege('anon', 'public.admin_create_teacher_direct(text,text,text,text,text,text,text,text)', 'EXECUTE');" | tr -d '[:space:]')
 if [ "$RESULT" = "f" ]; then
   echo "REVOKED (PASS)"
 else
@@ -64,9 +75,7 @@ fi
 
 # Invariant 3: stale audit_log_staff_select policy must be absent
 echo -n "  [3] stale policy audit_log_staff_select absent: "
-COUNT=$(psql "$DATABASE_URL" -t -c \
-  "SELECT COUNT(*) FROM pg_policies WHERE policyname='audit_log_staff_select' AND tablename='audit_logs';" \
-  2>&1 | tr -d '[:space:]')
+COUNT=$(run_sql "SELECT COUNT(*) FROM pg_policies WHERE policyname='audit_log_staff_select' AND tablename='audit_logs';" | tr -d '[:space:]')
 if [ "$COUNT" = "0" ]; then
   echo "ABSENT (PASS)"
 else
@@ -76,9 +85,7 @@ fi
 
 # Invariant 4: audit_logs table has RLS enabled
 echo -n "  [4] audit_logs RLS enabled: "
-RLS=$(psql "$DATABASE_URL" -t -c \
-  "SELECT relrowsecurity FROM pg_class WHERE relname='audit_logs' AND relnamespace='public'::regnamespace;" \
-  2>&1 | tr -d '[:space:]')
+RLS=$(run_sql "SELECT relrowsecurity FROM pg_class WHERE relname='audit_logs' AND relnamespace='public'::regnamespace;" | tr -d '[:space:]')
 if [ "$RLS" = "t" ]; then
   echo "ENABLED (PASS)"
 else
@@ -86,15 +93,13 @@ else
   FAIL=1
 fi
 
-# Invariant 5: service_role has SELECT on profiles (Wave 2A grants applied)
+# Invariant 5: service_role has SELECT on profiles (Supabase default ACL — verified present without user migrations)
 echo -n "  [5] service_role SELECT on profiles: "
-RESULT=$(psql "$DATABASE_URL" -t -c \
-  "SELECT has_table_privilege('service_role', 'public.profiles', 'SELECT');" \
-  2>&1 | tr -d '[:space:]')
+RESULT=$(run_sql "SELECT has_table_privilege('service_role', 'public.profiles', 'SELECT');" | tr -d '[:space:]')
 if [ "$RESULT" = "t" ]; then
   echo "GRANTED (PASS)"
 else
-  echo "DENIED (FAIL — wave2a grants migration missing or failed)"
+  echo "DENIED (FAIL — Supabase roles.sql initialization did not apply expected DEFAULT PRIVILEGES)"
   FAIL=1
 fi
 
