@@ -91,11 +91,6 @@ export async function assignApplicant(
 
   const batchId = String(context?.batchId || applicant.batch_id || "").trim() || await findActiveBatchId(db);
 
-  const slot = await resolveClassSlot(db, classOptionIdClean, batchId);
-  if (slot?.max_capacity !== null && Number(slot.current_enrolment || 0) >= Number(slot.max_capacity)) {
-    throw new Error(`Class is full for class_option_id=${classOptionIdClean} batch_id=${batchId}`);
-  }
-
   const assignedAt = new Date().toISOString();
   const updateApplicantPayload = {
     registration_status: "ASSIGNED",
@@ -188,14 +183,6 @@ export async function assignApplicant(
   };
   const { error: emailErr } = await db.from("email_queue").insert(emailPayload);
   if (emailErr) throw emailErr;
-
-  if (slot?.class_slot_id) {
-    const { error: slotErr } = await db
-      .from("class_slots")
-      .update({ current_enrolment: Number(slot.current_enrolment || 0) + 1, updated_at: assignedAt })
-      .eq("class_slot_id", slot.class_slot_id);
-    if (slotErr) throw slotErr;
-  }
 
   await insertAudit(db, {
     actor_email: context.actorEmail || `${context.triggeredBy}@system`,
