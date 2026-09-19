@@ -45,7 +45,7 @@ const PASSWORD = `W1Reg${TS}x`;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const DB_CONTAINER = "supabase_db_supabase_foundation";
+const DB_CONTAINER = Deno.env.get("DB_CONTAINER") ?? "supabase_db_supabase_foundation";
 
 async function psql(sql: string): Promise<string> {
   // Call docker exec directly — avoids Windows CMD batch-file argument

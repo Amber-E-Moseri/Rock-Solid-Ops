@@ -117,6 +117,8 @@ jobs:
           echo "SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
           echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
           echo "SUPABASE_ANON_KEY=$ANON_KEY" >> "$GITHUB_ENV"
+          DB_CONTAINER=$(docker ps --filter "name=supabase_db" --format "{{.Names}}" | head -1)
+          echo "DB_CONTAINER=$DB_CONTAINER" >> "$GITHUB_ENV"
 
       - name: Run security regression
         env:
