@@ -1,6 +1,6 @@
 create table if not exists public.class_selection_tokens (
   id uuid primary key default gen_random_uuid(),
-  token text not null unique default encode(gen_random_bytes(32), 'hex'),
+  token text not null unique default encode(extensions.gen_random_bytes(32), 'hex'),
   applicant_id uuid not null references public.applicants(id) on delete cascade,
   batch_id text not null,
   fellowship_code text not null,
