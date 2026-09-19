@@ -145,33 +145,37 @@ const insertedApplicantIds: string[] = [];
 // ─── Fixture setup ────────────────────────────────────────────────────────────
 
 async function setup(): Promise<void> {
-  // Batch
+  // batch_name (not "name") is the actual column; active must be false to avoid
+  // the unique-partial constraint uq_batches_one_active (only one active batch).
   await adminPost("/batches", {
     batch_id: BATCH_ID,
-    name: `Live Test Batch ${RUN}`,
+    batch_name: `Live Test Batch ${RUN}`,
     start_date: "2099-01-01",
     end_date: "2099-06-30",
-    status: "ACTIVE",
-    active: true,
+    status: "Active",
+    active: false,
   });
 
-  // fellowship_map entry (required for campus gate lookups)
+  // fellowship_map entry (required for the applicants FK constraint)
   await adminPost("/fellowship_map", {
     fellowship_code: FELLOWSHIP,
     campus_name: `Test Campus ${RUN}`,
     active: true,
   });
 
-  // Campus registration settings: open
+  // Campus registration settings (FK to batches + fellowship_map)
   await adminPost("/batch_campus_registration_settings", {
     batch_id: BATCH_ID,
     fellowship_code: FELLOWSHIP,
     registration_open: true,
   });
 
-  // Main class_option
+  // Main class_option — class_id, group_id, subgroup_id are NOT NULL in schema
   await adminPost("/class_options", {
     class_option_id: CO_MAIN,
+    class_id: `TC-MAIN-${RUN}`,
+    group_id: "CE",
+    subgroup_id: `CE-${RUN}`,
     teacher_name: "Test Teacher",
     day: "Monday",
     class_time: "19:00",
@@ -183,6 +187,9 @@ async function setup(): Promise<void> {
   // Alt class_option (for concurrency C4)
   await adminPost("/class_options", {
     class_option_id: CO_ALT,
+    class_id: `TC-ALT-${RUN}`,
+    group_id: "CE",
+    subgroup_id: `CE-ALT-${RUN}`,
     teacher_name: "Alt Teacher",
     day: "Tuesday",
     class_time: "20:00",
@@ -191,10 +198,12 @@ async function setup(): Promise<void> {
     enrollment_open: true,
   });
 
-  // Main slot (capacity will be set per test section)
+  // Main slot — group_id and subgroup_id are NOT NULL in class_slots
   await adminPost("/class_slots", {
     class_option_id: CO_MAIN,
     batch_id: BATCH_ID,
+    group_id: "CE",
+    subgroup_id: `CE-${RUN}`,
     status: "Active",
     max_capacity: 2,
     current_enrolment: 0,
@@ -204,6 +213,8 @@ async function setup(): Promise<void> {
   await adminPost("/class_slots", {
     class_option_id: CO_ALT,
     batch_id: BATCH_ID,
+    group_id: "CE",
+    subgroup_id: `CE-ALT-${RUN}`,
     status: "Active",
     max_capacity: 2,
     current_enrolment: 0,
@@ -322,6 +333,7 @@ async function runTests(): Promise<void> {
 
   console.log("\n[6] RPC BOUNDARY — anon/authenticated denied, service_role allowed");
   {
+    // anon sends the anon JWT → PostgREST maps 42501 to HTTP 401 for the anon role
     const anon = await callRPC(makeApplicant("boundary-anon@test.local", CO_NONE), ANON_KEY);
     assert(anon.status === 401, "[6.1] anon HTTP 401");
     const errA = (anon.body as Record<string,unknown>).message as string ?? "";
