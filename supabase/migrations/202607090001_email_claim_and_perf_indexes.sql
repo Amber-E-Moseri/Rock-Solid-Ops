@@ -23,13 +23,18 @@ ALTER TABLE public.email_queue ADD CONSTRAINT email_queue_status_check
 CREATE INDEX IF NOT EXISTS idx_email_queue_status_created_at
   ON public.email_queue (status, created_at);
 
--- stale-claim recovery sweep: WHERE status = 'Processing' AND updated_at < cutoff
-CREATE INDEX IF NOT EXISTS idx_email_queue_processing_updated_at
-  ON public.email_queue (updated_at)
-  WHERE status = 'Processing';
-
 DO $$
 BEGIN
+  -- stale-claim recovery sweep: WHERE status = 'Processing' AND updated_at < cutoff
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'email_queue' AND column_name = 'updated_at'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_email_queue_processing_updated_at
+      ON public.email_queue (updated_at)
+      WHERE status = 'Processing';
+  END IF;
+
   -- directory attendance summaries: rows looked up per applicant
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
