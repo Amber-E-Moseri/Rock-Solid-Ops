@@ -133,9 +133,20 @@
       return data;
     },
     async invokeMoodleSync(client, payload) {
-      const { data, error } = await client.functions.invoke("moodle-sync", {
-        body: payload || {}
-      });
+      // Route through admin-api proxy for authenticated access.
+      // Remap moodle-sync "action" param to avoid conflict with admin-api "action" field.
+      const body = { action: "invoke-moodle-sync" };
+      if (payload?.action) {
+        body.moodle_action = payload.action;
+      }
+      if (payload?.id) {
+        body.id = payload.id;
+      }
+      if (payload?.limit) {
+        body.limit = payload.limit;
+      }
+
+      const { data, error } = await client.functions.invoke("admin-api", { body });
       if (error) throw error;
       if (!data?.ok) {
         throw new Error(String(data?.error || "moodle-sync call failed"));

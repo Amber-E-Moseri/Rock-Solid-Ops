@@ -195,11 +195,8 @@
     async function testMoodleConnection() {
       msg("Testing Moodle connection...");
       try {
-        const { data, error } = await supabase.functions.invoke("moodle-sync", {
-          body: { action: "test" }
-        });
-        if (error) return msg(error.message || "Connection test failed.", true);
-        if (!data?.ok) return msg(data?.error || "Connection test failed.", true);
+        const result = await adminApi?.invokeMoodleSync?.(supabase, { action: "test" });
+        if (!result?.ok) return msg(result?.error || "Connection test failed.", true);
         msg("Moodle connection OK.");
       } catch (e) {
         msg(String(e?.message || e), true);

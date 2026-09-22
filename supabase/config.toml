@@ -33,6 +33,11 @@ verify_jwt = false
 entrypoint = "./functions/review-checkin/index.ts"
 # Cron schedule is defined in ./functions/review-checkin/config.toml
 
+[functions.moodle-sync]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/moodle-sync/index.ts"
+
 [functions.email-sender]
 enabled = true
 verify_jwt = false

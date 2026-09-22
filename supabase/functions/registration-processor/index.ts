@@ -44,30 +44,6 @@ Deno.serve(async (req) => {
       SUPABASE_URL,
       SUPABASE_SERVICE_ROLE_KEY
     );
-    const triggerMoodleSync = async (syncId: string) => {
-      if (!syncId) return;
-      try {
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/moodle-sync`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-            apikey: SUPABASE_SERVICE_ROLE_KEY,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ id: syncId, limit: 1 }),
-        });
-        if (!res.ok) {
-          const txt = await res.text();
-          console.error("REGISTRATION_PROCESSOR_MOODLE_SYNC_TRIGGER_FAILED", {
-            syncId,
-            status: res.status,
-            body: txt,
-          });
-        }
-      } catch (err) {
-        console.error("REGISTRATION_PROCESSOR_MOODLE_SYNC_TRIGGER_ERROR", { syncId, err });
-      }
-    };
     const body = await req.json().catch(() => ({}));
     
     // Input validation
@@ -772,9 +748,6 @@ Deno.serve(async (req) => {
           );
       } catch (moodleQueueErr) {
         console.error("REGISTRATION_PROCESSOR_MOODLE_QUEUE_ERROR", moodleQueueErr);
-      }
-      if (moodleSyncRowId) {
-        await triggerMoodleSync(moodleSyncRowId);
       }
     }
 
