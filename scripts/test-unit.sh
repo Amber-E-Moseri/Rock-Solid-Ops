@@ -16,6 +16,7 @@ echo "TEST:UNIT — Deno edge function units"
 echo "========================================"
 
 DENO_UNIT_TESTS=(
+  "supabase/functions/_shared/auth.test.ts"
   "supabase/functions/_shared/lib/assign-applicant.test.ts"
   "supabase/functions/_shared/push-notify.test.ts"
   "supabase/functions/_shared/webpush.test.ts"

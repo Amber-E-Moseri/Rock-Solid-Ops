@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { validateInternalAuth } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -109,25 +110,16 @@ async function isAdmin(db: ReturnType<typeof createClient>, userId: string, emai
   return false;
 }
 
-async function ensureAuthorized(req: Request, db: ReturnType<typeof createClient>, serviceKey: string) {
+async function ensureAuthorized(req: Request, db: ReturnType<typeof createClient>) {
+  if (req.headers.has("x-internal-secret")) {
+    const internalFailure = validateInternalAuth(req);
+    if (internalFailure) return { ok: false, reason: "Invalid internal authorization" };
+    return { ok: true, actorEmail: "internal-service@system" };
+  }
+
   const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
   if (!authHeader.startsWith("Bearer ")) return { ok: false, reason: "Missing bearer token" };
   const token = authHeader.slice("Bearer ".length).trim();
-
-  if (token === serviceKey) {
-    return { ok: true, actorEmail: "service@system" };
-  }
-
-  // Also accept the service role JWT (decoded role claim = "service_role")
-  try {
-    const parts = token.split(".");
-    if (parts.length === 3) {
-      const claims = JSON.parse(atob(parts[1]));
-      if (claims?.role === "service_role") {
-        return { ok: true, actorEmail: "service@system" };
-      }
-    }
-  } catch (_) {}
 
   const { data: userData, error: userErr } = await db.auth.getUser(token);
   if (userErr || !userData?.user) return { ok: false, reason: "Invalid session" };
@@ -358,7 +350,7 @@ Deno.serve(async (req) => {
   const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
   try {
-    const auth = await ensureAuthorized(req, db, SERVICE_KEY);
+    const auth = await ensureAuthorized(req, db);
     if (!auth.ok) return json({ ok: false, error: auth.reason }, 401);
 
     const body = (await req.json().catch(() => ({}))) as SyncRequest;
@@ -473,4 +465,3 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: message, non_fatal: true }, 200);
   }
 });
-
