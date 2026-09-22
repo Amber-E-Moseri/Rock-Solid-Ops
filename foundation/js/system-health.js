@@ -422,27 +422,33 @@
       }
 
       // Moodle API live connectivity check (core_webservice_get_site_info)
+      // Routes through admin-api proxy for authenticated access.
       try {
         const cfg = adminApi?.getConfig?.() || {};
         const supabaseUrl = String(window.FS_CONFIG?.SUPABASE_URL || cfg.url || "").trim();
-        const anonKey = String(window.FS_CONFIG?.SUPABASE_ANON_KEY || cfg.anonKey || "").trim();
-        if (!supabaseUrl || !anonKey) {
-          pushCheck("moodle-api", "Moodle API Connectivity", "warn", "Missing runtime config — cannot test Moodle connection.");
+        const { data: sess } = await supabase.auth.getSession();
+        const token = sess?.session?.access_token;
+
+        if (!supabaseUrl || !token) {
+          pushCheck("moodle-api", "Moodle API Connectivity", "warn", "Missing auth token or runtime config — cannot test Moodle connection.");
         } else {
           const moodleRes = await withTimeout(
             "moodle-api-test",
-            () => fetch(`${supabaseUrl}/functions/v1/moodle-sync`, {
+            () => fetch(`${supabaseUrl}/functions/v1/admin-api`, {
               method: "POST",
               headers: {
-                Authorization: `Bearer ${anonKey}`,
-                apikey: anonKey,
+                Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json"
               },
-              body: JSON.stringify({ action: "test" })
+              body: JSON.stringify({ action: "invoke-moodle-sync", moodle_action: "test" })
             }),
             10000
           );
           const moodleData = await moodleRes.json().catch(() => ({}));
+          // Remap moodle_action response back to action for compatibility.
+          if (moodleData.test === "moodle_connectivity") {
+            moodleData.action = "test";
+          }
           if (moodleData.ok) {
             const label = moodleData.sitename || moodleData.siteurl || moodleData.moodleUrl || "Moodle";
             pushCheck("moodle-api", "Moodle API Connectivity", "pass", `Connected — ${label}`);

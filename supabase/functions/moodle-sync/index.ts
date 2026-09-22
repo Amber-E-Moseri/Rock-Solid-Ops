@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { validateCronAuth } from "../_shared/auth.ts";
 import {
   corsHeaders,
   jsonResponse,
@@ -40,6 +41,13 @@ async function logAudit(db: ReturnType<typeof createClient>, action: string, ent
     details,
   });
 }
+
+// Exported test-observable boundary. Object properties are mutable from importers.
+// Set onRunAudit in unit tests to spy on MOODLE_SYNC_RUN emissions.
+// Must remain unset in production — only the logAudit DB path is authoritative.
+export const _testHooks: {
+  onRunAudit?: (action: string, entityId: string, details: Record<string, unknown>) => void;
+} = {};
 
 async function patchSyncRow(
   db: ReturnType<typeof createClient>,
@@ -329,9 +337,13 @@ async function resolveCourseId(db: ReturnType<typeof createClient>, row: Record<
   return "";
 }
 
-Deno.serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
+
+  // ── Authentication Gate (before any business logic) ──
+  const authFailure = validateCronAuth(req);
+  if (authFailure) return authFailure;
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -346,7 +358,37 @@ Deno.serve(async (req) => {
     const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
     const payload = await req.json().catch(() => ({}));
 
+    if (!isValidPayload(payload)) {
+      return json({ ok: false, error: "Invalid payload", code: "INVALID_PAYLOAD" }, 400);
+    }
+
+    // Test action: live Moodle connectivity check via core_webservice_get_site_info
+    // READ-ONLY: does not execute stuck-processing recovery (observational only).
+    if (String(payload?.action || "").trim() === "test") {
+      if (!MOODLE_URL || !MOODLE_TOKEN) {
+        return json({ ok: false, code: "MOODLE_NOT_CONFIGURED", error: "MOODLE_URL or MOODLE_TOKEN not set", moodleUrl: null }, 200);
+      }
+      try {
+        const info = await callMoodle(MOODLE_URL, MOODLE_TOKEN, "core_webservice_get_site_info", {});
+        return json({ ok: true, test: "moodle_connectivity", sitename: info?.sitename || "", siteurl: info?.siteurl || "", moodleUrl: MOODLE_URL });
+      } catch (testErr) {
+        const moodle403 = (testErr as any)?.moodle403 as { code: MoodleFailureCode; retryable: boolean; detail: string } | undefined;
+        if (moodle403) {
+          return json({ ok: false, test: "moodle_connectivity", error: moodle403.detail, code: moodle403.code, failure_reason: moodle403.code, moodleUrl: MOODLE_URL });
+        }
+        const c = classifyError(testErr);
+        return json({ ok: false, test: "moodle_connectivity", error: c.message, code: c.code, moodleUrl: MOODLE_URL });
+      }
+    }
+
+    // Deterministic run-start observability: fires after auth gate on every normal
+    // scheduled invocation, including zero-work runs. Never fires on action:"test".
+    const _runAuditDetails = { triggered_at: new Date().toISOString() };
+    await logAudit(db, "MOODLE_SYNC_RUN", "scheduled-run", "SUCCESS", _runAuditDetails);
+    _testHooks.onRunAudit?.("MOODLE_SYNC_RUN", "scheduled-run", _runAuditDetails);
+
     // Recovery: reset rows stuck in PROCESSING for more than 30 minutes.
+    // Only runs on normal sync path (not on action:"test").
     const processingStaleBeforeIso = new Date(Date.now() - (30 * 60 * 1000)).toISOString();
     const { data: resetRows, error: resetError } = await db
       .from("moodle_enrollment_sync")
@@ -367,28 +409,6 @@ Deno.serve(async (req) => {
         threshold_minutes: 30,
       },
     );
-
-    if (!isValidPayload(payload)) {
-      return json({ ok: false, error: "Invalid payload", code: "INVALID_PAYLOAD" }, 400);
-    }
-
-    // Test action: live Moodle connectivity check via core_webservice_get_site_info
-    if (String(payload?.action || "").trim() === "test") {
-      if (!MOODLE_URL || !MOODLE_TOKEN) {
-        return json({ ok: false, code: "MOODLE_NOT_CONFIGURED", error: "MOODLE_URL or MOODLE_TOKEN not set", moodleUrl: null });
-      }
-      try {
-        const info = await callMoodle(MOODLE_URL, MOODLE_TOKEN, "core_webservice_get_site_info", {});
-        return json({ ok: true, test: "moodle_connectivity", sitename: info?.sitename || "", siteurl: info?.siteurl || "", moodleUrl: MOODLE_URL });
-      } catch (testErr) {
-        const moodle403 = (testErr as any)?.moodle403 as { code: MoodleFailureCode; retryable: boolean; detail: string } | undefined;
-        if (moodle403) {
-          return json({ ok: false, test: "moodle_connectivity", error: moodle403.detail, code: moodle403.code, failure_reason: moodle403.code, moodleUrl: MOODLE_URL });
-        }
-        const c = classifyError(testErr);
-        return json({ ok: false, test: "moodle_connectivity", error: c.message, code: c.code, moodleUrl: MOODLE_URL });
-      }
-    }
 
     const forceId = String(payload?.id || "").trim();
     const limitInput = Number(payload?.limit || 5) || 5;
@@ -633,18 +653,10 @@ Deno.serve(async (req) => {
         });
         if (emailQueueError) {
           console.error("MOODLE_SYNC_CREDENTIALS_EMAIL_QUEUE_FAILED", { id, email, error: emailQueueError });
-        } else {
-          // Trigger email-sender immediately so credentials go out fast
-          void fetch(`${SUPABASE_URL}/functions/v1/email-sender`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${SERVICE_KEY}`,
-              apikey: SERVICE_KEY,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({}),
-          }).catch((err) => console.error("MOODLE_SYNC_EMAIL_SENDER_TRIGGER_ERROR", { id, email, error: err }));
         }
+        // Email is durable in email_queue; scheduled email-sender cron (*\/5 min) will process it.
+        // No function-to-function invocation: moodle-sync does not hold email-sender credentials
+        // and doesn't require immediate sends for correctness (queue → eventual delivery model).
 
         summary.synced += 1;
       } catch (error) {
@@ -747,5 +759,9 @@ Deno.serve(async (req) => {
     const c = classifyError(error);
     return json({ ok: false, error: c.message, code: c.code }, c.statusCode);
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handler);
+}
 

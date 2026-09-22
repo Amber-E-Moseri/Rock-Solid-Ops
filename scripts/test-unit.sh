@@ -20,14 +20,14 @@ DENO_UNIT_TESTS=(
   "supabase/functions/_shared/push-notify.test.ts"
   "supabase/functions/_shared/webpush.test.ts"
   "supabase/functions/admin-api/create-staff-direct.test.ts"
+  "supabase/functions/admin-api/invoke-moodle-sync.test.ts"
   "supabase/functions/admin-api/role-boundary-matrix.test.ts"
   "supabase/functions/teacher-portal-api/class-ownership.test.ts"
   "supabase/functions/teacher-portal-api/teacher-auth.test.ts"
   "supabase/functions/waitlist-processor/waitlist-dedup.test.ts"
   "supabase/functions/registration-processor/registration-processor.test.ts"
   "supabase/functions/nexus-users-search/nexus-cors.test.ts"
-  # moodle-sync/moodle-sync.test.ts excluded: pre-existing type errors +
-  # top-level Deno.serve() in index.ts prevents import (tracked separately)
+  "supabase/functions/moodle-sync/handler.test.ts"
 )
 
 cd "$ROOT"

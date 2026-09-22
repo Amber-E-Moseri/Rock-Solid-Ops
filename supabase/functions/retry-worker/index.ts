@@ -49,26 +49,6 @@ function json(body: unknown, status = 200) {
   );
 }
 
-async function triggerMoodleSync(
-  supabaseUrl: string,
-  serviceKey: string,
-  id: string,
-) {
-  const res = await fetch(`${supabaseUrl}/functions/v1/moodle-sync`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${serviceKey}`,
-      apikey: serviceKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ id, limit: 1 }),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`moodle-sync trigger failed (${res.status}): ${text}`);
-  }
-}
-
 async function triggerClickupEscalation(
   supabaseUrl: string,
   serviceKey: string,
@@ -462,22 +442,8 @@ Deno.serve(async (req) => {
         "SUCCESS",
         { source: "moodle_enrollment_sync", selected: sweep.selected, attempted: sweep.attempted, escalated, limit },
       );
-      // Trigger Moodle sync once after sweep to process newly marked RETRYING rows.
-      if (sweep.attempted > 0) {
-        try {
-          await fetch(`${SUPABASE_URL}/functions/v1/moodle-sync`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${SERVICE_KEY}`,
-              apikey: SERVICE_KEY,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ limit: limit }),
-          });
-        } catch (triggerErr) {
-          console.error("RETRY_SWEEP_MOODLE_TRIGGER_ERROR", triggerErr);
-        }
-      }
+      // Moodle rows marked RETRYING are durable — the scheduled */5 moodle-sync cron
+      // discovers them on its next run. No function-to-function invocation required.
       return json({ ok: true, mode: "auto_sweep", source: "moodle_enrollment_sync", selected: sweep.selected, attempted: sweep.attempted, escalated, limit });
     }
 
@@ -503,11 +469,8 @@ Deno.serve(async (req) => {
         } catch (escalationErr) {
           console.error("RETRY_WORKER_CLICKUP_ESCALATION_ERROR", escalationErr);
         }
-        try {
-          await triggerMoodleSync(SUPABASE_URL, SERVICE_KEY, id);
-        } catch (triggerErr) {
-          console.error("RETRY_WORKER_MOODLE_TRIGGER_ERROR", triggerErr);
-        }
+        // Row is now RETRYING — the scheduled */5 moodle-sync cron picks it up.
+        // No function-to-function invocation needed; durable state drives processing.
       }
     }
     else await applyResolve(serviceDb, source, id);
