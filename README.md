@@ -268,44 +268,49 @@ Note: current access is primarily role-based; regional data scoping is not globa
 
 ## Edge Functions Reference
 
-| Function | Schedule | Role |
-|---|---|---|
-| `registration-processor` | On-demand | Canonical registration intake |
-| `admin-api` | On-demand | Admin API router |
-| `teacher-portal-api` | On-demand | Teacher API router |
-| `messaging-api` | On-demand | In-app messaging API router |
-| `phase2-processor` | On-demand | Assignment processing (legacy/consolidation path) |
-| `moodle-sync` | On-demand | Moodle enrollment |
-| `moodle-grade-sync` | Cron | Moodle grade pull |
-| `retry-worker` | `*/20 * * * *` | Retry sweep |
-| `notification-batch-processor` | On-demand | Scheduled notification batching |
-| `email-sender` | `*/15 * * * *` | Resend delivery |
-| `email-retry` | On-demand | Email retry helper |
-| `notification-retry-helper` | On-demand | Single-notification reset |
-| `notification-dispatcher` | On-demand | Notification routing |
-| `missed-class-detector` | `15 2 * * *` | Nightly attendance gap detection |
-| `attendance-reminder` | Cron | Attendance reminders |
-| `review-checkin` | Cron | REVIEW follow-up |
-| `student-engagement-monitor` | Cron | Engagement monitoring |
-| `clickup-sync` | On-demand | Nexus escalation (retained function name) |
-| `nexus-users-search` | On-demand | Nexus user lookup for admin mapping UI |
-| `waitlist-processor` | On-demand | Waitlist evaluation |
-| `class-selection` | On-demand | Class selection token handler |
-| `report-generator` | Cron | Report generation |
-| `reminder-processor` | Do not schedule | Legacy stub |
+| Function | Schedule | Auth | Role |
+|---|---|---|---|
+| `registration-processor` | On-demand | JWT (verify_jwt=true) | Canonical registration intake |
+| `admin-api` | On-demand | Bearer token | Admin API router |
+| `teacher-portal-api` | On-demand | Bearer token | Teacher API router |
+| `messaging-api` | On-demand | Bearer token | In-app messaging API router |
+| `phase2-processor` | On-demand | Internal | Assignment processing (legacy/consolidation path) |
+| `moodle-sync` | On-demand | Bearer token | Moodle enrollment |
+| `moodle-grade-sync` | Cron | Cron auth + Bearer | Moodle grade pull |
+| `retry-worker` | `*/20 * * * *` (config.toml) | Cron auth | Retry sweep |
+| `notification-batch-processor` | On-demand | Cron auth | Scheduled notification batching |
+| `email-sender` | `*/15 * * * *` | Cron auth | Resend delivery |
+| `email-retry` | On-demand | Cron auth | Email retry helper |
+| `notification-retry-helper` | On-demand | Bearer token | Single-notification reset |
+| `notification-dispatcher` | On-demand | Internal | Notification routing |
+| `missed-class-detector` | `15 2 * * *` | Cron auth | Nightly attendance gap detection |
+| `attendance-reminder` | Cron | Cron auth | Attendance reminders |
+| `review-checkin` | Cron | Cron auth | REVIEW follow-up |
+| `student-engagement-monitor` | Cron | Cron auth | Engagement monitoring |
+| `clickup-sync` | On-demand | Bearer token | Nexus escalation (retained function name) |
+| `nexus-users-search` | On-demand | Bearer token | Nexus user lookup for admin mapping UI |
+| `waitlist-processor` | On-demand | Internal | Waitlist evaluation |
+| `class-selection` | On-demand | Token | Class selection token handler |
+| `report-generator` | Cron | Cron auth | Report generation |
+| `reminder-processor` | Do not schedule | — | Legacy stub |
+
+**Auth Note (Sept 2026):** Cron-scheduled functions now validate `x-cron-secret` header via `validateCronAuth()` in `_shared/auth.ts`. Functions use `verify_jwt = false` in config and handle token validation internally, allowing support for both cron invocation and manual staff bearer-token calls.
 
 ---
 
 ## Cron Schedule
 
-| Time | Function |
-|---|---|
-| Every 15 min | `email-sender` |
-| Every 20 min | `retry-worker` |
-| Daily 02:15 UTC | `missed-class-detector` |
-| See function config | `attendance-reminder`, `review-checkin`, `student-engagement-monitor`, `report-generator`, `moodle-grade-sync` |
+| Time | Function | Status (Sept 2026) |
+|---|---|---|
+| Every 15 min | `email-sender` | Declared in function config; verify active in Supabase |
+| Every 20 min | `retry-worker` | Declared in function config; verify active in Supabase |
+| Daily 02:15 UTC | `missed-class-detector` | Declared in function config |
+| Per function config | `attendance-reminder`, `review-checkin`, `student-engagement-monitor`, `report-generator`, `moodle-grade-sync` | See individual function config.toml files |
+| **Unscheduled** | `email-retry`, `scheduled-notification-sender` | Both are single-item retry helpers; retry responsibility moved to `retry-worker` (manually callable via Retry Center) |
 
-Never schedule: `notification-retry-helper`, `reminder-processor`.
+**Never schedule:** `notification-retry-helper`, `reminder-processor`.
+
+**Note:** As of Sept 21, 2026, `retry-worker` and `notification-batch-processor` have cron declarations in `config.toml` but their actual production scheduling should be verified in the Supabase dashboard — scheduled invocation may be a separate decision from code deployment.
 
 ---
 
@@ -378,20 +383,24 @@ Never commit real credentials.
 
 | Issue | Location | Status |
 |---|---|---|
-| `teacher_assignments` query still present in teacher roster flow | `foundation/teacher/roster.html` | Open |
+| CSS token migration incomplete | Staff pages (`foundation/staff/*.html`) | In Progress (14 pages) |
 | Moodle HTTP 403 / WAF blocks enrollment sync | `moodle-sync` | External dependency |
+| Mobile table overflow on operational pages | `admin-management.html`, others | Partial (UX pass in progress) |
+| CLASS_OPTIONS creation failure on approval flow | `phase2-processor`, admin-review | Open |
+| Large tables overflow on mobile | Multiple staff pages | Open |
 
 ---
 
 ## Tech Debt Register (Summary)
 
-| Area | Risk | Target |
+| Area | Risk | Status (Sept 2026) |
 |---|---|---|
-| Assignment logic split across `registration-processor` and `phase2-processor` | High | Q3 2026 |
-| Remaining `fs-*` migration gaps | Medium | Q3-Q4 2026 |
-| Schema fallback loops in some functions | Medium | Q4 2026 |
-| Per-page style duplication | Medium | Q4 2026 |
-| Legacy audit fallback paths | Medium | Q3 2026 |
+| CSS token standardization | Medium | In Progress (14 HTML pages + ongoing) |
+| Assignment logic split across `registration-processor` and `phase2-processor` | High | Pending Q4 2026 consolidation |
+| Edge function auth verification | Medium | Completed (cron auth added Sept 2026) |
+| Schema fallback loops in some functions | Medium | Ongoing review |
+| Per-page style duplication | Medium | Reduced via shared tokens.css |
+| Legacy audit fallback paths | Low | Audit_logs canonicalization applied |
 
 ---
 
@@ -419,6 +428,30 @@ Never:
 `archive/apps-script-legacy/` is read-only historical reference and not part of runtime.
 
 ---
+
+## Latest Updates (September 2026)
+
+**Security & Auth:**
+- Edge function auth hardening: internal cron authentication via `validateCronAuth()` in `_shared/auth.ts`. Functions like `moodle-grade-sync`, `retry-worker`, `attendance-reminder` now validate cron tokens and bearer tokens independently rather than relying on `verify_jwt` in config.
+- `verify_jwt` now set to `false` on cron-scheduled functions (auth handled internally). `registration-processor` retains `verify_jwt = true` for public intake.
+- Internal auth test suite added (`internal-auth.test.ts`) covering cron and staff-role validation paths.
+
+**Configuration & Functions:**
+- `config.toml` updated: `retry-worker` changed to `verify_jwt = false`; new function entries for `attendance-reminder`, `attention-flag-push-sweep`, `notification-batch-processor`.
+- Cron job scheduling audit complete (Sept 21): `email-retry` and `scheduled-notification-sender` unscheduled (both are single-item retry helpers, not batch workers).
+
+**UI/CSS Standardization:**
+- Staff pages undergoing CSS token migration: `var(--surface)` → `var(--color-surface)`, `var(--muted)` → `var(--color-text-muted)`, etc.
+- Pages affected: applicant-directory, attendance, availability-approval, batch-management, class-editor, dashboards, email-campaigns, failed-sync-retry-center, teacher-management, waitlist.
+- Goal: full alignment with `tokens.css` + `primitives.css` canonical token set by Q4 2026.
+
+**Mobile UX:**
+- Responsive layout improvements: CSS utilities in `components.css` and `layout.css` expanded for better mobile density on operational pages.
+- Dashboard mobile card view, table fallback views, and breakpoint improvements.
+
+**API & Waitlist:**
+- Waitlist processor enhanced (77 lines of additions) to support expanded class-selection and auto-assign scenarios.
+- Report generator and moodle-grade-sync refactored for robustness.
 
 ## Latest Updates (July 2026)
 
