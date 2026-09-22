@@ -73,15 +73,16 @@ function classNumberForDate(batchStartDate: string, classDate: Date) {
 
 async function invokeClickupSync(
   supabaseUrl: string,
-  serviceKey: string,
   body: Record<string, unknown>,
 ) {
+  const internalSecret = Deno.env.get("INTERNAL_INVOKE_SECRET") || "";
+  if (!internalSecret) throw new Error("Missing INTERNAL_INVOKE_SECRET");
+
   const res = await fetch(`${supabaseUrl}/functions/v1/clickup-sync`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${serviceKey}`,
-      apikey: serviceKey,
       "Content-Type": "application/json",
+      "x-internal-secret": internalSecret,
     },
     body: JSON.stringify(body),
   });
@@ -218,7 +219,7 @@ Deno.serve(async (req) => {
 
       summary.missed_count += 1;
 
-      const clickupRes = await invokeClickupSync(SUPABASE_URL, SERVICE_KEY, {
+      const clickupRes = await invokeClickupSync(SUPABASE_URL, {
         type: "missed_class",
         payload: {
           student_id: studentId,
@@ -334,7 +335,7 @@ Deno.serve(async (req) => {
     for (const a of candidates) {
       const subgroupId = fellowshipMap.get(normalizeText(a.fellowship_code)) || "";
       const fullName = `${normalizeText(a.first_name)} ${normalizeText(a.last_name)}`.trim();
-      const clickupRes = await invokeClickupSync(SUPABASE_URL, SERVICE_KEY, {
+      const clickupRes = await invokeClickupSync(SUPABASE_URL, {
         type: "escalation",
         payload: {
           source: "applicants",

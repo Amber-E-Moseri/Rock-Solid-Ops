@@ -800,18 +800,23 @@ Deno.serve(async (req) => {
       await writeAudit("REGISTRATION_INACTIVE", "SUCCESS", commonAuditDetails);
       // Fire-and-forget: decrement slot and check waitlist for next eligible student
       if (class_option_id && batch_id) {
-        void fetch(`${SUPABASE_URL}/functions/v1/waitlist-processor`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            applicant_id:    String(insertedApplicant?.id || ""),
-            class_option_id,
-            batch_id,
-          }),
-        }).catch(() => {});
+        const internalSecret = Deno.env.get("INTERNAL_INVOKE_SECRET") || "";
+        if (!internalSecret) {
+          console.error("REGISTRATION_PROCESSOR_WAITLIST_TRIGGER_CONFIG_ERROR");
+        } else {
+          void fetch(`${SUPABASE_URL}/functions/v1/waitlist-processor`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-internal-secret": internalSecret,
+            },
+            body: JSON.stringify({
+              applicant_id:    String(insertedApplicant?.id || ""),
+              class_option_id,
+              batch_id,
+            }),
+          }).catch(() => {});
+        }
       }
     } else if (registrationStatusTyped === "DUPLICATE") {
       await writeAudit("REGISTRATION_DUPLICATE", "SUCCESS", commonAuditDetails);

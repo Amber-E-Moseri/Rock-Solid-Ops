@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { validateInternalAuth } from "../_shared/auth.ts";
 import { corsHeaders, jsonResponse, safeLogAudit, withTimeout } from "../_shared/http.ts";
 import { buildClassAvailableDedupeKey, CANONICAL_TEMPLATE_KEY } from "./dedupe.ts";
 import { notifyProfilesPush, resolveStaffRecipients } from "../_shared/push-notify.ts";
@@ -215,6 +216,10 @@ async function notifyClassNowAvailable(slot: Slot, classInfo: ClassInfo, results
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.headers.has("x-internal-secret")) {
+    const internalFailure = validateInternalAuth(req);
+    if (internalFailure) return internalFailure;
+  }
 
   try {
     const body = await req.json().catch(() => ({})) as {

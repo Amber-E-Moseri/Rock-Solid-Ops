@@ -51,15 +51,16 @@ function json(body: unknown, status = 200) {
 
 async function triggerClickupEscalation(
   supabaseUrl: string,
-  serviceKey: string,
   payload: Record<string, unknown>,
 ) {
+  const internalSecret = Deno.env.get("INTERNAL_INVOKE_SECRET") || "";
+  if (!internalSecret) throw new Error("Missing INTERNAL_INVOKE_SECRET");
+
   const res = await fetch(`${supabaseUrl}/functions/v1/clickup-sync`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${serviceKey}`,
-      apikey: serviceKey,
       "Content-Type": "application/json",
+      "x-internal-secret": internalSecret,
     },
     body: JSON.stringify({
       type: "escalation",
@@ -185,7 +186,6 @@ async function sweepMoodleEnrollmentRetries(
 async function maybeEscalateMoodleFailure(
   db: ReturnType<typeof createClient>,
   supabaseUrl: string,
-  serviceKey: string,
   rowId: string,
 ) {
   const { data: row, error } = await db
@@ -227,7 +227,7 @@ async function maybeEscalateMoodleFailure(
     error_message: String(row.last_error || ""),
   };
 
-  const clickupRes = await triggerClickupEscalation(supabaseUrl, serviceKey, payload);
+  const clickupRes = await triggerClickupEscalation(supabaseUrl, payload);
   const taskId = String(clickupRes?.clickup_task_id || "").trim();
   if (taskId) {
     await db.from("moodle_enrollment_sync").update({ clickup_task_id: taskId }).eq("id", row.id);
@@ -427,7 +427,7 @@ Deno.serve(async (req) => {
       let escalated = 0;
       for (const row of sweep.candidates || []) {
         try {
-          const outcome = await maybeEscalateMoodleFailure(serviceDb, SUPABASE_URL, SERVICE_KEY, String(row.id || ""));
+          const outcome = await maybeEscalateMoodleFailure(serviceDb, SUPABASE_URL, String(row.id || ""));
           if (outcome.escalated) escalated += 1;
         } catch (err) {
           console.error("RETRY_SWEEP_ESCALATION_ERROR", err);
@@ -465,7 +465,7 @@ Deno.serve(async (req) => {
 
       if (source === "moodle_enrollment_sync") {
         try {
-          await maybeEscalateMoodleFailure(serviceDb, SUPABASE_URL, SERVICE_KEY, id);
+          await maybeEscalateMoodleFailure(serviceDb, SUPABASE_URL, id);
         } catch (escalationErr) {
           console.error("RETRY_WORKER_CLICKUP_ESCALATION_ERROR", escalationErr);
         }
