@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { validateCronAuth } from "../_shared/auth.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -53,6 +54,9 @@ function classLabel(classOptionId: string, day: string, classTime: string): stri
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
+
+  const authFailure = validateCronAuth(req);
+  if (authFailure) return authFailure;
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";

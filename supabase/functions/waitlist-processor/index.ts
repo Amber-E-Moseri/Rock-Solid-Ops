@@ -1,15 +1,76 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { validateInternalAuth } from "../_shared/auth.ts";
+import { validateCronAuth, validateInternalAuth } from "../_shared/auth.ts";
 import { corsHeaders, jsonResponse, safeLogAudit, withTimeout } from "../_shared/http.ts";
 import { buildClassAvailableDedupeKey, CANONICAL_TEMPLATE_KEY } from "./dedupe.ts";
 import { notifyProfilesPush, resolveStaffRecipients } from "../_shared/push-notify.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // Same selection-link base the DB trigger path uses (202605191920 / 202607141000).
 const SELECTION_URL_BASE = "https://rocksolidsuite.netlify.app/foundation/registration/class-selection.html?token=";
 
-const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE);
+let sb: any;
+
+function authJson(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function createServiceDb(): any {
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+  const SUPABASE_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  return createClient(SUPABASE_URL, SUPABASE_SERVICE, { auth: { persistSession: false } });
+}
+
+async function isAuthorizedStaff(db: any, userId: string, email?: string) {
+  const profile = await db
+    .from("profiles")
+    .select("role,is_active")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!profile.error && profile.data) {
+    const role = String(profile.data.role || "").toLowerCase();
+    const active = profile.data.is_active !== false;
+    return active && ["admin", "superadmin", "subgroup_admin", "pastor", "principal"].includes(role);
+  }
+
+  const legacy = await db
+    .from("admin_users")
+    .select("role,status,active")
+    .or(`auth_user_id.eq.${userId}${email ? `,email.eq.${email}` : ""}`)
+    .maybeSingle();
+  if (legacy.error || !legacy.data) return false;
+  const role = String(legacy.data.role || "").toLowerCase();
+  const active = legacy.data.active !== false && legacy.data.status !== "suspended";
+  return active && ["admin", "superadmin", "subgroup_admin", "pastor", "principal"].includes(role);
+}
+
+async function authorizeRequest(req: Request): Promise<Response | null> {
+  if (req.headers.has("x-cron-secret")) {
+    return validateCronAuth(req);
+  }
+
+  if (req.headers.has("x-internal-secret")) {
+    return validateInternalAuth(req);
+  }
+
+  const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return authJson({ ok: false, error: "Missing credentials" }, 401);
+  }
+
+  const token = authHeader.slice("Bearer ".length).trim();
+  const serviceDb = createServiceDb();
+  const { data: userData, error: userErr } = await serviceDb.auth.getUser(token);
+  if (userErr || !userData?.user) {
+    return authJson({ ok: false, error: "Invalid session" }, 401);
+  }
+
+  const allowed = await isAuthorizedStaff(serviceDb, userData.user.id, userData.user.email);
+  if (!allowed) return authJson({ ok: false, error: "Forbidden" }, 403);
+  sb = serviceDb;
+  return null;
+}
 
 interface Slot {
   class_slot_id: string;
@@ -216,10 +277,10 @@ async function notifyClassNowAvailable(slot: Slot, classInfo: ClassInfo, results
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (req.headers.has("x-internal-secret")) {
-    const internalFailure = validateInternalAuth(req);
-    if (internalFailure) return internalFailure;
-  }
+
+  const authFailure = await authorizeRequest(req);
+  if (authFailure) return authFailure;
+  if (!sb) sb = createServiceDb();
 
   try {
     const body = await req.json().catch(() => ({})) as {

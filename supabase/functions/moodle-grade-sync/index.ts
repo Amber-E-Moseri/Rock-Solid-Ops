@@ -19,19 +19,78 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse, safeLogAudit } from "../_shared/http.ts";
+import { validateCronAuth } from "../_shared/auth.ts";
 
-const MOODLE_URL           = Deno.env.get("MOODLE_URL") || "";
-const MOODLE_TOKEN         = Deno.env.get("MOODLE_TOKEN") || "";
 const SUPABASE_URL         = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const BATCH_SIZE           = 20;
 const CALL_TIMEOUT_MS      = 15_000;
+
+function authJson(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function isAuthorizedStaff(db: any, userId: string, email?: string) {
+  const profile = await db
+    .from("profiles")
+    .select("role,is_active")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!profile.error && profile.data) {
+    const role = String(profile.data.role || "").toLowerCase();
+    const active = profile.data.is_active !== false;
+    return active && ["admin", "superadmin", "subgroup_admin", "pastor", "principal"].includes(role);
+  }
+
+  const legacy = await db
+    .from("admin_users")
+    .select("role,status,active")
+    .or(`auth_user_id.eq.${userId}${email ? `,email.eq.${email}` : ""}`)
+    .maybeSingle();
+  if (legacy.error || !legacy.data) return false;
+  const role = String(legacy.data.role || "").toLowerCase();
+  const active = legacy.data.active !== false && legacy.data.status !== "suspended";
+  return active && ["admin", "superadmin", "subgroup_admin", "pastor", "principal"].includes(role);
+}
+
+async function authorizeRequest(
+  req: Request,
+  serviceDb: any,
+): Promise<Response | null> {
+  if (req.headers.has("x-cron-secret")) {
+    return validateCronAuth(req);
+  }
+
+  if (req.headers.has("x-internal-secret")) {
+    return authJson({ ok: false, error: "Unsupported caller credential" }, 401);
+  }
+
+  const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return authJson({ ok: false, error: "Missing credentials" }, 401);
+  }
+
+  const token = authHeader.slice("Bearer ".length).trim();
+  const { data: userData, error: userErr } = await serviceDb.auth.getUser(token);
+  if (userErr || !userData?.user) {
+    return authJson({ ok: false, error: "Invalid session" }, 401);
+  }
+
+  const allowed = await isAuthorizedStaff(serviceDb, userData.user.id, userData.user.email);
+  if (!allowed) return authJson({ ok: false, error: "Forbidden" }, 403);
+  return null;
+}
 
 // Minimal callMoodle — POST to /webservice/rest/server.php with wstoken + wsfunction + json format.
 async function callMoodle(
   wsfunction: string,
   params: Record<string, string>,
 ): Promise<Record<string, unknown>> {
+  const MOODLE_URL = Deno.env.get("MOODLE_URL") || "";
+  const MOODLE_TOKEN = Deno.env.get("MOODLE_TOKEN") || "";
   const body = new URLSearchParams({
     wstoken: MOODLE_TOKEN,
     wsfunction,
@@ -63,7 +122,11 @@ async function callMoodle(
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  if (!MOODLE_URL || !MOODLE_TOKEN) {
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const authFailure = await authorizeRequest(req, supabase);
+  if (authFailure) return authFailure;
+
+  if (!Deno.env.get("MOODLE_URL") || !Deno.env.get("MOODLE_TOKEN")) {
     return jsonResponse(
       { ok: false, error: "MOODLE_URL and MOODLE_TOKEN must be configured" },
       500,
@@ -78,8 +141,6 @@ Deno.serve(async (req) => {
       if (typeof body?.email === "string") filterEmail = body.email;
     }
   } catch { /* ignore */ }
-
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
   // Fetch all SYNCED rows that have a Moodle user and course assigned.
   let query = supabase

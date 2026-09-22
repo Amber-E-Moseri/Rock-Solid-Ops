@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse, safeLogAudit } from "../_shared/http.ts";
 import { notifyProfilesPush, resolveStaffRecipients } from "../_shared/push-notify.ts";
 import { vapidKeysFromEnv } from "../_shared/webpush.ts";
+import { validateCronAuth } from "../_shared/auth.ts";
 
 /*
  * attention-flag-push-sweep (PWA Phase C.2).
@@ -23,13 +24,16 @@ import { vapidKeysFromEnv } from "../_shared/webpush.ts";
  * for the exact net.http_post shape.
  */
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const MAX_FLAGS_PER_SWEEP = 200;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const authFailure = validateCronAuth(req);
+  if (authFailure) return authFailure;
+
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+  const SUPABASE_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const db = createClient(SUPABASE_URL, SUPABASE_SERVICE);
 
   // If VAPID isn't configured yet, do nothing AND leave flags unstamped so
