@@ -45,19 +45,39 @@ Data:
 ## Table of Contents
 
 1. [What This Is](#what-this-is)
-2. [Tech Stack](#tech-stack)
-3. [Repository Structure](#repository-structure)
-4. [Core Features](#core-features)
-5. [Edge Functions Reference](#edge-functions-reference)
-6. [Cron Schedule](#cron-schedule)
-7. [Status Enums](#status-enums)
-8. [Deployment](#deployment)
-9. [Environment Variables / Secrets](#environment-variables--secrets)
-10. [Known Issues](#known-issues)
-11. [Tech Debt Register (Summary)](#tech-debt-register-summary)
-12. [Security Rules](#security-rules)
-13. [Legacy Archive](#legacy-archive)
-14. [Latest Updates (May 2026)](#latest-updates-may-2026)
+2. [Quick Start](#quick-start)
+3. [Tech Stack](#tech-stack)
+4. [Repository Structure](#repository-structure)
+5. [Core Features](#core-features)
+6. [Edge Functions Reference](#edge-functions-reference)
+7. [Cron Schedule](#cron-schedule)
+8. [Status Enums](#status-enums)
+9. [Deployment](#deployment)
+10. [Environment Variables / Secrets](#environment-variables--secrets)
+11. [Testing](#testing)
+12. [Known Issues](#known-issues)
+13. [Security Rules](#security-rules)
+14. [Documentation](#documentation)
+15. [Legacy Archive](#legacy-archive)
+16. [Latest Updates](#latest-updates)
+
+---
+
+## Quick Start
+
+**For developers:**
+1. Install Supabase CLI: `npm install -g supabase`
+2. Clone repo & install dependencies: `npm install`
+3. Start Supabase locally: `supabase start`
+4. Apply migrations: `supabase db push`
+5. Deploy functions: `supabase functions deploy`
+6. Run frontend: `cd foundation-spa && npm run dev` (React) or open `foundation/staff/dashboards.html` (Vanilla)
+
+**For ops:**
+- Check health: `docs/OPERATIONAL_HEALTH.md`
+- System overview: `docs/SYSTEM_ARCHITECTURE.md`
+- Production status: `docs/PRODUCTION_READINESS_2026-09-19.md`
+- Troubleshooting: `docs/migration-log.md` (decision history)
 
 ---
 
@@ -81,16 +101,18 @@ Backend migration from Google Apps Script + Sheets to Supabase Postgres + Edge F
 
 | Layer | Technology |
 |---|---|
-| Database | Supabase Postgres (public schema) |
-| Auth | Supabase Auth (JWT sessions) |
-| Backend logic | Supabase Edge Functions (Deno / TypeScript) |
-| Frontend | Plain HTML / CSS / Vanilla JS |
-| Email delivery | Resend API |
-| LMS sync | Moodle REST Web Services API |
-| Task escalation | Nexus API (internal project management) |
-| Hosting | Vercel (static frontend) + Supabase (functions) |
-| Design tokens | `tokens.css`, `primitives.css` |
-| Font | Manrope |
+| **Database** | Supabase Postgres (public schema) |
+| **Auth** | Supabase Auth (JWT sessions, RLS-enforced) |
+| **Backend Logic** | Supabase Edge Functions (Deno / TypeScript) |
+| **Frontend - Staff Portals** | Vanilla HTML / CSS / JavaScript (admin/staff pages under `foundation/staff/`) |
+| **Frontend - Teacher & Dashboard** | React (Vite) + TypeScript (SPA under `foundation-spa/`) |
+| **Email Delivery** | Resend API |
+| **LMS Sync** | Moodle REST Web Services API |
+| **Task Escalation** | Nexus API (internal project management) |
+| **Web Push Notifications** | Web Push API (VAPID keys, service workers) |
+| **Hosting** | Netlify (frontend) + Supabase (Postgres + Edge Functions + Auth) |
+| **Design System** | CSS tokens (`tokens.css`, `primitives.css`), Manrope font |
+| **Package Manager** | npm (monorepo with `foundation/` and `foundation-spa/`) |
 
 ---
 
@@ -98,22 +120,59 @@ Backend migration from Google Apps Script + Sheets to Supabase Postgres + Edge F
 
 ```
 /
-|- foundation/
-|  |- auth/
-|  |- staff/
-|  |- teacher/
-|  |- js/
-|  |- ui/
-|  `- docs/
-|- supabase/
-|  |- functions/
-|  |  |- _shared/
-|  |  `- <function>/
-|  `- migrations/
-|- ai/
-|- archive/
+|- foundation/                              # Vanilla HTML/CSS/JS staff portals
+|  |- auth/                                 # Auth flows, login, session handling
+|  |- staff/                                # Admin/staff pages (batch management, dashboards, etc.)
+|  |- teacher/                              # (Legacy) teacher portal auth
+|  |- js/                                   # Shared JavaScript modules (api-client, admin-shell, auth-guards, etc.)
+|  |- ui/                                   # Shared CSS (tokens.css, components.css, layout.css, primitives.css)
+|  |- docs/                                 # (Local) architecture, known bugs, next steps
+|
+|- foundation-spa/                          # React (Vite) SPA for teacher portal & dashboard
+|  |- src/
+|  |  |- pages/                             # Page components (Dashboard, TeacherPortal, etc.)
+|  |  |- components/                        # Reusable React components
+|  |  |- hooks/                             # Custom React hooks
+|  |  |- services/                          # API client, auth service, data fetching
+|  |  |- styles/                            # CSS modules (inherits design tokens from foundation/ui/)
+|  |  `- main.tsx
+|  |- public/                               # Static assets
+|  |- package.json
+|  |- vite.config.ts
+|  `- tsconfig.json
+|
+|- supabase/                                # Backend (Edge Functions + Database)
+|  |- functions/                            # Supabase Edge Functions (Deno / TypeScript)
+|  |  |- _shared/                           # Shared utilities (auth hardening, error classification)
+|  |  |- registration-processor/            # Canonical registration intake
+|  |  |- moodle-sync/                       # Moodle enrollment sync
+|  |  |- email-sender/                      # Resend email delivery
+|  |  |- retry-worker/                      # Hourly retry sweep
+|  |  |- [other-functions]/
+|  |  `- config.toml                        # Cron schedules, env vars
+|  `- migrations/                           # Postgres schema migrations (YYYYMMDDHHMMSS_*.sql)
+|
+|- docs/                                    # Canonical documentation
+|  |- archive/                              # Historical audits and certifications (read-only)
+|  |- PRODUCTION_READINESS_2026-09-19.md   # Current production certification
+|  |- STAGING_CERTIFICATION_2026-09-19.md  # Current staging certification
+|  |- OPERATIONAL_HEALTH.md                 # Health metrics, thresholds, runbooks
+|  |- SYSTEM_ARCHITECTURE.md                # System diagram, data flows, RLS model
+|  |- migration-log.md                      # Migration decision log
+|  |- BRANCH_HOLDS.md                       # Feature/fix holds (unmerged briefs)
+|
+|- ai/                                      # AI workflow docs (constraints, statuses, refactor roadmap)
+|- archive/                                 # Historical legacy backend (read-only)
 |  `- apps-script-legacy/
-`- vercel.json
+|
+|- scripts/                                 # Utility scripts (testing, setup, etc.)
+|- .github/                                 # GitHub Actions CI/CD (TBD: PR checks, deployment)
+|- .env.example                             # Environment variables template
+|- .env.local                               # Local environment overrides (gitignored)
+|- vercel.json                              # Netlify/Vercel frontend routing config
+|- netlify.toml                             # Netlify deployment config
+|- package.json                             # Root npm dependencies
+`- CLAUDE.md                                # AI / project instructions (local reference)
 ```
 
 ---
@@ -326,35 +385,70 @@ Teacher availability: PENDING | APPROVED | REJECTED | RESET
 
 ## Deployment
 
-### Pre-deploy
+### Prerequisites
 
-1. Create `foundation/js/config.js` from `config.js.example`
-2. Set frontend config values (`SUPABASE_URL`, `SUPABASE_ANON_KEY`)
-3. Set required Supabase secrets
-4. Run `supabase db push`
-5. Run `supabase functions deploy`
-6. Confirm `ALLOWED_ORIGINS`
+- Supabase project (production: `xelpsttqhrcqmttmjory`)
+- Netlify site (production: `https://rocksolidsuite.netlify.app`)
+- Supabase CLI installed & authenticated
+- All required secrets configured in Supabase project (see below)
 
-Messaging Phase 1 deploy commands:
+### Deploy Workflow
 
-1. `supabase db push --include-all`
-2. `supabase functions deploy messaging-api`
+**Step 1: Database Migrations**
+```bash
+supabase db push                    # Apply all pending migrations to linked project
+supabase db push --dry-run --linked # Preview without applying (if linked to production)
+```
 
-### Post-deploy checks
+**Step 2: Edge Functions**
+```bash
+supabase functions deploy           # Deploy all functions to linked project
+supabase functions deploy <name>    # Deploy specific function
+supabase functions list             # Verify deployment
+```
 
-- Login works
-- Registration fellowships load
-- Admin portal loads
-- Teacher portal loads
-- Email is delivered
-- Moodle health check is green
+**Step 3: Frontend (Vanilla + React SPA)**
+```bash
+# Build both frontends
+npm run build                       # Builds both foundation/ and foundation-spa/
 
-### Rollback
+# Deploy to Netlify (auto-triggered on main push)
+# OR manual deploy via Netlify CLI:
+netlify deploy --prod               # Deploy to production
+```
 
-1. Revert frontend deploy
-2. Redeploy prior function versions
-3. Apply forward-fix migration if needed
-4. Re-run smoke tests
+### Post-Deployment Checks
+
+After deploying, verify:
+- [ ] Supabase functions deployed successfully: `supabase functions list`
+- [ ] Database migrations applied: `supabase db pull` matches repo HEAD
+- [ ] Frontend loads: `https://rocksolidsuite.netlify.app/foundation/staff/dashboards.html`
+- [ ] Login works: Test staff + teacher credentials
+- [ ] Registration form accessible: `/foundation/auth/register.html`
+- [ ] Email sending works: Check Resend dashboard or test notification
+- [ ] Moodle sync health: `docs/OPERATIONAL_HEALTH.md` → Moodle Sync section
+- [ ] Cron jobs firing: Check edge function logs for `retry-worker`, `email-sender`
+
+### Rollback Procedure
+
+If deployment causes issues:
+
+1. **Frontend:** Revert to prior Netlify deployment (Netlify dashboard → Deploys → Rollback)
+2. **Functions:** Redeploy prior function versions: `supabase functions deploy`
+3. **Database:** Migrations are forward-only; use forward-fix migrations if needed
+4. **Smoke tests:** Re-run checks above
+
+### Staging Deployment
+
+Staging uses the same repository but a separate Supabase project. Deploy staging to test migrations + functions before production:
+
+```bash
+supabase link --project-ref <staging-project-id>
+supabase db push
+supabase functions deploy
+```
+
+See `docs/STAGING_CERTIFICATION_*.md` for staging status.
 
 ---
 
@@ -379,6 +473,73 @@ Never commit real credentials.
 
 ---
 
+## Testing
+
+### Unit & Integration Tests
+
+Run automated tests:
+```bash
+npm run test                    # Run all tests
+npm run test -- --watch        # Watch mode
+npm run test -- --coverage     # Coverage report
+```
+
+### Edge Function Testing
+
+Test Supabase Edge Functions locally:
+```bash
+supabase functions serve        # Start edge function server
+curl -X POST http://localhost:54321/functions/v1/<function-name> \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"param": "value"}'
+```
+
+### Manual Verification Checklist
+
+After deployment, verify:
+- [ ] Login works (staff + teacher + public)
+- [ ] Registration form submits and creates applicant
+- [ ] Admin can view and approve registrations
+- [ ] Assigned applicants enroll in Moodle
+- [ ] Email notifications send (check Resend logs)
+- [ ] Retry center shows failed records
+- [ ] Cron jobs fire on schedule (check edge function logs)
+
+### Database Schema Testing
+
+Test migrations on a clean database:
+```bash
+supabase start                  # Fresh local Postgres
+supabase db push                # Apply all migrations
+supabase db pull                # Verify schema matches repo
+psql "postgresql://..." -c "SELECT COUNT(*) FROM applicants;"
+```
+
+See `supabase/migrations/README.md` for migration best practices and idempotency rules.
+
+---
+
+## Documentation
+
+| Document | Purpose | Audience |
+|---|---|---|
+| **[docs/SYSTEM_ARCHITECTURE.md](docs/SYSTEM_ARCHITECTURE.md)** | System diagram, data flows, RLS model, function contracts | Engineers, architects |
+| **[docs/OPERATIONAL_HEALTH.md](docs/OPERATIONAL_HEALTH.md)** | Health metrics, thresholds, runbooks, escalation paths | On-call ops, platform team |
+| **[docs/PRODUCTION_READINESS_2026-09-19.md](docs/PRODUCTION_READINESS_2026-09-19.md)** | Current production certification status | Stakeholders, release leads |
+| **[docs/STAGING_CERTIFICATION_2026-09-19.md](docs/STAGING_CERTIFICATION_2026-09-19.md)** | Staging environment status | QA, staging team |
+| **[supabase/migrations/README.md](supabase/migrations/README.md)** | Migration conventions, idempotency, testing | Engineers working on schema |
+| **[docs/migration-log.md](docs/migration-log.md)** | Decision log, phase transitions, known bugs | Long-term reference, architects |
+| **[CLAUDE.md](CLAUDE.md)** | AI workflow, constraints, architecture rules | AI assistants, developers |
+| **[ai/statuses.md](ai/statuses.md)** | Canonical status enums (registration, batch, teacher) | Developers |
+| **[ai/constraints.md](ai/constraints.md)** | Hard engineering constraints (never violate) | All engineers |
+
+### Historical Reference
+
+Old audit and certification documents are archived in `docs/archive/` for reference. Current source of truth is `docs/PRODUCTION_READINESS_*.md`.
+
+---
+
 ## Known Issues
 
 | Issue | Location | Status |
@@ -388,19 +549,6 @@ Never commit real credentials.
 | Mobile table overflow on operational pages | `admin-management.html`, others | Partial (UX pass in progress) |
 | CLASS_OPTIONS creation failure on approval flow | `phase2-processor`, admin-review | Open |
 | Large tables overflow on mobile | Multiple staff pages | Open |
-
----
-
-## Tech Debt Register (Summary)
-
-| Area | Risk | Status (Sept 2026) |
-|---|---|---|
-| CSS token standardization | Medium | In Progress (14 HTML pages + ongoing) |
-| Assignment logic split across `registration-processor` and `phase2-processor` | High | Pending Q4 2026 consolidation |
-| Edge function auth verification | Medium | Completed (cron auth added Sept 2026) |
-| Schema fallback loops in some functions | Medium | Ongoing review |
-| Per-page style duplication | Medium | Reduced via shared tokens.css |
-| Legacy audit fallback paths | Low | Audit_logs canonicalization applied |
 
 ---
 
@@ -423,50 +571,39 @@ Never:
 
 ---
 
-## Legacy Archive
+### September 22, 2026 - Repo Polish & Documentation
 
-`archive/apps-script-legacy/` is read-only historical reference and not part of runtime.
+- **Repo cleanup:** Archived 11 superseded audit/certification docs to `docs/archive/`; deleted backup SQL files, ZIPs, and logs.
+- **New documentation:**
+  - `docs/OPERATIONAL_HEALTH.md`: Health checkpoints, metrics, runbooks, on-call escalation paths
+  - `docs/SYSTEM_ARCHITECTURE.md`: System diagram, data flows (registration → Moodle → notifications), RLS model, function contracts
+  - `supabase/migrations/README.md`: Migration conventions, idempotency patterns, testing, production deployment
+- **README updates:** Clarified tech stack (Vanilla HTML/JS + React SPA), improved repository structure documentation, added Quick Start, Testing, and Documentation sections.
+- **GitHub CI (pending):** Planning PR checks for migrations, secret scanning, type checking, RLS tests.
 
----
+**Production Status:** All core security gates closed. Database fully current with repo HEAD (157 migrations). Production certified Sept 20, 2026.
 
-## Latest Updates (September 2026)
+### September 2026 - Security & Auth
 
-**Security & Auth:**
-- Edge function auth hardening: internal cron authentication via `validateCronAuth()` in `_shared/auth.ts`. Functions like `moodle-grade-sync`, `retry-worker`, `attendance-reminder` now validate cron tokens and bearer tokens independently rather than relying on `verify_jwt` in config.
-- `verify_jwt` now set to `false` on cron-scheduled functions (auth handled internally). `registration-processor` retains `verify_jwt = true` for public intake.
-- Internal auth test suite added (`internal-auth.test.ts`) covering cron and staff-role validation paths.
+- Edge function auth hardening: cron authentication via `validateCronAuth()` in `_shared/auth.ts`
+- `verify_jwt` set to `false` on cron-scheduled functions; auth handled internally
+- Internal auth test suite covers cron and staff-role validation paths
 
-**Configuration & Functions:**
-- `config.toml` updated: `retry-worker` changed to `verify_jwt = false`; new function entries for `attendance-reminder`, `attention-flag-push-sweep`, `notification-batch-processor`.
-- Cron job scheduling audit complete (Sept 21): `email-retry` and `scheduled-notification-sender` unscheduled (both are single-item retry helpers, not batch workers).
+### July 2026 - Integration Consolidation
 
-**UI/CSS Standardization:**
-- Staff pages undergoing CSS token migration: `var(--surface)` → `var(--color-surface)`, `var(--muted)` → `var(--color-text-muted)`, etc.
-- Pages affected: applicant-directory, attendance, availability-approval, batch-management, class-editor, dashboards, email-campaigns, failed-sync-retry-center, teacher-management, waitlist.
-- Goal: full alignment with `tokens.css` + `primitives.css` canonical token set by Q4 2026.
+- ClickUp replaced with Nexus API for task escalation
+- `clickup-sync` function renamed logically; posts to `NEXUS_API_URL`
+- Tables: `rocksolid_admin_mappings`, `rocksolid_task_links`
 
-**Mobile UX:**
-- Responsive layout improvements: CSS utilities in `components.css` and `layout.css` expanded for better mobile density on operational pages.
-- Dashboard mobile card view, table fallback views, and breakpoint improvements.
+### May 2026 - UX & Mobile Improvements
 
-**API & Waitlist:**
-- Waitlist processor enhanced (77 lines of additions) to support expanded class-selection and auto-assign scenarios.
-- Report generator and moodle-grade-sync refactored for robustness.
-
-## Latest Updates (July 2026)
-
-- ClickUp integration replaced with internal Nexus project management system. `clickup-sync` function retained its name but now posts to Nexus (`NEXUS_API_URL`/`NEXUS_API_KEY`); tables renamed to `rocksolid_admin_mappings` and `rocksolid_task_links`.
-- New `nexus-users-search` function backs a searchable user picker in the admin mapping UI (`rocksolid-management.html`, not yet committed — uses legacy `fs-*` CSS classes and needs a rebuild against current design tokens before merge).
-
-## Latest Updates (May 2026)
-
-- Shell navigation now uses smooth transition states (fade + subtle lift) for both admin and teacher portals.
-- Top loading progress bar added during cross-page navigation in both shells.
-- Mobile shell behavior standardized: slide-in sidebar + backdrop + body lock class (`fs-sidebar-open`).
-- Shared responsive utility rules in `foundation/ui/primitives.css` expanded for tables, drawers, modals, and KPI grids.
-- Help guide hardened for public access (works without auth config) with optional role filtering when session/config is available.
-- `scheduled_notifications` dedupe writes moved away from `ON CONFLICT (dedupe_key)` pattern to explicit dedupe lookup + insert where needed.
+- Shell navigation: smooth transitions + progress bar during cross-page nav
+- Mobile behavior standardized: slide-in sidebar + backdrop
+- Responsive utilities expanded for tables, drawers, modals
+- CSS tokens moved to shared `tokens.css` / `primitives.css`
 
 ---
 
-Generated May 2026. Keep updated as platform evolves.
+**Platform Status:** Production-ready, fully audited and certified. See `docs/PRODUCTION_READINESS_2026-09-19.md` for current certification.
+
+For questions or issues, see [docs/migration-log.md](docs/migration-log.md) for decision history and [CLAUDE.md](CLAUDE.md) for engineering constraints.
