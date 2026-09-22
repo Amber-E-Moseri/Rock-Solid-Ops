@@ -1,14 +1,12 @@
 ﻿import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { withTrace, writeAudit } from "../_shared/audit.ts";
+import { validateCronAuth } from "../_shared/auth.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
-
-const MOODLE_URL = String(Deno.env.get("MOODLE_URL") || "").trim();
-const MOODLE_TOKEN = String(Deno.env.get("MOODLE_TOKEN") || "").trim();
 
 function applyAllowedOrigin(req: Request) {
   const allowed = String(Deno.env.get("ALLOWED_ORIGINS") || "")
@@ -60,6 +58,8 @@ async function callMoodle(
   wsfunction: string,
   params: Record<string, string>,
 ): Promise<Record<string, unknown>> {
+  const MOODLE_URL = String(Deno.env.get("MOODLE_URL") || "").trim();
+  const MOODLE_TOKEN = String(Deno.env.get("MOODLE_TOKEN") || "").trim();
   if (!MOODLE_URL || !MOODLE_TOKEN) throw new Error("MOODLE_URL and MOODLE_TOKEN are required");
   const body = new URLSearchParams({
     wstoken: MOODLE_TOKEN,
@@ -102,6 +102,7 @@ async function shouldQueueMoodleReminder(db: any, row: ScheduledNotificationRow)
     return { queue: false, email, payload: row.payload || {} };
   }
 
+  const moodleUrl = String(Deno.env.get("MOODLE_URL") || "").trim();
   return {
     queue: true,
     email,
@@ -109,7 +110,7 @@ async function shouldQueueMoodleReminder(db: any, row: ScheduledNotificationRow)
       ...(row.payload || {}),
       email,
       full_name: String((row.payload || {}).full_name || applicant?.full_name || "").trim(),
-      moodle_url: String((row.payload || {}).moodle_url || MOODLE_URL),
+      moodle_url: String((row.payload || {}).moodle_url || moodleUrl),
     },
   };
 }
@@ -119,6 +120,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  const authFailure = validateCronAuth(req);
+  if (authFailure) return authFailure;
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;

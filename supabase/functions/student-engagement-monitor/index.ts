@@ -5,13 +5,18 @@ import {
   safeLogAudit,
   withTimeout,
 } from "../_shared/http.ts";
+import { validateCronAuth } from "../_shared/auth.ts";
 
-const SUPABASE_URL      = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const MOODLE_URL        = "https://rocksolid.lwcanada.org";
 const BATCH_SIZE        = 20;
 
-const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE);
+let sb: ReturnType<typeof createClient>;
+
+function initServiceClient(): void {
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+  const SUPABASE_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  sb = createClient(SUPABASE_URL, SUPABASE_SERVICE);
+}
 
 // ── Config helpers ────────────────────────────────────────────────────────────
 async function getConfig(): Promise<Record<string, number>> {
@@ -379,7 +384,11 @@ async function getClassInfo(classOptionId: string | null) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const authFailure = validateCronAuth(req);
+  if (authFailure) return authFailure;
+
   try {
+    initServiceClient();
     const cfg = await getConfig();
 
     // Get active batches

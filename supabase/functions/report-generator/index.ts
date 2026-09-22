@@ -21,6 +21,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { applyAllowedOrigin, corsHeaders, jsonResponse, safeLogAudit } from "../_shared/http.ts";
+import { validateCronAuth } from "../_shared/auth.ts";
 
 const SUPABASE_URL         = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -64,6 +65,58 @@ async function requireAdminAccess(req: Request, serviceDb: ReturnType<typeof cre
   }
 
   return { ok: true as const, user };
+}
+
+function authJson(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function authorizeRequest(req: Request, serviceDb: any) {
+  if (req.headers.has("x-cron-secret")) {
+    const cronFailure = validateCronAuth(req);
+    if (cronFailure) return { ok: false as const, response: cronFailure, mode: "cron" as const };
+    return { ok: true as const, mode: "cron" as const };
+  }
+
+  if (req.headers.has("x-internal-secret")) {
+    return {
+      ok: false as const,
+      response: authJson({ ok: false, error: "Unsupported caller credential" }, 401),
+      mode: "user" as const,
+    };
+  }
+
+  const userAuth = await requireAdminAccess(req, serviceDb);
+  if (!userAuth.ok) {
+    return {
+      ok: false as const,
+      response: authJson({ ok: false, error: userAuth.error }, userAuth.status),
+      mode: "user" as const,
+    };
+  }
+  return { ok: true as const, mode: "user" as const, user: userAuth.user };
+}
+
+function normalizeCronReportBody(body: Record<string, unknown>): Response | null {
+  const reportType = String(body.report_type || "weekly");
+  const allowed = ["weekly", "monthly", "weekly_regional", "monthly_regional", "pastor_digest"];
+  if (!allowed.includes(reportType)) {
+    return authJson({ ok: false, error: "Cron report type not allowed" }, 403);
+  }
+  if (Array.isArray(body.recipients) && body.recipients.length > 0) {
+    return authJson({ ok: false, error: "Cron recipients override not allowed" }, 403);
+  }
+  if (reportType === "weekly_regional") {
+    body.report_type = "weekly";
+    body.scope = "regional";
+  } else if (reportType === "monthly_regional") {
+    body.report_type = "monthly";
+    body.scope = "regional";
+  }
+  return null;
 }
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
@@ -520,12 +573,16 @@ Deno.serve(async (req) => {
   if (req.method !== "POST")    return jsonResponse({ ok: false, error: "POST required" }, 405);
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-  const auth = await requireAdminAccess(req, supabase);
-  if (!auth.ok) return jsonResponse({ ok: false, error: auth.error }, auth.status);
+  const auth = await authorizeRequest(req, supabase);
+  if (!auth.ok) return auth.response;
 
   let body: Record<string, unknown>;
   try { body = await req.json(); }
   catch { return jsonResponse({ ok: false, error: "Invalid JSON" }, 400); }
+  if (auth.mode === "cron") {
+    const cronScopeFailure = normalizeCronReportBody(body);
+    if (cronScopeFailure) return cronScopeFailure;
+  }
 
   const report_type     = String(body.report_type  || "weekly");
   const scope           = String(body.scope        || "regional");

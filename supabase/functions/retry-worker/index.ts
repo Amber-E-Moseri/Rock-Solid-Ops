@@ -9,6 +9,7 @@ import {
   isValidString,
   safeLogAudit,
 } from "../_shared/http.ts";
+import { validateCronAuth } from "../_shared/auth.ts";
 
 type RetryAction = "retry" | "resolve";
 type RetrySource = "email_queue" | "scheduled_notifications" | "moodle_sync" | "moodle_enrollment_sync" | "failed_syncs";
@@ -117,6 +118,41 @@ async function isAdmin(serviceDb: ReturnType<typeof createClient>, userId: strin
   } catch (_) {
     return false;
   }
+}
+
+async function authorizeRequest(
+  req: Request,
+  serviceDb: any,
+): Promise<
+  | { ok: true; mode: "cron"; actorEmail: string }
+  | { ok: true; mode: "user"; actorEmail: string }
+  | { ok: false; response: Response }
+> {
+  if (req.headers.has("x-cron-secret")) {
+    const cronFailure = validateCronAuth(req);
+    if (cronFailure) return { ok: false, response: cronFailure };
+    return { ok: true, mode: "cron", actorEmail: "retry-worker@system" };
+  }
+
+  if (req.headers.has("x-internal-secret")) {
+    return { ok: false, response: json({ ok: false, error: "Unsupported caller credential" }, 401) };
+  }
+
+  const authHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return { ok: false, response: json({ ok: false, error: "Missing credentials" }, 401) };
+  }
+
+  const jwt = authHeader.slice("Bearer ".length).trim();
+  const { data: userData, error: userErr } = await serviceDb.auth.getUser(jwt);
+  if (userErr || !userData?.user) {
+    return { ok: false, response: json({ ok: false, error: "Invalid session" }, 401) };
+  }
+  const allowed = await isAdmin(serviceDb, userData.user.id, userData.user.email);
+  if (!allowed) {
+    return { ok: false, response: json({ ok: false, error: "Admin access required" }, 403) };
+  }
+  return { ok: true, mode: "user", actorEmail: userData.user.email || "retry-worker@user" };
 }
 
 async function logAudit(
@@ -384,17 +420,10 @@ Deno.serve(async (req) => {
     if (!SUPABASE_URL || !SERVICE_KEY) return json({ ok: false, error: "Missing Supabase env" }, 500);
 
     const serviceDb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
-    const authHeader = req.headers.get("Authorization") || "";
-    const isCronCall = !authHeader.startsWith("Bearer ");
-    let actorEmail = "retry-worker@system";
-    if (!isCronCall) {
-      const jwt = authHeader.slice("Bearer ".length).trim();
-      const { data: userData, error: userErr } = await serviceDb.auth.getUser(jwt);
-      if (userErr || !userData?.user) return json({ ok: false, error: "Invalid session" }, 401);
-      const allowed = await isAdmin(serviceDb, userData.user.id, userData.user.email);
-      if (!allowed) return json({ ok: false, error: "Admin access required" }, 403);
-      actorEmail = userData.user.email || actorEmail;
-    }
+    const auth = await authorizeRequest(req, serviceDb);
+    if (!auth.ok) return auth.response;
+    const isCronCall = auth.mode === "cron";
+    const actorEmail = auth.actorEmail;
 
     const body = (await req.json().catch(() => ({}))) as RetryRequest;
     

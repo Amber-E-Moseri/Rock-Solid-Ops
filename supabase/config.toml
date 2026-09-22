@@ -12,7 +12,7 @@ entrypoint = "./functions/registration-processor/index.ts"
 
 [functions.retry-worker]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 entrypoint = "./functions/retry-worker/index.ts"
 # Schedule is defined in ./functions/retry-worker/config.toml
 
@@ -56,6 +56,21 @@ entrypoint = "./functions/report-generator/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/student-engagement-monitor/index.ts"
+
+[functions.attendance-reminder]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/attendance-reminder/index.ts"
+
+[functions.attention-flag-push-sweep]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/attention-flag-push-sweep/index.ts"
+
+[functions.notification-batch-processor]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/notification-batch-processor/index.ts"
 
 [functions.teacher-portal-api]
 enabled = true
