@@ -88,6 +88,12 @@ html[data-theme="dark"] {
   --info-bg: #0E1F44;
   --info-bd: color-mix(in srgb, var(--info) 35%, var(--info-bg));
   --surface-alt: var(--surface-2);
+
+  /* Canonical --color-* tokens (tokens.css defines light values only):
+     follow the legacy dark values so migrated pages keep dark-mode parity. */
+  --color-surface: var(--surface);
+  --color-text-muted: var(--muted);
+
   --navy-ghost: rgba(139, 107, 255, 0.12);
   --text-2: #A39BB8;
   --soft-lav: #241c38;
