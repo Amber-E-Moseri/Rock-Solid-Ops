@@ -69,10 +69,20 @@ async function patchSyncRow(
     },
     { ...baseNoFailureReason, status: baseNoFailureReason.sync_status ?? baseNoFailureReason.status ?? null },
   ];
+  let lastError: { code?: string; message?: string } | null = null;
   for (const v of variants) {
     const { error } = await db.from("moodle_enrollment_sync").update(v).eq("id", id);
     if (!error) return;
+    lastError = error;
   }
+  // Every variant was rejected. Keep the established non-throwing semantics, but
+  // make the loss observable. Column names only — never values.
+  console.error("MOODLE_SYNC_PATCH_FAILED", {
+    id,
+    code: lastError?.code ?? null,
+    message: String(lastError?.message ?? "").slice(0, 300),
+    attempted_columns: Object.keys(patch),
+  });
 }
 
 function splitName(fullName: string) {
