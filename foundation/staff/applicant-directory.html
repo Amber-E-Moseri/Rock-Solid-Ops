@@ -147,11 +147,7 @@
     .kv label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
     .kv strong { font-size: 13px; display: block; margin-top: 3px; word-break: break-word; }
     .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-    .chip {
-      border-radius: 999px; padding: 5px 10px; font-size: 11px; font-weight: 700;
-      background: color-mix(in srgb, var(--soft-lavender) 70%, white 30%);
-      color: color-mix(in srgb, var(--primary) 92%, #2f254f); border: 1px solid var(--line-soft);
-    }
+    /* .chip migrated → .fs-badge.fs-badge-primary from primitives.css */
     .list { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface-2); }
     .list .row {
       padding: 10px; border-bottom: 1px solid var(--line); font-size: 12px;
@@ -172,18 +168,18 @@
     }
     .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .warn {
-      border: 1px solid color-mix(in srgb, #f59e0b 35%, var(--surface));
-      background: color-mix(in srgb, #f59e0b 14%, var(--surface)); color: #854d0e;
+      border: 1px solid var(--warn-bd, color-mix(in srgb, var(--warn) 35%, var(--warn-bg)));
+      background: var(--warn-bg); color: var(--warn);
       border-radius: 12px; padding: 8px 10px; font-size: 12px;
     }
     .err {
-      border: 1px solid color-mix(in srgb, #ef4444 38%, var(--surface));
-      background: color-mix(in srgb, #ef4444 15%, var(--surface)); color: #b42318;
+      border: 1px solid var(--danger-bd, color-mix(in srgb, var(--danger) 38%, var(--danger-bg)));
+      background: var(--danger-bg); color: var(--danger);
       border-radius: 12px; padding: 8px 10px; font-size: 12px;
     }
     .success {
-      border: 1px solid color-mix(in srgb, #22c55e 35%, var(--surface));
-      background: color-mix(in srgb, #22c55e 14%, var(--surface)); color: #166534;
+      border: 1px solid var(--success-bd, color-mix(in srgb, var(--success) 35%, var(--success-bg)));
+      background: var(--success-bg); color: var(--success);
       border-radius: 12px; padding: 8px 10px; font-size: 12px;
     }
     .mobile-cards { display: none; gap: 10px; }
@@ -213,10 +209,10 @@
     .review-sub { margin-top: 4px; color: var(--muted); font-size: 13px; }
     .review-time { margin-top: 8px; color: var(--muted); font-size: 13px; text-align:right; }
     .review-status { display:inline-flex; align-items:center; justify-content:center; min-width: 98px; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
-    .review-status.duplicate { color:#ff4d3a; background:#ffe9e7; }
-    .review-status.review { color:#e18b00; background:#fff0cf; }
-    .review-status.pending { color:#6e6a93; background:#f5f2fb; }
-    .review-status.assigned { color:#16974d; background:#e7f8ea; }
+    .review-status.duplicate { color:var(--danger); background:var(--danger-bg); }
+    .review-status.review    { color:var(--warn);   background:var(--warn-bg); }
+    .review-status.pending   { color:var(--color-text-muted);  background:var(--surface-2); }
+    .review-status.assigned  { color:var(--success); background:var(--success-bg); }
     .review-detail-body { padding: 0; }
     .review-student-head {
       padding: 22px 28px 18px; display:flex; gap:18px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap;
@@ -237,18 +233,18 @@
     .compare-name { font-size: 15px; font-weight: 800; margin-top: 4px; }
     .compare-date { color: var(--muted); font-size: 13px; margin-top: 4px; }
     .compare-badge { display:inline-flex; align-items:center; justify-content:center; padding:6px 12px; border-radius:999px; font-size:12px; font-weight:800; text-transform:uppercase; }
-    .compare-badge.incoming { background:#fff0cf; color:#e18b00; }
-    .compare-badge.assigned { background:#e7f8ea; color:#16974d; }
+    .compare-badge.incoming { background:var(--warn-bg);    color:var(--warn); }
+    .compare-badge.assigned { background:var(--success-bg); color:var(--success); }
     .compare-grid .row {
       display:grid; grid-template-columns: 120px 1fr; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); font-size: 14px;
     }
     .compare-grid .row:last-child { border-bottom: 0; }
-    .compare-grid .key { color: #6f6885; font-weight: 700; }
-    .compare-grid .value { color: #1c1631; font-weight: 700; text-align:right; word-break:break-word; }
-    .compare-grid .row.diff { background: #fff7e8; }
+    .compare-grid .key { color: var(--color-text-muted); font-weight: 700; }
+    .compare-grid .value { color: var(--text); font-weight: 700; text-align:right; word-break:break-word; }
+    .compare-grid .row.diff { background: var(--warn-bg); }
     .compare-footer {
       display:flex; align-items:center; justify-content:center; min-height: 44px; padding: 12px 18px; border-top: 1px solid var(--line);
-      color: var(--primary); font-weight: 800; background: color-mix(in srgb, var(--primary) 6%, white);
+      color: var(--primary); font-weight: 800; background: color-mix(in srgb, var(--primary) 6%, var(--color-surface));
     }
     .review-note-wrap { padding: 0 28px 22px; }
     .review-note-label { font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
@@ -263,7 +259,7 @@
       border: 1px solid var(--line-soft); background: var(--surface); color: var(--text);
     }
     .review-primary-btn { background: var(--primary); color:#fff; border-color: color-mix(in srgb, var(--primary) 82%, black); }
-    .review-warn-btn { color:#e18b00; background:#fff6e6; border-color:#ffd28a; }
+    .review-warn-btn { color:var(--warn); background:var(--warn-bg); border-color:var(--warn-bd, color-mix(in srgb, var(--warn) 45%, var(--warn-bg))); }
     .review-empty { padding: 34px 24px; text-align:center; color: var(--muted); }
 
     /* Quick tab strip & mode tabs — pill style */
@@ -275,7 +271,7 @@
     }
     #quickTabStrip button:hover, #modeTabs button:hover { background: rgba(76,42,146,.07); color: var(--text); }
     #quickTabStrip button.active, #modeTabs button.active {
-      background: #fff; color: var(--primary);
+      background: var(--color-surface); color: var(--primary);
       box-shadow: 0 1px 4px rgba(76,42,146,.16);
     }
     #reviewWorkspace,

@@ -47,7 +47,7 @@
     ]);
     const applicantMilestones = new Set(getApplicantMilestones(app));
     const labels = milestoneLabels();
-    $("milestoneChips").innerHTML = milestoneKeys().map((k) => `<span class="chip" style="opacity:${applicantMilestones.has(k) ? 1 : .45}">${esc(labels[k] || k)}</span>`).join("");
+    $("milestoneChips").innerHTML = milestoneKeys().map((k) => `<span class="fs-badge fs-badge-primary" style="opacity:${applicantMilestones.has(k) ? 1 : .45}">${esc(labels[k] || k)}</span>`).join("");
     setKv("attendanceKv", [
       { label: "Attendance %", value: attendance.pct == null ? "-" : `${attendance.pct}%` },
       { label: "Sessions Attended", value: `${attendance.attended}/${attendance.total}` },
