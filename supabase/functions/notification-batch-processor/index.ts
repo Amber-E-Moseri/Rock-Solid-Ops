@@ -1,4 +1,4 @@
-﻿import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { withTrace, writeAudit } from "../_shared/audit.ts";
 import { validateCronAuth } from "../_shared/auth.ts";
@@ -33,6 +33,7 @@ type ScheduledNotificationRow = {
   max_attempts: number;
   scheduled_for: string;
   trace_id: string | null;
+  claimed_at?: string | null;
 };
 
 function buildSubjectFromTemplate(templateKey: string): string {
@@ -54,6 +55,11 @@ function buildSubjectFromTemplate(templateKey: string): string {
   return map[templateKey] || "Foundation School Notification";
 }
 
+// Bounded Moodle API call (C6-PREACTIVATION).
+// Uses AbortController + setTimeout (established pattern in moodle-grade-sync)
+// rather than AbortSignal.timeout() which may not be available in all runtimes.
+const MOODLE_TIMEOUT_MS = 15_000;
+
 async function callMoodle(
   wsfunction: string,
   params: Record<string, string>,
@@ -67,11 +73,21 @@ async function callMoodle(
     moodlewsrestformat: "json",
     ...params,
   });
-  const res = await fetch(`${MOODLE_URL}/webservice/rest/server.php`, { method: "POST", body });
-  if (!res.ok) throw new Error(`Moodle HTTP ${res.status}`);
-  const json = await res.json();
-  if (json?.exception) throw new Error(`Moodle error: ${json.message || json.exception}`);
-  return json as Record<string, unknown>;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MOODLE_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${MOODLE_URL}/webservice/rest/server.php`, {
+      method: "POST",
+      body,
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`Moodle HTTP ${res.status}`);
+    const json = await res.json();
+    if (json?.exception) throw new Error(`Moodle error: ${json.message || json.exception}`);
+    return json as Record<string, unknown>;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function shouldQueueMoodleReminder(db: any, row: ScheduledNotificationRow): Promise<{ queue: boolean; email: string; payload: Record<string, unknown> }> {
@@ -132,41 +148,23 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const limit = Math.min(Math.max(Number(body.limit || 10), 1), 200);
 
-    const nowIso = new Date().toISOString();
-    let data: ScheduledNotificationRow[] | null = null;
-    let error: { message?: string } | null = null;
-    ({
-      data,
-      error,
-    } = await db
-      .from("scheduled_notifications")
-      .select("id,recipient_email,template_key,event_type,applicant_id,payload,status,attempts,max_attempts,scheduled_for,trace_id")
-      .eq("status", "PENDING")
-      .lte("scheduled_for", nowIso)
-      .order("scheduled_for", { ascending: true })
-      .limit(limit));
+    // Claim rows atomically.
+    // The RPC handles stale PROCESSING recovery, terminal-exhausted sweep,
+    // and FOR UPDATE SKIP LOCKED — two concurrent workers receive non-overlapping rows.
+    const { data: claimedData, error: claimErr } = await db.rpc(
+      "claim_notification_batch",
+      { p_limit: limit },
+    );
 
-    if (error) {
-      const msg = JSON.stringify(error);
-      if (msg.includes("trace_id")) {
-        const legacyRes = await db
-          .from("scheduled_notifications")
-          .select("id,recipient_email,template_key,event_type,applicant_id,payload,status,attempts,max_attempts,scheduled_for")
-          .eq("status", "PENDING")
-          .lte("scheduled_for", nowIso)
-          .order("scheduled_for", { ascending: true })
-          .limit(limit);
-        if (legacyRes.error) throw legacyRes.error;
-        data = ((legacyRes.data || []) as Array<Record<string, unknown>>).map((row) => ({
-          ...(row as ScheduledNotificationRow),
-          trace_id: null,
-        }));
-      } else {
-        throw error;
-      }
+    if (claimErr) {
+      const message = claimErr.message || String(claimErr);
+      return new Response(
+        JSON.stringify({ ok: false, error: message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
-    const rows = (data || []) as ScheduledNotificationRow[];
+    const rows = (claimedData || []) as ScheduledNotificationRow[];
 
     let processed = 0;
     let queued = 0;
@@ -175,15 +173,12 @@ Deno.serve(async (req) => {
 
     for (const row of rows) {
       processed += 1;
+      // nextAttempts is computed once, outside try/catch, from the original row value.
+      // It is incremented exactly once per processing invocation — not on claim,
+      // not on stale recovery, only when the try-block is entered (real work attempted).
+      const nextAttempts = (row.attempts || 0) + 1;
 
       try {
-        if ((row.attempts || 0) >= (row.max_attempts || 0)) {
-          failed += 1;
-          results.push({ id: row.id, status: "skipped_max_attempts" });
-          continue;
-        }
-
-        const nextAttempts = (row.attempts || 0) + 1;
         const eventType = String(row.event_type || "").toLowerCase();
         let shouldQueue = true;
         let email = String(row.recipient_email || "").trim();
@@ -206,20 +201,25 @@ Deno.serve(async (req) => {
             status: "Pending",
             payload,
             trace_id: row.trace_id || null,
+            // source_notification_id enforces at-most-one delivery per source row.
+            // The partial unique index (WHERE source_notification_id IS NOT NULL)
+            // means other producers writing NULL are unaffected.
+            source_notification_id: row.id,
           };
-          let queueErr: { message?: string } | null = null;
-          ({ error: queueErr } = await db.from("email_queue").insert(emailQueueInsert));
-          if (queueErr) {
-            const queueMsg = JSON.stringify(queueErr);
-            if (queueMsg.includes("trace_id")) {
-              const legacyInsert = { ...emailQueueInsert } as Record<string, unknown>;
-              delete legacyInsert.trace_id;
-              ({ error: queueErr } = await db.from("email_queue").insert(legacyInsert));
-            }
-          }
-          if (queueErr) throw queueErr;
+
+          // ignoreDuplicates: true maps to ON CONFLICT ... DO NOTHING.
+          // Empty RETURNING means the delivery already exists (a prior run or
+          // concurrent worker created it). Treat as "delivery already complete."
+          const upsertRes = await db.from("email_queue").upsert(
+            emailQueueInsert,
+            { onConflict: "source_notification_id", ignoreDuplicates: true },
+          ).select("id");
+
+          if (upsertRes.error) throw upsertRes.error;
+          // Empty data = delivery already exists. Still proceed to finalization.
         }
 
+        // Finalize: mark source notification as SENT and clear the claim.
         const { error: sentErr } = await db
           .from("scheduled_notifications")
           .update({
@@ -227,10 +227,26 @@ Deno.serve(async (req) => {
             sent_at: new Date().toISOString(),
             attempts: nextAttempts,
             error_message: null,
+            claimed_at: null,
           })
           .eq("id", row.id);
 
-        if (sentErr) throw sentErr;
+        if (sentErr) {
+          // Delivery is durable in email_queue but finalization failed.
+          // Try compensating reset so the row becomes re-claimable. If the
+          // reset also fails, the row remains PROCESSING and the 15-minute
+          // stale recovery sweep in claim_notification_batch will reset it.
+          // Either way the unique constraint prevents a duplicate delivery.
+          try {
+            await db
+              .from("scheduled_notifications")
+              .update({ status: "PENDING", claimed_at: null })
+              .eq("id", row.id);
+          } catch (_resetErr) {
+            // Stale recovery handles this.
+          }
+          throw sentErr;
+        }
 
         await writeAudit(
           db,
@@ -262,12 +278,11 @@ Deno.serve(async (req) => {
         });
       } catch (rowErr) {
         const message = rowErr instanceof Error ? rowErr.message : String(rowErr);
-        const nextAttempts = (row.attempts || 0) + 1;
-        const nextStatus = nextAttempts >= (row.max_attempts || 0) ? "FAILED" : "PENDING";
+        const nextStatus = nextAttempts >= (row.max_attempts || 3) ? "FAILED" : "PENDING";
 
         await db
           .from("scheduled_notifications")
-          .update({ attempts: nextAttempts, status: nextStatus, error_message: message })
+          .update({ attempts: nextAttempts, status: nextStatus, error_message: message, claimed_at: null })
           .eq("id", row.id);
 
         failed += 1;
