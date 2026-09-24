@@ -312,6 +312,19 @@ export function onlyAssignedSyncJobs(rows: Array<Record<string, unknown>>) {
   return (rows || []).filter((row) => String(row?.registration_status || "").toUpperCase() === "ASSIGNED");
 }
 
+// Pure eligibility predicate for the automatic moodle-sync selector.
+// Exported for unit testing (T01–T10). Must stay in sync with baseQuery.
+export function isMoodleSyncEligible(row: Record<string, unknown>, nowIso: string): boolean {
+  if (String(row.registration_status || "").toUpperCase() !== "ASSIGNED") return false;
+  const status = String(row.sync_status || "").toUpperCase();
+  if (status === "PENDING") return true;
+  if (status === "RETRYING") {
+    const nra = row.next_retry_at != null ? String(row.next_retry_at) : null;
+    return !nra || nra <= nowIso;
+  }
+  return false;
+}
+
 async function resolveCourseId(db: ReturnType<typeof createClient>, row: Record<string, unknown>) {
   // moodle_course_id is the written column name; course_id is a legacy alias — check both
   const explicit = String(row.course_id || row.moodle_course_id || "").trim();
@@ -424,10 +437,11 @@ export async function handler(req: Request): Promise<Response> {
     const limitInput = Number(payload?.limit || 5) || 5;
     const limit = Math.max(1, Math.min(50, limitInput)); // Max 50 to prevent abuse
 
+    const selectorNowIso = new Date().toISOString();
     const baseQuery = db
       .from("moodle_enrollment_sync")
       .select("*")
-      .in("sync_status", ["PENDING", "RETRYING", "FAILED"])
+      .or(`sync_status.eq.PENDING,and(sync_status.eq.RETRYING,or(next_retry_at.is.null,next_retry_at.lte.${selectorNowIso}))`)
       .eq("registration_status", "ASSIGNED")
       .order("updated_at", { ascending: true })
       .limit(limit);
