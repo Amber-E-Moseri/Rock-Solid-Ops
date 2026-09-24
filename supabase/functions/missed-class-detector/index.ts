@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { validateCronAuth } from "../_shared/auth.ts";
+import { ensureNexusTask } from "../_shared/nexus-tasks.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -72,29 +73,6 @@ function classNumberForDate(batchStartDate: string, classDate: Date) {
   return String(weekNum);
 }
 
-async function invokeClickupSync(
-  supabaseUrl: string,
-  body: Record<string, unknown>,
-) {
-  const internalSecret = Deno.env.get("INTERNAL_INVOKE_SECRET") || "";
-  if (!internalSecret) throw new Error("Missing INTERNAL_INVOKE_SECRET");
-
-  const res = await fetch(`${supabaseUrl}/functions/v1/clickup-sync`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-internal-secret": internalSecret,
-    },
-    body: JSON.stringify(body),
-  });
-
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(String(data?.error || `clickup-sync failed (${res.status})`));
-  }
-  return data as Record<string, unknown>;
-}
-
 async function logAudit(db: ReturnType<typeof createClient>, action: string, status: string, details: Record<string, unknown>) {
   await db.from("audit_logs").insert({
     actor_email: "missed-class-detector@system",
@@ -117,6 +95,8 @@ Deno.serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  const NEXUS_API_URL = Deno.env.get("NEXUS_API_URL") || "";
+  const NEXUS_API_KEY = Deno.env.get("NEXUS_API_KEY") || "";
   if (!SUPABASE_URL || !SERVICE_KEY) return json({ ok: false, error: "Missing Supabase env" }, 500);
 
   const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
@@ -223,23 +203,20 @@ Deno.serve(async (req) => {
 
       summary.missed_count += 1;
 
-      const clickupRes = await invokeClickupSync(SUPABASE_URL, {
-        type: "missed_class",
-        payload: {
-          student_id: studentId,
-          student_name: student?.full_name || studentId,
-          email: student?.email || "",
-          group_id: groupId || classDef.group_id,
-          subgroup_id: subgroupId || classDef.subgroup_id,
-          class_option_id: classOptionId,
-          class_number: classNumber,
-          class_date: classDate,
-          reason: "No attendance record for passed session",
-        },
-      });
+      const nexusRes = await ensureNexusTask(db, "missed_class", {
+        student_id: studentId,
+        student_name: student?.full_name || studentId,
+        email: student?.email || "",
+        group_id: groupId || classDef.group_id,
+        subgroup_id: subgroupId || classDef.subgroup_id,
+        class_option_id: classOptionId,
+        class_number: classNumber,
+        class_date: classDate,
+        reason: "No attendance record for passed session",
+      }, "missed-class-detector@system", { nexusUrl: NEXUS_API_URL, nexusApiKey: NEXUS_API_KEY });
 
-      if (clickupRes?.reused) summary.skipped_duplicate_count += 1;
-      if (clickupRes?.clickup_task_id) summary.task_created_count += 1;
+      if (nexusRes?.reused) summary.skipped_duplicate_count += 1;
+      if (nexusRes?.nexus_task_id) summary.task_created_count += 1;
 
       // Send missed-class check-in email when student has missed >= 2 sessions in this batch.
       const studentEmail = student?.email || "";
@@ -339,22 +316,19 @@ Deno.serve(async (req) => {
     for (const a of candidates) {
       const subgroupId = fellowshipMap.get(normalizeText(a.fellowship_code)) || "";
       const fullName = `${normalizeText(a.first_name)} ${normalizeText(a.last_name)}`.trim();
-      const clickupRes = await invokeClickupSync(SUPABASE_URL, {
-        type: "escalation",
-        payload: {
-          source: "applicants",
-          source_id: String(a.id),
-          student_name: fullName,
-          email: normalizeText(a.email),
-          group_id: normalizeText(a.group_id),
-          subgroup_id: subgroupId,
-          reason: "Registration stuck in REVIEW for more than 48 hours",
-          error_code: "REVIEW_STALE_48H",
-          error_message: "Applicant remained in REVIEW beyond 48h operational threshold",
-        },
-      });
+      const nexusRes = await ensureNexusTask(db, "escalation", {
+        source: "applicants",
+        source_id: String(a.id),
+        student_name: fullName,
+        email: normalizeText(a.email),
+        group_id: normalizeText(a.group_id),
+        subgroup_id: subgroupId,
+        reason: "Registration stuck in REVIEW for more than 48 hours",
+        error_code: "REVIEW_STALE_48H",
+        error_message: "Applicant remained in REVIEW beyond 48h operational threshold",
+      }, "missed-class-detector@system", { nexusUrl: NEXUS_API_URL, nexusApiKey: NEXUS_API_KEY });
 
-      if (clickupRes?.clickup_task_id) {
+      if (nexusRes?.nexus_task_id) {
         summary.review_escalation_created += 1;
       }
     }

@@ -10,6 +10,7 @@ import {
   safeLogAudit,
 } from "../_shared/http.ts";
 import { validateCronAuth } from "../_shared/auth.ts";
+import { ensureNexusTask } from "../_shared/nexus-tasks.ts";
 
 type RetryAction = "retry" | "resolve";
 type RetrySource = "email_queue" | "scheduled_notifications" | "moodle_sync" | "moodle_enrollment_sync" | "failed_syncs";
@@ -48,29 +49,6 @@ function json(body: unknown, status = 200) {
     },
     status,
   );
-}
-
-async function triggerClickupEscalation(
-  supabaseUrl: string,
-  payload: Record<string, unknown>,
-) {
-  const internalSecret = Deno.env.get("INTERNAL_INVOKE_SECRET") || "";
-  if (!internalSecret) throw new Error("Missing INTERNAL_INVOKE_SECRET");
-
-  const res = await fetch(`${supabaseUrl}/functions/v1/clickup-sync`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-internal-secret": internalSecret,
-    },
-    body: JSON.stringify({
-      type: "escalation",
-      payload,
-    }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(String(data?.error || `clickup-sync failed (${res.status})`));
-  return data as Record<string, unknown>;
 }
 
 async function isAdmin(serviceDb: ReturnType<typeof createClient>, userId: string, email?: string) {
@@ -221,7 +199,6 @@ async function sweepMoodleEnrollmentRetries(
 
 async function maybeEscalateMoodleFailure(
   db: ReturnType<typeof createClient>,
-  supabaseUrl: string,
   rowId: string,
 ) {
   const { data: row, error } = await db
@@ -263,12 +240,14 @@ async function maybeEscalateMoodleFailure(
     error_message: String(row.last_error || ""),
   };
 
-  const clickupRes = await triggerClickupEscalation(supabaseUrl, payload);
-  const taskId = String(clickupRes?.clickup_task_id || "").trim();
-  if (taskId) {
-    await db.from("moodle_enrollment_sync").update({ clickup_task_id: taskId }).eq("id", row.id);
-  }
-  return { escalated: true, clickup_task_id: taskId || null };
+  const NEXUS_API_URL = Deno.env.get("NEXUS_API_URL") || "";
+  const NEXUS_API_KEY = Deno.env.get("NEXUS_API_KEY") || "";
+  const nexusRes = await ensureNexusTask(db, "escalation", payload, "retry-worker@system", {
+    nexusUrl: NEXUS_API_URL,
+    nexusApiKey: NEXUS_API_KEY,
+  });
+  const taskId = String(nexusRes?.nexus_task_id || "").trim();
+  return { escalated: true, nexus_task_id: taskId || null };
 }
 
 async function applyRetry(
@@ -457,7 +436,7 @@ Deno.serve(async (req) => {
       let escalated = 0;
       for (const row of sweep.candidates || []) {
         try {
-          const outcome = await maybeEscalateMoodleFailure(serviceDb, SUPABASE_URL, String(row.id || ""));
+          const outcome = await maybeEscalateMoodleFailure(serviceDb, String(row.id || ""));
           if (outcome.escalated) escalated += 1;
         } catch (err) {
           console.error("RETRY_SWEEP_ESCALATION_ERROR", err);
@@ -495,9 +474,9 @@ Deno.serve(async (req) => {
 
       if (source === "moodle_enrollment_sync") {
         try {
-          await maybeEscalateMoodleFailure(serviceDb, SUPABASE_URL, id);
+          await maybeEscalateMoodleFailure(serviceDb, id);
         } catch (escalationErr) {
-          console.error("RETRY_WORKER_CLICKUP_ESCALATION_ERROR", escalationErr);
+          console.error("RETRY_WORKER_NEXUS_ESCALATION_ERROR", escalationErr);
         }
         // Row is now RETRYING — the scheduled */5 moodle-sync cron picks it up.
         // No function-to-function invocation needed; durable state drives processing.
