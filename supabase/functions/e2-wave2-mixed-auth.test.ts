@@ -194,14 +194,13 @@ Deno.test("W2-retry-worker: absent bearer no longer means cron", async () => {
   assert(source.includes('const isCronCall = auth.mode === "cron";'));
 });
 
-Deno.test("W2-retry-worker: outbound ClickUp internal auth remains", async () => {
+Deno.test("W2-retry-worker: Nexus task escalation uses server-side credentials", async () => {
   const source = await readSource("./retry-worker/index.ts");
-  const fnStart = source.indexOf("async function triggerClickupEscalation");
-  const fnEnd = source.indexOf("async function isAdmin", fnStart);
-  const fn = source.slice(fnStart, fnEnd);
-  assert(fn.includes('Deno.env.get("INTERNAL_INVOKE_SECRET")'));
-  assert(fn.includes('"x-internal-secret": internalSecret'));
-  assertEquals(fn.includes("Authorization"), false);
+  assert(source.includes("ensureNexusTask("), "ensureNexusTask must be imported and used");
+  assert(source.includes("NEXUS_API_URL"), "NEXUS_API_URL env var must be referenced");
+  assert(source.includes("NEXUS_API_KEY"), "NEXUS_API_KEY must be read server-side");
+  assertEquals(source.includes("triggerClickupEscalation"), false, "removed ClickUp escalation function");
+  assertEquals(source.includes("x-internal-secret"), false, "internal auth no longer sent to ClickUp");
 });
 
 Deno.test("W2-retry-worker: B4 durable handoff remains", async () => {

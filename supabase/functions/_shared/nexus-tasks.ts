@@ -240,9 +240,31 @@ async function updateSourceNexusTaskId(
   }
 }
 
-// Idempotent task creation: checks rocksolid_task_links before calling Nexus.
+// Validate dedupe identity fields before claiming or posting.
+function validateDedupeFields(type: RequestType, payload: MissedClassPayload | EscalationPayload): string | null {
+  if (type === "missed_class") {
+    const p = payload as MissedClassPayload;
+    const student = normalizeText(p.student_id);
+    const classOpt = normalizeText(p.class_option_id);
+    const classNum = normalizeText(p.class_number);
+    const classDate = normalizeText(p.class_date);
+    if (!student || !classOpt || !classNum || !classDate) {
+      return `malformed missed_class payload: missing required fields (student_id, class_option_id, class_number, class_date)`;
+    }
+  } else {
+    const p = payload as EscalationPayload;
+    const source = normalizeText(p.source);
+    const sourceId = normalizeText(p.source_id);
+    if (!source || !sourceId) {
+      return `malformed escalation payload: missing required fields (source, source_id)`;
+    }
+  }
+  return null;
+}
+
+// Idempotent task creation: uses atomic Postgres claim to prevent concurrent duplicate POSTs.
 // Returns { ok: true, reused: true } if a task already exists for this event.
-// Returns { ok: false, non_fatal: true } if Nexus is unreachable or unconfigured.
+// Returns { ok: false, non_fatal: true } if claim is not owned or Nexus is unreachable.
 export async function ensureNexusTask(
   db: ReturnType<typeof createClient>,
   type: RequestType,
@@ -264,20 +286,43 @@ export async function ensureNexusTask(
     ? `${normalizeText((payload as MissedClassPayload).student_id)}:${normalizeText((payload as MissedClassPayload).class_option_id)}:${normalizeText((payload as MissedClassPayload).class_number)}:${normalizeText((payload as MissedClassPayload).class_date)}`
     : normalizeText((payload as EscalationPayload).source_id);
 
-  const existing = await db
-    .from("rocksolid_task_links")
-    .select("id,nexus_task_id,status")
-    .eq("dedupe_key", dedupeKey)
-    .maybeSingle();
-
-  if (existing.data?.nexus_task_id) {
-    return { ok: true, dedupe_key: dedupeKey, nexus_task_id: existing.data.nexus_task_id, reused: true };
+  // Validate dedupe identity before claiming
+  const validationErr = validateDedupeFields(type, payload);
+  if (validationErr) {
+    await _logAudit(db, actorEmail, "NEXUS_TASK_MALFORMED", sourceType, sourceId || dedupeKey, { dedupe_key: dedupeKey, error: validationErr });
+    return { ok: false, dedupe_key: dedupeKey, nexus_task_id: null, reused: false, non_fatal: true, error: validationErr };
   }
 
-  await db.from("rocksolid_task_links").upsert(
-    { source_type: sourceType, source_id: sourceId || "unknown", dedupe_key: dedupeKey, status: "PENDING" },
-    { onConflict: "dedupe_key" },
-  );
+  // Atomic claim: only one concurrent invocation per dedupe_key can proceed to POST
+  const claimToken = crypto.randomUUID();
+  const { data: claimResult, error: claimErr } = await db
+    .rpc("claim_nexus_task", {
+      p_source_type: sourceType,
+      p_source_id: sourceId || "unknown",
+      p_dedupe_key: dedupeKey,
+      p_claim_token: claimToken,
+    });
+
+  if (claimErr) {
+    await _logAudit(db, actorEmail, "NEXUS_TASK_CLAIM_ERROR", sourceType, sourceId || dedupeKey, { dedupe_key: dedupeKey, error: claimErr.message });
+    return { ok: false, dedupe_key: dedupeKey, nexus_task_id: null, reused: false, non_fatal: true, error: claimErr.message };
+  }
+
+  const claim = (claimResult as unknown[])?.[0] as any;
+  if (!claim) {
+    await _logAudit(db, actorEmail, "NEXUS_TASK_CLAIM_EMPTY", sourceType, sourceId || dedupeKey, { dedupe_key: dedupeKey });
+    return { ok: false, dedupe_key: dedupeKey, nexus_task_id: null, reused: false, non_fatal: true, error: "claim returned empty" };
+  }
+
+  // If task already completed, return existing nexus_task_id
+  if (claim.nexus_task_id) {
+    return { ok: true, dedupe_key: dedupeKey, nexus_task_id: claim.nexus_task_id, reused: true };
+  }
+
+  // If caller is not owner, another invocation claimed this; return in-progress
+  if (!claim.is_owner) {
+    return { ok: false, dedupe_key: dedupeKey, nexus_task_id: null, reused: false, non_fatal: true, error: "another invocation owns this claim" };
+  }
 
   if (!nexusUrl || !nexusApiKey) {
     const msg = "Nexus API secrets are not configured";
@@ -296,15 +341,24 @@ export async function ensureNexusTask(
   const taskBody = { ...buildTask(type, payload, assigneeId), list_id: listId, space_id: spaceId };
 
   let created: Record<string, unknown> = {};
+  let createErr: Error | null = null;
   try {
     created = await createNexusTask(nexusUrl, nexusApiKey, taskBody, timeoutMs);
-  } catch (createErr) {
-    const errMsg = createErr instanceof Error ? createErr.message : String(createErr);
+  } catch (err) {
+    createErr = err instanceof Error ? err : new Error(String(err));
+  }
+
+  if (createErr) {
+    const errMsg = createErr.message;
+    const isTimeout = errMsg.toLowerCase().includes("abort") || errMsg.toLowerCase().includes("timeout");
+    const failureStatus = isTimeout ? "TIMEOUT_UNKNOWN" : "FAILED";
+
     await db
       .from("rocksolid_task_links")
-      .update({ status: "FAILED", error_message: errMsg, updated_at: new Date().toISOString() })
+      .update({ status: failureStatus, error_message: errMsg, updated_at: new Date().toISOString() })
       .eq("dedupe_key", dedupeKey);
-    await _logAudit(db, actorEmail, "NEXUS_TASK_FAILED", sourceType, sourceId || dedupeKey, { dedupe_key: dedupeKey, error: errMsg });
+    await _logAudit(db, actorEmail, "NEXUS_TASK_FAILED", sourceType, sourceId || dedupeKey, { dedupe_key: dedupeKey, error: errMsg, status: failureStatus });
+
     return { ok: false, dedupe_key: dedupeKey, nexus_task_id: null, reused: false, non_fatal: true, error: errMsg };
   }
 

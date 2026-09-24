@@ -4,7 +4,6 @@ import { validateCronAuth } from "../_shared/auth.ts";
 import {
   corsHeaders,
   jsonResponse,
-  withTimeout,
   classifyError,
   exponentialBackoffMs,
   shouldRetry,
@@ -164,15 +163,20 @@ async function callMoodle(
     ...params,
   });
 
-  const response = await withTimeout(
-    fetch(`${url.replace(/\/$/, "")}/webservice/rest/server.php`, {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(`${url.replace(/\/$/, "")}/webservice/rest/server.php`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
-    }),
-    timeoutMs,
-    wsfunction,
-  );
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!response.ok) {
     if (response.status === 403) {
