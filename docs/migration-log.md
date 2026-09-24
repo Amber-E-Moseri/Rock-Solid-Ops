@@ -2797,3 +2797,47 @@ now passing is the verification performed this session.
 Registration-processor touch reviewed and approved by the operator (see above) — this was the
 only gate; no RLS/auth-boundary change otherwise. Merged to `main` same session per the
 standing branch-per-brief workflow.
+
+---
+
+## C1 Production Deployment — 2026-09-24
+
+**Brief:** ROCK SOLID OPS — TRACK C / C1 NOTIFICATION BATCH SAFETY — PRODUCTION MIGRATION + FUNCTION DEPLOYMENT GATE
+
+**Commits deployed:**
+- `5297320` feat(c1): notification-batch-processor atomic claim + delivery idempotency
+- `c8697f4` test(c1): add Phase 10 edge function tests for notification-batch-processor
+- `9c653e7` test(c1): add true SKIP LOCKED concurrency certification (SC01/SC02)
+
+**Production mutations (authorized by brief):**
+1. Migration `202609231200_notification_batch_safe_claim.sql` applied via `supabase db push --linked`
+2. Function `notification-batch-processor` deployed via `supabase functions deploy`
+
+**Pre-migration state verified:**
+- Latest remote migration: `202609231100` — `202609231200` absent ✓
+- All C1 objects (`claimed_at`, `source_notification_id`, `claim_notification_batch()`, both indexes) absent from production ✓
+- Pre-migration queue: `pending`:1, `PENDING`:3, `SENT`:2 (6 total rows)
+
+**Post-migration certification:**
+- All 5 C1 objects present and correct (claimed_at nullable, RPC exists, indexes exist) ✓
+- Zero historical mutation: `claimed_at_set`:0, `processing_count`:0, total remains 6 ✓
+- Final snapshot unchanged: `pending`:1, `PENDING`:3, `SENT`:2 ✓
+
+**Function deployment certification:**
+- Negative auth: no-auth → HTTP 401, invalid bearer → HTTP 401 ✓
+- Cron: 0 active cron jobs for notification-batch-processor ✓
+- Function is NOT yet active (no cron, no invocation) — cron wiring is a separate authorized step
+
+**Local gate results (Phase 3):**
+- C1_REAL_POSTGRES: 30/30 PASS (post supabase db reset replay)
+- C1_EDGE_FUNCTION: 24/24 PASS
+- SC01/SC02: SKIP LOCKED true overlapping-transaction concurrency PASS
+- W1/W2: 34/34 PASS
+- SECURITY: 45/45 PASS (nexus-upstream.test.ts is a pre-existing local-integration gate, not a C1 regression)
+- FULL_MIGRATION_REPLAY: supabase db reset exit 0, 202609231200 applies cleanly
+
+### GATE
+
+Migration and function deployment authorized by the C1 Production Gate brief. No new cron
+created, no function invoked with valid auth. Function deployed but dormant — activation
+requires a separate cron-wiring step under independent operator authorization.
