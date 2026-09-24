@@ -38,7 +38,7 @@ interface RunResult {
 // Invoked on a cron schedule (see config.toml).
 // Also accepts manual POST for operational use.
 
-Deno.serve(async (req): Promise<Response> => {
+export async function handler(req: Request): Promise<Response> {
   const authFailure = validateCronAuth(req);
   if (authFailure) return authFailure;
 
@@ -212,7 +212,9 @@ Deno.serve(async (req): Promise<Response> => {
     } catch { /* ignore log errors */ }
     return json({ ok: false, error: message, ...result })
   }
-})
+}
+
+if (import.meta.main) Deno.serve(handler);
 
 // ── Content resolution ───────────────────────────────────────
 
@@ -250,7 +252,7 @@ function substituteVariables(template: string, row: EmailQueueRow): string {
 // ── Resend API ───────────────────────────────────────────────
 // Returns an error string on failure, null on success.
 
-async function sendEmail(opts: {
+export async function sendEmail(opts: {
   from: string
   replyTo: string
   to: string
@@ -267,18 +269,27 @@ async function sendEmail(opts: {
   }
   if (opts.replyTo) body['reply_to'] = opts.replyTo
 
+  // Resend URL and timeout read at call time so tests can override via env.
+  const resendUrl = Deno.env.get('RESEND_API_URL') || 'https://api.resend.com/emails'
+  const timeoutMs = Number(Deno.env.get('RESEND_TIMEOUT_MS') || '30000')
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
   let res: Response
   try {
-    res = await fetch('https://api.resend.com/emails', {
+    res = await fetch(resendUrl, {
       method:  'POST',
       headers: {
         'Authorization': `Bearer ${RESEND_API_KEY}`,
         'Content-Type':  'application/json'
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal: controller.signal,
     })
   } catch (e) {
     return e instanceof Error ? e.message : String(e)
+  } finally {
+    clearTimeout(timer)
   }
 
   if (!res.ok) {

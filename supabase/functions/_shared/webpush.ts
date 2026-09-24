@@ -228,6 +228,7 @@ export async function sendWebPush(
   payload: unknown,
   keys: VapidKeys,
   ttlSeconds = 2419200, // 28 days, the common max
+  timeoutMs = 10_000,
 ): Promise<SendResult> {
   const bodyBytes = encodePayloadBytes(payload);
   const encrypted = await encryptPayload(sub, bodyBytes);
@@ -236,17 +237,25 @@ export async function sendWebPush(
   const audience = `${url.protocol}//${url.host}`;
   const auth = await vapidAuthHeader(audience, keys);
 
-  const res = await fetch(sub.endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: auth,
-      "Content-Encoding": "aes128gcm",
-      "Content-Type": "application/octet-stream",
-      TTL: String(ttlSeconds),
-      Urgency: "normal",
-    },
-    body: encrypted,
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(sub.endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: auth,
+        "Content-Encoding": "aes128gcm",
+        "Content-Type": "application/octet-stream",
+        TTL: String(ttlSeconds),
+        Urgency: "normal",
+      },
+      body: encrypted,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 
   const expired = res.status === 404 || res.status === 410;
   let text: string | undefined;

@@ -2841,3 +2841,74 @@ standing branch-per-brief workflow.
 Migration and function deployment authorized by the C1 Production Gate brief. No new cron
 created, no function invoked with valid auth. Function deployed but dormant — activation
 requires a separate cron-wiring step under independent operator authorization.
+
+---
+
+## 2026-09-24 — C3B Production Gate: moodle-sync + retry-worker eligibility fix deployed
+
+### SUMMARY
+
+C3B defect fixed: automatic moodle-sync selector now honors `next_retry_at` for RETRYING rows
+and excludes FAILED/PERMANENTLY_FAILED from auto-selection. Manual retry in retry-worker now
+clears `next_retry_at: null` so a manually-triggered row is immediately eligible.
+
+**Branch:** `brief/c3b-moodle-retry-eligibility`
+**Commit:** `82540b2ad365fdd4b7476301b0a2c59a0d8f0e0c`
+
+### CHANGES DEPLOYED
+
+- `supabase/functions/moodle-sync/index.ts` (v77→v78): selector changed from `.in(["PENDING","RETRYING","FAILED"])` to PostgREST `.or()` filter excluding FAILED and gating RETRYING on `next_retry_at IS NULL OR <= now()`
+- `supabase/functions/retry-worker/index.ts` (v40→v41): `applyRetry` for `moodle_enrollment_sync` now sets `next_retry_at: null`
+
+No migration. No cron change. No schema change. No secrets change.
+
+### GATE RESULTS
+
+- LOCAL_RECONFIRMATION: PASS (25/25 tests)
+- PRESTATE: PENDING=0, RETRYING_DUE=0, RETRYING_FUTURE=0, RETRYING_NULL=0, FAILED=0, PERMANENTLY_FAILED=0, PROCESSING=0 (all 17 rows SYNCED)
+- moodle-sync deployed: YES (v78, ACTIVE)
+- moodle-sync cron: 1, */5, NEW_CRON_AUTH — unchanged
+- Natural cron runs observed: 12:35 UTC (succeeded), 12:40 UTC (succeeded)
+- MOODLE_SYNC_RUN: SUCCESS × 3 post-deploy; MOODLE_SYNC_STUCK_RESET: SUCCESS × 3
+- Eligibility invariants: all NOT_OBSERVABLE_THIS_RUN (no RETRYING/FAILED/PERMANENTLY_FAILED rows existed in production)
+- retry-worker deployed: YES (v41, ACTIVE), cron count = 0
+- POSTSTATE: identical to PRESTATE (all 17 rows SYNCED, no unexpected transitions)
+- HEAD unchanged, no new staging, stash count = 3, not pushed
+
+### STATUS
+
+C3B CLOSED. Both functions deployed. No production fixtures created. No rollback needed.
+
+---
+
+## 2026-09-24 — C6 Local Certification: External Dependency Timeout Hardening
+
+### SUMMARY
+
+Bounded all outbound HTTP calls to external services with AbortController + setTimeout so no
+edge function can block indefinitely on a third-party timeout.
+
+**Branch:** `brief/c6-timeout-hardening`
+
+### CHANGES
+
+- `supabase/functions/email-sender/index.ts`: exported `handler`, added `import.meta.main` guard, added 30 s AbortController timeout on Resend API fetch (env-configurable via `RESEND_TIMEOUT_MS`).
+- `supabase/functions/nexus-users-search/index.ts`: added `import.meta.main` guard (handler already exported), added 15 s AbortController timeout on Nexus fetch (env-configurable via `NEXUS_TIMEOUT_MS`).
+- `supabase/functions/clickup-sync/index.ts`: added 15 s AbortController timeout on ClickUp fetch (env-configurable via `NEXUS_TIMEOUT_MS`).
+- `supabase/functions/_shared/webpush.ts`: added `timeoutMs` parameter (default 10 s) to `sendWebPush`.
+- Test files added: `email-sender/timeout.test.ts` (E01–E08), `nexus-users-search/timeout.test.ts` (N01–N08), `clickup-sync/timeout.test.ts` (T21–T25), `_shared/webpush.test.ts` (T26–T29 added).
+
+No migration. No schema change. No cron change. No secrets change.
+
+### GATE RESULTS
+
+- E01–E08 (email-sender): 8/8 PASS
+- N01–N08 (nexus-users-search): 8/8 PASS
+- T21–T25 (clickup-sync): 5/5 PASS
+- T26–T29 (webpush): 4/4 PASS
+- _shared regression (auth + webpush + assign-applicant + push-notify): 35/35 PASS
+- Security: no CRON_INVOKE_SECRET, INTERNAL_INVOKE_SECRET, service-role, JWT, cron, Vault, or auth changes
+
+### STATUS
+
+C6 LOCAL CERTIFICATION COMPLETE. Not yet deployed. Deployment gate is a separate authorized step.

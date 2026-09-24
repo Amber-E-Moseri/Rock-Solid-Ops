@@ -53,6 +53,8 @@ function applyAllowedOrigin(req: Request) {
   }
 }
 
+const NEXUS_TASK_TIMEOUT_MS = Number(Deno.env.get("NEXUS_TIMEOUT_MS") || "15000");
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -283,14 +285,22 @@ async function createNexusTaskWithBackoff(
 
   while (attempt < 5) {
     attempt += 1;
-    const res = await fetch(`${nexusUrl}/tasks`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), NEXUS_TASK_TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await fetch(`${nexusUrl}/tasks`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
 
     if (res.ok) return await res.json();
 
