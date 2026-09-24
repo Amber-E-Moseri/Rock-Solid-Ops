@@ -343,6 +343,7 @@ async function applyRetry(
         error_message: null,
         error_code: null,
         retry_requested_at: now,
+        next_retry_at: null,
         updated_at: now,
       })
       .eq("id", id);
