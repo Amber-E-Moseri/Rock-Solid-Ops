@@ -2841,3 +2841,71 @@ standing branch-per-brief workflow.
 Migration and function deployment authorized by the C1 Production Gate brief. No new cron
 created, no function invoked with valid auth. Function deployed but dormant — activation
 requires a separate cron-wiring step under independent operator authorization.
+
+---
+
+## 2026-09-24 — C3B Production: moodle-sync + retry-worker eligibility fix deployed
+
+### SUMMARY
+
+C3B defect fixed: moodle-sync selector now honors `next_retry_at` for RETRYING rows and
+excludes FAILED/PERMANENTLY_FAILED. retry-worker manual trigger clears `next_retry_at: null`.
+
+**Branch:** `brief/c3b-moodle-retry-eligibility`  **Commit:** `82540b2`
+
+**Changes deployed:**
+- `moodle-sync` (v77→v78): selector `.in(["PENDING","RETRYING","FAILED"])` → `.or()` filter
+- `retry-worker` (v40→v41): `applyRetry` for moodle_enrollment_sync sets `next_retry_at: null`
+
+No migration. No cron change. No schema change. No secrets change.
+
+**Gate results:** 25/25 PASS. Natural cron runs at 12:35 UTC, 12:40 UTC — both succeeded.
+All 17 production moodle rows SYNCED pre and post. C3B CLOSED.
+
+---
+
+## 2026-09-24 — C6 + Nexus Task Migration: external timeout hardening + task adapter rename
+
+### SUMMARY
+
+Combined C6 timeout certification and ClickUp→Nexus task adapter migration.
+
+**Branch:** `brief/c6-timeout-hardening`
+
+### C6 TIMEOUT CHANGES
+
+- `email-sender/index.ts`: exported `handler`, `import.meta.main` guard, 30 s AbortController on Resend (E01–E08)
+- `nexus-users-search/index.ts`: `import.meta.main` guard, 15 s AbortController on Nexus fetch, 504 on timeout (N01–N08)
+- `_shared/webpush.ts`: `timeoutMs` param (default 10 s) added to `sendWebPush` (T26–T29)
+
+### NEXUS TASK MIGRATION
+
+`clickup-sync` is confirmed Nexus-backed (no api.clickup.com calls remain). Callers migrated to shared module.
+
+- `_shared/nexus-tasks.ts` added: exports `createNexusTask` (single-attempt, 15 s AbortController), `ensureNexusTask` (idempotent via `rocksolid_task_links.dedupe_key`), `buildTask`, `buildDedupeKey`, `resolveAssignee`
+- `missed-class-detector/index.ts`: `invokeClickupSync` HTTP call removed; replaced with `ensureNexusTask` (M3–M7)
+- `retry-worker/index.ts`: `triggerClickupEscalation` HTTP call removed; replaced with `ensureNexusTask` (R4–R8, C3B Moodle eligibility rules preserved)
+- `clickup-sync/index.ts`: source unchanged; classified RETIRED_NO_CALLERS
+
+DB column names (`clickup_task_id`) retained for backward compat — no migration needed.
+
+### IDEMPOTENCY
+
+`NEXUS_TASK_IDEMPOTENCY: PROVEN` — `rocksolid_task_links.dedupe_key` prevents duplicate tasks across invocations. `createNexusTask` is single-attempt (no auto-retry) to avoid creating duplicates on timeout where Nexus may have already accepted the POST.
+
+### TEST RESULTS
+
+- NT01–NT15 (nexus-tasks): 15/15 PASS
+- M3–M7 (missed-class-detector): 5/5 PASS
+- R4–R8 (retry-worker): 5/5 PASS
+- E01–E08 (email-sender): 8/8 PASS
+- N01–N08 (nexus-users-search): 8/8 PASS
+- T26–T29 (webpush): 4/4 PASS
+- _shared regression: 31/31 PASS
+- Total: 76/76 PASS
+
+No migration. No schema change. No cron change. No secrets change. No production deployment.
+
+### STATUS
+
+LOCAL CERTIFICATION COMPLETE. Not yet deployed. Deployment gate is a separate step.

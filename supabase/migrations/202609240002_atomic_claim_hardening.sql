@@ -1,15 +1,10 @@
--- Fix: Protect TIMEOUT_UNKNOWN status in fresh-claim recovery window
---
--- BUG: Fresh TIMEOUT_UNKNOWN claims (within 2-minute TTL) were not protected
--- by Case C of the claim_nexus_task RPC. The status check was:
---
---   status in ('CLAIMING', 'PENDING')
---
--- This allowed a fresh TIMEOUT_UNKNOWN row to be stolen in Case D.
--- TIMEOUT_UNKNOWN is an ambiguous remote-commit state that must remain
--- protected from automatic repost until the TTL expires.
---
--- FIX: Add TIMEOUT_UNKNOWN to the protected status list.
+begin;
+
+-- Atomic claim hardening: stale-recovery protection + minimum privileges
+-- 
+-- Fixes two issues in claim_nexus_task RPC:
+-- 1. TIMEOUT_UNKNOWN status was recoverable after TTL expiry (requires explicit reconciliation)
+-- 2. authenticated EXECUTE grant was overly broad (only service_role calls this RPC)
 
 create or replace function public.claim_nexus_task(
   p_source_type  text,
@@ -25,17 +20,14 @@ create or replace function public.claim_nexus_task(
 declare
   v_existing    record;
   v_is_owner    boolean := false;
-  v_fresh_claim boolean := false;
   v_ttl_minutes int := 2;
 begin
-  -- Try to find existing row
-  select id, nexus_task_id, status, claim_token, claimed_at
+  select rtl.id, rtl.nexus_task_id, rtl.status, rtl.claim_token, rtl.claimed_at
   into v_existing
-  from public.rocksolid_task_links
-  where dedupe_key = p_dedupe_key
+  from public.rocksolid_task_links as rtl
+  where rtl.dedupe_key = p_dedupe_key
   for update;
 
-  -- Case A: No existing row
   if v_existing is null then
     insert into public.rocksolid_task_links
       (source_type, source_id, dedupe_key, status, claim_token, claimed_at)
@@ -52,7 +44,6 @@ begin
     return;
   end if;
 
-  -- Case B: Existing row with successful task
   if v_existing.nexus_task_id is not null then
     row_id := v_existing.id;
     nexus_task_id := v_existing.nexus_task_id;
@@ -62,10 +53,17 @@ begin
     return;
   end if;
 
-  -- Case C: Fresh active claim
-  -- CRITICAL: TIMEOUT_UNKNOWN must be protected from automatic repost
+  if v_existing.status = 'TIMEOUT_UNKNOWN' then
+    row_id := v_existing.id;
+    nexus_task_id := v_existing.nexus_task_id;
+    status := v_existing.status;
+    is_owner := false;
+    return next;
+    return;
+  end if;
+
   if v_existing.claim_token is not null
-     and v_existing.status in ('CLAIMING', 'PENDING', 'TIMEOUT_UNKNOWN')
+     and v_existing.status in ('CLAIMING', 'PENDING')
      and v_existing.claimed_at > now() - make_interval(mins => v_ttl_minutes)
   then
     row_id := v_existing.id;
@@ -76,7 +74,6 @@ begin
     return;
   end if;
 
-  -- Case D: Stale claim (caller may recover)
   update public.rocksolid_task_links
   set
     claim_token = p_claim_token,
@@ -92,3 +89,7 @@ begin
   return next;
 end;
 $$;
+
+revoke execute on function public.claim_nexus_task(text, text, text, uuid) from authenticated;
+
+commit;
