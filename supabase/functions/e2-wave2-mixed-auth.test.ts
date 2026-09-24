@@ -199,8 +199,11 @@ Deno.test("W2-retry-worker: Nexus task escalation uses server-side credentials",
   assert(source.includes("ensureNexusTask("), "ensureNexusTask must be imported and used");
   assert(source.includes("NEXUS_API_URL"), "NEXUS_API_URL env var must be referenced");
   assert(source.includes("NEXUS_API_KEY"), "NEXUS_API_KEY must be read server-side");
+  assert(source.includes("maybeEscalateMoodleFailure"), "escalation path must exist");
   assertEquals(source.includes("triggerClickupEscalation"), false, "removed ClickUp escalation function");
-  assertEquals(source.includes("x-internal-secret"), false, "internal auth no longer sent to ClickUp");
+  // x-internal-secret may appear in auth rejection logic, but must not be used for outbound calls
+  const escalateFn = source.slice(source.indexOf("async function maybeEscalateMoodleFailure("));
+  assertEquals(escalateFn.includes("x-internal-secret"), false, "internal secret not used in escalation function");
 });
 
 Deno.test("W2-retry-worker: B4 durable handoff remains", async () => {
