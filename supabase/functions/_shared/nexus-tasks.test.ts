@@ -17,7 +17,7 @@
 // NT15  C3B Moodle retry behavior unchanged
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { buildDedupeKey, buildTask, createNexusTask, NEXUS_TIMEOUT_MS } from "./nexus-tasks.ts";
+import { buildDedupeKey, buildTask, buildExternalUniqueKey, createNexusTask, NEXUS_TIMEOUT_MS } from "./nexus-tasks.ts";
 
 const nexusSrc  = await Deno.readTextFile(new URL("./nexus-tasks.ts",                    import.meta.url));
 const missedSrc = await Deno.readTextFile(new URL("../missed-class-detector/index.ts",  import.meta.url));
@@ -66,7 +66,7 @@ Deno.test("NT03: Nexus timeout aborts the request and throws", async () => {
   );
   try {
     const port = (server.addr as Deno.NetAddr).port;
-    await createNexusTask(`http://127.0.0.1:${port}`, "test-key", { name: "test" }, 100);
+    await createNexusTask(`http://127.0.0.1:${port}`, "test-key", { name: "test" }, "rocksolid:test", 100);
     assert(false, "should have thrown on timeout");
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -87,7 +87,7 @@ Deno.test("NT04: Nexus 200 returns task id from response", async () => {
   );
   try {
     const port = (server.addr as Deno.NetAddr).port;
-    const result = await createNexusTask(`http://127.0.0.1:${port}`, "key", {}, 5000);
+    const result = await createNexusTask(`http://127.0.0.1:${port}`, "key", {}, "rocksolid:test", 5000);
     assertEquals(result.id, "nexus-task-abc");
   } finally {
     await server.shutdown();
@@ -104,7 +104,7 @@ Deno.test("NT05: Nexus 4xx throws immediately with no retry", async () => {
   });
   try {
     const port = (server.addr as Deno.NetAddr).port;
-    await createNexusTask(`http://127.0.0.1:${port}`, "key", {}, 5000);
+    await createNexusTask(`http://127.0.0.1:${port}`, "key", {}, "rocksolid:test", 5000);
     assert(false, "should have thrown");
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -136,7 +136,7 @@ Deno.test("NT07: timeout does not return a nexus_task_id (throws, not resolves)"
   );
   try {
     const port = (server.addr as Deno.NetAddr).port;
-    const result = await createNexusTask(`http://127.0.0.1:${port}`, "key", {}, 100)
+    const result = await createNexusTask(`http://127.0.0.1:${port}`, "key", {}, "rocksolid:test", 100)
       .catch((e: unknown) => ({ __error: true, msg: e instanceof Error ? e.message : String(e) }));
     assert("__error" in result, "timeout must reject, not resolve with a task id");
   } finally {
@@ -233,4 +233,36 @@ Deno.test("NT15: C3B Moodle retry eligibility rules are preserved in retry-worke
   assert(retrySrc.includes("MOODLE_PERMISSION_DENIED"),  "permission denied non-retryable preserved");
   assert(retrySrc.includes("sweepMoodleEnrollmentRetries"), "moodle sweep function still present");
   assert(retrySrc.includes("RETRY_WORKER_NEXUS_ESCALATION_ERROR"), "escalation error log renamed to NEXUS");
+});
+
+// ── I01 external_unique_key sent in POST body ────────────────────────────────
+
+Deno.test("I01: outgoing Nexus POST includes external_unique_key", () => {
+  assert(nexusSrc.includes("external_unique_key:"), "external_unique_key included in request body");
+  assert(nexusSrc.includes("buildExternalUniqueKey"), "buildExternalUniqueKey function called");
+});
+
+// ── I02/I03 deterministic key generation ────────────────────────────────────
+
+Deno.test("I02/I03: external_unique_key determinism and uniqueness", () => {
+  const key1 = buildExternalUniqueKey("missed_class:S001:CO1:3:2026-09-20");
+  const key2 = buildExternalUniqueKey("missed_class:S001:CO1:3:2026-09-20");
+  const key3 = buildExternalUniqueKey("missed_class:S002:CO1:3:2026-09-20");
+  assertEquals(key1, key2, "same dedupe identity produces same external key");
+  assertEquals(key1, "rocksolid:missed_class:S001:CO1:3:2026-09-20", "key is namespaced");
+  assertEquals(key1 === key3, false, "different identities produce different keys");
+});
+
+// ── I04 namespacing ────────────────────────────────────────────────────────
+
+Deno.test("I04: external_unique_key is namespaced to Rock Solid", () => {
+  const key = buildExternalUniqueKey("test:data");
+  assert(key.startsWith("rocksolid:"), "key is prefixed with rocksolid: namespace");
+});
+
+// ── I05/I06 response compatibility ────────────────────────────────────────────
+
+Deno.test("I05/I06: Nexus response task ID extraction unchanged", () => {
+  assert(nexusSrc.includes("created?.id"), "response parser extracts .id field");
+  assert(nexusSrc.includes("nexus_task_id: nexusTaskId"), "task ID persisted to state");
 });

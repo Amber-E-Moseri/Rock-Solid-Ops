@@ -81,6 +81,10 @@ export function buildDedupeKey(type: RequestType, payload: MissedClassPayload | 
   return `escalation:${source}:${sourceId}:${err}`;
 }
 
+export function buildExternalUniqueKey(dedupeKey: string): string {
+  return `rocksolid:${dedupeKey}`;
+}
+
 export function buildTask(
   type: RequestType,
   payload: MissedClassPayload | EscalationPayload,
@@ -186,6 +190,7 @@ export async function createNexusTask(
   nexusUrl: string,
   apiKey: string,
   body: Record<string, unknown>,
+  externalUniqueKey: string,
   timeoutMs = NEXUS_TIMEOUT_MS,
 ): Promise<Record<string, unknown>> {
   const controller = new AbortController();
@@ -198,7 +203,7 @@ export async function createNexusTask(
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ ...body, external_unique_key: externalUniqueKey }),
       signal: controller.signal,
     });
   } finally {
@@ -339,11 +344,12 @@ export async function ensureNexusTask(
   const assigneeId = await resolveAssignee(db, groupId, subgroupId, "");
 
   const taskBody = { ...buildTask(type, payload, assigneeId), list_id: listId, space_id: spaceId };
+  const externalUniqueKey = buildExternalUniqueKey(dedupeKey);
 
   let created: Record<string, unknown> = {};
   let createErr: Error | null = null;
   try {
-    created = await createNexusTask(nexusUrl, nexusApiKey, taskBody, timeoutMs);
+    created = await createNexusTask(nexusUrl, nexusApiKey, taskBody, externalUniqueKey, timeoutMs);
   } catch (err) {
     createErr = err instanceof Error ? err : new Error(String(err));
   }
