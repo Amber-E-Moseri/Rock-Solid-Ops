@@ -40,7 +40,7 @@ function makeNexusServer(
     // Default Supabase mock: valid user + admin profile.
     // Profiles must be a plain object (not array) because .single() parses it directly.
     if (url.pathname.includes("/auth/v1/user")) {
-      return new Response(JSON.stringify({ user: { id: "admin-user-id" } }), { status: 200 });
+      return new Response(JSON.stringify({ id: "admin-user-id", email: "admin@test.example", role: "authenticated" }), { status: 200 });
     }
     if (url.pathname.includes("/rest/v1/profiles")) {
       return new Response(JSON.stringify({ role: "admin" }), { status: 200 });
