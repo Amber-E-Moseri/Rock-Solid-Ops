@@ -11,6 +11,7 @@ import {
   createVapidJWT,
   encodePayloadBytes,
   encryptPayload,
+  sendWebPush,
   type PushSubscriptionJSON,
   type VapidKeys,
 } from "./webpush.ts";
@@ -112,4 +113,38 @@ Deno.test("RFC 8291 aes128gcm: encryptPayload produces a decryptable body", asyn
 
   const recovered = await decryptAes128gcm(body, uaKeyPair.privateKey, uaPublicRaw, authSecret);
   assertEquals(recovered, message);
+});
+
+// ── C6 timeout tests ─────────────────────────────────────────────────────────
+// T26–T29 use Function.prototype.toString() to inspect the loaded function body
+// without requiring --allow-read (no filesystem access).
+
+Deno.test("T26: sendWebPush accepts a timeoutMs parameter (default 10 s)", () => {
+  assert(
+    sendWebPush.toString().includes("timeoutMs = 10_000"),
+    "sendWebPush must declare timeoutMs with a 10 s default",
+  );
+});
+
+Deno.test("T27: sendWebPush constructs an AbortController for the push fetch", () => {
+  assert(
+    sendWebPush.toString().includes("new AbortController()"),
+    "sendWebPush must construct an AbortController",
+  );
+});
+
+Deno.test("T28: sendWebPush passes signal to the push fetch", () => {
+  assert(
+    sendWebPush.toString().includes("signal: controller.signal"),
+    "fetch in sendWebPush must receive signal: controller.signal",
+  );
+});
+
+Deno.test("T29: sendWebPush clears the timer in a finally block", () => {
+  const src = sendWebPush.toString();
+  const fetchIdx = src.indexOf("signal: controller.signal");
+  const finallyIdx = src.indexOf("} finally", fetchIdx);
+  const clearIdx = src.indexOf("clearTimeout(timer)", fetchIdx);
+  assert(finallyIdx > fetchIdx, "finally block must follow the fetch in sendWebPush");
+  assert(clearIdx > finallyIdx, "clearTimeout must be inside the finally block");
 });

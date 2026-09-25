@@ -2797,3 +2797,70 @@ now passing is the verification performed this session.
 Registration-processor touch reviewed and approved by the operator (see above) — this was the
 only gate; no RLS/auth-boundary change otherwise. Merged to `main` same session per the
 standing branch-per-brief workflow.
+
+---
+
+## 2026-09-24 — C6 + Nexus Task Migration: atomic claim hardening + timeout hardening
+
+### SUMMARY
+
+Combined C6 atomic claim hardening (normalized), timeout hardening, and ClickUp→Nexus task adapter migration.
+
+**Source branch:** `brief/c6-timeout-hardening`  **PR branch:** `brief/c6-atomic-claim-clean`
+
+### C6 MIGRATION NORMALIZATION
+
+Three tangled migrations (two with duplicate 202609240002 timestamps + 202609240004) consolidated into two clean files:
+
+- `202609240001_rocksolid_atomic_nexus_claim.sql`: adds `claim_token`/`claimed_at` columns, indexes, base `claim_nexus_task()` RPC (4-case logic), grants to authenticated+service_role
+- `202609240002_atomic_claim_hardening.sql`: adds TIMEOUT_UNKNOWN non-recovery guard (fires before Case C/D unconditionally); revokes EXECUTE from authenticated → net: service_role only
+
+**Semantic bug fixed:** Old chain used `CREATE OR REPLACE` in `004_protect` which silently overwrote `002_fix`'s TIMEOUT_UNKNOWN-before-Case-D guard, making stale TIMEOUT_UNKNOWN rows recoverable via Case D. New single migration fires TU guard unconditionally regardless of row age.
+
+### C6 TIMEOUT CHANGES
+
+- `email-sender/index.ts`: exported `handler`, `import.meta.main` guard, 30 s AbortController on Resend (E01–E08)
+- `nexus-users-search/index.ts`: `import.meta.main` guard, 15 s AbortController on Nexus fetch, 504 on timeout (N01–N08)
+- `_shared/webpush.ts`: `timeoutMs` param (default 10 s) added to `sendWebPush` (T26–T29)
+
+### NEXUS TASK MIGRATION
+
+`clickup-sync` is confirmed Nexus-backed (no api.clickup.com calls remain). Callers migrated to shared module.
+
+- `_shared/nexus-tasks.ts` added: exports `createNexusTask` (single-attempt, 15 s AbortController), `ensureNexusTask` (idempotent via `rocksolid_task_links.dedupe_key`), `buildTask`, `buildDedupeKey`, `resolveAssignee`
+- `missed-class-detector/index.ts`: `invokeClickupSync` HTTP call removed; replaced with `ensureNexusTask` (M3–M7)
+- `retry-worker/index.ts`: `triggerClickupEscalation` HTTP call removed; replaced with `ensureNexusTask` (R4–R8)
+
+### IDEMPOTENCY
+
+`NEXUS_TASK_IDEMPOTENCY: PROVEN` — `rocksolid_task_links.dedupe_key` prevents duplicate tasks across invocations. `createNexusTask` is single-attempt (no auto-retry) to avoid creating duplicates on timeout where Nexus may have already accepted the POST.
+
+### LIVE POSTGRESQL CERTIFICATION
+
+All 7 semantic tests PASSED on Neon disposable project `plain-sun-30243157` (PostgreSQL 17.11):
+- C01: stale CLAIMING recovery (Case D) → is_owner=true
+- Stale TIMEOUT_UNKNOWN non-recovery (core fix) → is_owner=false
+- CREATED reuse (Case B) → is_owner=false, nexus_task_id returned
+- Fresh CLAIMING within TTL (Case C) → protected, is_owner=(token match)
+- Stale TIMEOUT_UNKNOWN non-recovery (Case D age check irrelevant) → is_owner=false
+- Different-key independence → concurrent claims on separate dedupe_keys independent
+- Idempotency: same claim_token → same result; fresh different-token → Case C protection
+
+RPC privilege ACL verified: `{owner=rocksolid_c6_cert_user/rocksolid_c6_cert_user, service_role=rocksolid_c6_cert_user/rocksolid_c6_cert_user}` — authenticated absent.
+
+### TEST RESULTS
+
+- NT01–NT15 (nexus-tasks): 15/15 PASS
+- M3–M7 (missed-class-detector): 5/5 PASS
+- R4–R8 (retry-worker): 5/5 PASS
+- E01–E08 (email-sender): 8/8 PASS
+- N01–N08 (nexus-users-search): 8/8 PASS
+- T26–T29 (webpush): 4/4 PASS
+- _shared regression: 31/31 PASS
+- Total: 76/76 PASS (carried forward from source branch)
+
+No schema change outside migrations. No cron change. No secrets change. No production deployment.
+
+### STATUS
+
+LOCAL CERTIFICATION COMPLETE. Live PostgreSQL semantic certification COMPLETE (carried forward). Not yet deployed. Deployment gate is a separate step.

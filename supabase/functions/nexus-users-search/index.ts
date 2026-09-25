@@ -12,7 +12,7 @@ function json(body: unknown, status = 200, corsHeaders: Record<string, string> =
   });
 }
 
-Deno.serve(async (req) => {
+export async function handler(req: Request): Promise<Response> {
   const corsHeaders = getCORSHeaders(req.headers.get("origin"));
 
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -64,20 +64,31 @@ Deno.serve(async (req) => {
 
     // If NEXUS_API_URL is configured, fetch from Nexus
     if (NEXUS_API_URL && NEXUS_API_KEY) {
-      const nexusRes = await fetch(`${NEXUS_API_URL}/users`, {
-        headers: {
-          "Authorization": `Bearer ${NEXUS_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!nexusRes.ok) {
-        const msg = await nexusRes.text();
-        return json({ ok: false, error: `Nexus API error: ${msg}` }, nexusRes.status, corsHeaders);
+      const timeoutMs = Number(Deno.env.get("NEXUS_TIMEOUT_MS") || "15000")
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), timeoutMs)
+      let nexusRes: Response
+      try {
+        nexusRes = await fetch(`${NEXUS_API_URL}/users`, {
+          headers: {
+            "Authorization": `Bearer ${NEXUS_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          signal: controller.signal,
+        })
+      } catch (e) {
+        return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 504, corsHeaders)
+      } finally {
+        clearTimeout(timer)
       }
 
-      const { users } = await nexusRes.json();
-      return json({ ok: true, users: users || [] }, 200, corsHeaders);
+      if (!nexusRes.ok) {
+        const msg = await nexusRes.text()
+        return json({ ok: false, error: `Nexus API error: ${msg}` }, nexusRes.status, corsHeaders)
+      }
+
+      const { users } = await nexusRes.json()
+      return json({ ok: true, users: users || [] }, 200, corsHeaders)
     }
 
     // Fallback: return empty list if Nexus API not configured
@@ -86,4 +97,6 @@ Deno.serve(async (req) => {
     const message = error instanceof Error ? error.message : String(error);
     return json({ ok: false, error: message }, 500, corsHeaders);
   }
-});
+}
+
+if (import.meta.main) Deno.serve(handler);
