@@ -15,6 +15,8 @@ import {
   type VapidKeys,
 } from "./webpush.ts";
 
+const webpushSource = await Deno.readTextFile(new URL("./webpush.ts", import.meta.url));
+
 const RSO_VAPID: VapidKeys = {
   publicKey: "BOVlCDUmr1OpRqO8-NjWRm5c38_6XTXunZmhGHr4PNODrLC7qk_6zcDMZ7ywAgV7O-wDpuuyQE-nX67KxFgqmJg",
   privateKey: "OEL0ht9AcYecpe8FtAoVwO52L0PYNXlUflaQ88C-1kc",
@@ -112,4 +114,44 @@ Deno.test("RFC 8291 aes128gcm: encryptPayload produces a decryptable body", asyn
 
   const recovered = await decryptAes128gcm(body, uaKeyPair.privateKey, uaPublicRaw, authSecret);
   assertEquals(recovered, message);
+});
+
+// ── C6 timeout tests ─────────────────────────────────────────────────────────
+
+Deno.test("T26: sendWebPush accepts a timeoutMs parameter (default 10 s)", () => {
+  assert(
+    webpushSource.includes("timeoutMs = 10_000"),
+    "sendWebPush must declare timeoutMs with a 10 s default",
+  );
+});
+
+Deno.test("T27: sendWebPush constructs an AbortController for the push fetch", () => {
+  const fnStart = webpushSource.indexOf("export async function sendWebPush(");
+  const fnEnd = webpushSource.indexOf("\nexport ", fnStart + 1);
+  const fnBody = webpushSource.slice(fnStart, fnEnd > fnStart ? fnEnd : undefined);
+  assert(
+    fnBody.includes("new AbortController()"),
+    "sendWebPush must construct an AbortController",
+  );
+});
+
+Deno.test("T28: sendWebPush passes signal to the push fetch", () => {
+  const fnStart = webpushSource.indexOf("export async function sendWebPush(");
+  const fnEnd = webpushSource.indexOf("\nexport ", fnStart + 1);
+  const fnBody = webpushSource.slice(fnStart, fnEnd > fnStart ? fnEnd : undefined);
+  assert(
+    fnBody.includes("signal: controller.signal"),
+    "fetch in sendWebPush must receive signal: controller.signal",
+  );
+});
+
+Deno.test("T29: sendWebPush clears the timer in a finally block", () => {
+  const fnStart = webpushSource.indexOf("export async function sendWebPush(");
+  const fnEnd = webpushSource.indexOf("\nexport ", fnStart + 1);
+  const fnBody = webpushSource.slice(fnStart, fnEnd > fnStart ? fnEnd : undefined);
+  const fetchIdx = fnBody.indexOf("signal: controller.signal");
+  const finallyIdx = fnBody.indexOf("} finally {", fetchIdx);
+  const clearIdx = fnBody.indexOf("clearTimeout(timer)", fetchIdx);
+  assert(finallyIdx > fetchIdx, "finally block must follow the fetch in sendWebPush");
+  assert(clearIdx > finallyIdx, "clearTimeout must be inside the finally block");
 });

@@ -12,7 +12,7 @@ entrypoint = "./functions/registration-processor/index.ts"
 
 [functions.retry-worker]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 entrypoint = "./functions/retry-worker/index.ts"
 # Schedule is defined in ./functions/retry-worker/config.toml
 
