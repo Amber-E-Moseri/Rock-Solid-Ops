@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { validateCronAuth } from "../_shared/auth.ts";
 import { ensureNexusTask, nexusTaskConfigFromEnv } from "../_shared/nexus-tasks.ts";
+import { describeError, looksLikeUnavailable } from "../_shared/error-text.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -99,16 +100,17 @@ Deno.serve(async (req) => {
 
   const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
+  const summary = {
+    checked_count: 0,
+    missed_count: 0,
+    task_created_count: 0,
+    skipped_duplicate_count: 0,
+    review_escalation_candidates: 0,
+    review_escalation_created: 0,
+    schedule_derivation_errors: 0,
+  };
+
   try {
-    const summary = {
-      checked_count: 0,
-      missed_count: 0,
-      task_created_count: 0,
-      skipped_duplicate_count: 0,
-      review_escalation_candidates: 0,
-      review_escalation_created: 0,
-      schedule_derivation_errors: 0,
-    };
 
     const rosterRes = await db
       .from("class_roster")
@@ -334,8 +336,20 @@ Deno.serve(async (req) => {
     await logAudit(db, "MISSED_CLASS_DETECTOR_SUMMARY", "SUCCESS", summary);
     return json({ ok: true, ...summary });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await logAudit(db, "MISSED_CLASS_DETECTOR_SUMMARY", "FAILED", { error: message });
-    return json({ ok: false, error: message }, 200);
+    // supabase-js returns PostgREST failures as plain objects, so describeError (not `instanceof Error`) is
+    // needed to avoid "[object Object]". The text is redacted of credentials before it is stored or returned.
+    const message = describeError(error, [SERVICE_KEY, Deno.env.get("CRON_INVOKE_SECRET"), Deno.env.get("NEXUS_TASK_API_KEY")]);
+    const unavailable = looksLikeUnavailable(error);
+    try {
+      // Best effort: when the database is the thing that failed this write fails too and must not mask the error.
+      await logAudit(db, "MISSED_CLASS_DETECTOR_SUMMARY", "FAILED", { error: message, ...summary });
+    } catch { /* nothing more can be done */ }
+    // A scheduler must see the failure: 503 = dependency unavailable (retry later), 500 = anything else.
+    return json({
+      ok: false,
+      code: unavailable ? "DATABASE_UNAVAILABLE" : "DETECTOR_ERROR",
+      error: message,
+      ...summary,
+    }, unavailable ? 503 : 500);
   }
 });

@@ -17,9 +17,11 @@ Deno.test("M3: missed-class-detector task semantics are preserved", () => {
   assert(source.includes("MISSED_CLASS_DETECTOR_SUMMARY"), "summary audit log still present");
 });
 
-Deno.test("M4: detector failure behavior remains non-throwing JSON response", () => {
-  assert(source.includes('return json({ ok: false, error: message }, 200);'),
-    "catch block returns JSON, not throws");
+Deno.test("M4: detector failure behavior remains a non-throwing JSON response, now with a non-2xx status", () => {
+  // Was `return json({ ok: false, error: message }, 200)`: a scheduler read a failed run as success.
+  // Behavioural proof: db-failure.test.ts (DD01-DD05).
+  assert(source.includes("}, unavailable ? 503 : 500);"), "catch block returns JSON with 503/500, not throws and not 200");
+  assertEquals(source.includes('return json({ ok: false, error: message }, 200);'), false, "the 200-on-failure line is gone");
 });
 
 Deno.test("M5: invokeClickupSync and internal-secret ClickUp path are removed", () => {

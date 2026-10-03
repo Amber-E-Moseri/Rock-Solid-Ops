@@ -54,6 +54,7 @@ deno test --allow-env --allow-net --allow-read --no-prompt --no-check --node-mod
   supabase/functions/e2-wave2-mixed-auth.test.ts \
   supabase/functions/email-sender/timeout.test.ts \
   supabase/functions/missed-class-detector/internal-nexus.test.ts \
+  supabase/functions/missed-class-detector/db-failure.test.ts \
   supabase/functions/moodle-sync/failure-persistence.test.ts \
   supabase/functions/moodle-sync/moodle-abort.test.ts \
   supabase/functions/moodle-sync/moodle-sync.test.ts \
