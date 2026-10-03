@@ -38,7 +38,8 @@ DENO_EXIT=$?
 # In-process handler auth regression (needs read/net to import handlers; SUPABASE_URL is unroutable)
 deno test --allow-env --allow-net --allow-read --no-prompt --no-check --node-modules-dir=auto \
   supabase/functions/_shared/caller-auth.test.ts \
-  supabase/functions/_shared/auth-regression.test.ts
+  supabase/functions/_shared/auth-regression.test.ts \
+  supabase/functions/cron-contract.test.ts
 
 echo ""
 echo "========================================"

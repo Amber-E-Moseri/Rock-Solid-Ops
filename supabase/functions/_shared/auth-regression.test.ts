@@ -127,6 +127,42 @@ for (const fn of CRON_ONLY) {
   });
 }
 
+// Every function the cron cutover script targets (plus retry-worker, whose schedule is not in the
+// repo) must ACCEPT the correct x-cron-secret: the guard passes and the handler proceeds (it then
+// fails on the unroutable database or returns a business status, never 401/403).
+const CRON_ACCEPTING = [
+  ...CRON_ONLY,
+  "retry-worker",
+  "waitlist-processor",
+  "moodle-grade-sync",
+  "report-generator",
+];
+
+// A guard rejection returns immediately. A handler that is still running after the grace period
+// has passed the guard and is working against the unroutable database, so "pending" = accepted.
+// The orphaned handler is left to finish in the background (hence sanitizers off for these tests).
+const GRACE_MS = 750;
+
+for (const fn of CRON_ACCEPTING) {
+  Deno.test({
+    name: `${fn}: correct x-cron-secret passes the auth guard`,
+    sanitizeOps: false,
+    sanitizeResources: false,
+    fn: async () => {
+      const h = await loadHandler(`../${fn}/index.ts`);
+      const outcome = await Promise.race([
+        Promise.resolve(h(post({ "x-cron-secret": CRON_SECRET }, { action: "drop_table", ...BODY })))
+          .then((res) => ({ status: res.status }))
+          .catch(() => ({ status: -1 })), // threw after auth: DB/network failure = past the guard
+        new Promise<{ status: "pending" }>((r) => setTimeout(() => r({ status: "pending" }), GRACE_MS)),
+      ]);
+      if (outcome.status === 401 || outcome.status === 403) {
+        throw new Error(`${fn} rejected the correct cron secret (${outcome.status})`);
+      }
+    },
+  });
+}
+
 // ── class-selection notify_waitlisted: exact service key only ──
 const NOTIFY = { action: "notify_waitlisted", fellowship_codes: ["X"], batch_id: "b" };
 
