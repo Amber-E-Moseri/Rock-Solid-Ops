@@ -88,3 +88,14 @@ Deno.test("DI07: the tombstones are actually inert 410 handlers (no secrets, no 
     assertFalse(/Deno\.env|createClient|fetch\(|\.from\(/.test(code), `${fn} must stay inert`);
   }
 });
+
+Deno.test("DI08: the active health probes do not list the retired tombstones as live functions", async () => {
+  for (const rel of ["../../foundation/staff/env-check.html", "../../foundation/js/system-health.js", "../../foundation-spa/src/features/system-health/lib/system-health.js"]) {
+    const src = await read(rel);
+    const line = src.split("\n").find((l) => /edgeFunctions\s*=\s*\[/.test(l));
+    assert(line, `${rel}: edgeFunctions array`);
+    const list = line!.slice(0, line!.indexOf("]") + 1); // the array literal only, not the trailing comment
+    for (const fn of TOMBSTONES) assertFalse(list.includes(fn), `${rel} still probes retired ${fn}`);
+    assert(list.includes("retry-worker"), `${rel} still probes the live retry-worker`);
+  }
+});
