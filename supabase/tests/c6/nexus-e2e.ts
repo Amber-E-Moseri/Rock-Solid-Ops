@@ -193,7 +193,12 @@ try {
   await rs(`update public.rocksolid_admin_mappings set nexus_user_id = '${crypto.randomUUID()}' where group_id = '${GROUP}'`);
   resetProxy();
   const r10 = await ensure("e8");
-  rec("E7", "mapped id that is not a Nexus user: real 400 'assignee not found' -> FAILED (definite), nothing created", `ok=${r10.ok} status=${(await link("e8")).status} err=${(await link("e8")).error_message?.slice(0, 55)} Nexus tasks=${await nexusCount("e8")}`, !r10.ok && (await link("e8")).status === "FAILED" && (await nexusCount("e8")) === 0);
+  // 202610030004: a CONFIRMED permanent rejection (400 "assignee not found" for a mapped id) is the terminal manual-attention
+  // status ASSIGNEE_REJECTED (previously FAILED, which was re-POSTed on every run forever). Nothing is created.
+  rec("E7", "mapped id that is not a Nexus user: real 400 'assignee not found' -> terminal ASSIGNEE_REJECTED, nothing created", `ok=${r10.ok} status=${(await link("e8")).status} err=${(await link("e8")).error_message?.slice(0, 55)} Nexus tasks=${await nexusCount("e8")}`, !r10.ok && (await link("e8")).status === "ASSIGNEE_REJECTED" && (await nexusCount("e8")) === 0);
+  const postsBeforeRerun = seen.postsReceived;
+  await ensure("e8"); await ensure("e8");
+  rec("E7b", "the dead mapping is no longer hammered: two more producer runs send ZERO POSTs to Nexus", `POSTs since=${seen.postsReceived - postsBeforeRerun} status=${(await link("e8")).status}`, seen.postsReceived === postsBeforeRerun && (await link("e8")).status === "ASSIGNEE_REJECTED");
   await rs(`update public.rocksolid_admin_mappings set nexus_user_id = '${ASSIGNEE}' where group_id = '${GROUP}'`);
 } finally {
   await rs(`delete from public.rocksolid_admin_mappings where group_id = '${GROUP}'`);

@@ -110,7 +110,9 @@ select (select count(*) from per),
        (select count(*) from c6_cc.claims where sc='S1')")"
 check "S1 atomic claim: exactly one owner per key" $([ "$OWNERS_BAD" = 0 ] && echo 0 || echo 1) "workers=$W keys=$KEYS attempts=$TOTAL keys_with_owners!=1: $OWNERS_BAD"
 check "S1 one task-link row per key, owned by the winning token" $([ "$ROWS_BAD" = 0 ] && [ "$TOKBAD" = 0 ] && echo 0 || echo 1) "rows!=1: $ROWS_BAD, owner-token mismatch: $TOKBAD"
-check "S1 no unexpected errors (no deadlock); first-insert races surface as 23505" $([ "$OTHERERR" = 0 ] && echo 0 || echo 1) "unique_violation losers: $ERRS, other errors (incl. 40P01 deadlock): $OTHERERR"
+# 202610030002 made the first insert an INSERT ... ON CONFLICT DO NOTHING, so contention must NOT surface as an
+# exception at all (previously ~90% of attempts raised 23505). Zero unique violations AND zero other errors.
+check "S1 first-insert races: 0 unique violations (23505), 0 other errors (no deadlock); losers get is_owner=false" $([ "$OTHERERR" = 0 ] && [ "$ERRS" = 0 ] && echo 0 || echo 1) "unique_violation losers: $ERRS (must be 0), other errors (incl. 40P01 deadlock): $OTHERERR"
 check "S2 claim-token fencing: only the owner's finalize applies; every loser updates 0 rows" $([ "$FENCE_BAD" = 0 ] && echo 0 || echo 1) "keys violating fencing: $FENCE_BAD"
 echo "     owner timing: first/last claim per key within ms (barrier-aligned); worker errors: $(cat "$WORKDIR"/*.err 2>/dev/null | wc -l)"
 
