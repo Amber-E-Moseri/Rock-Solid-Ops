@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse, safeLogAudit } from "../_shared/http.ts";
+import { isServiceRoleToken } from "../_shared/caller-auth.ts";
 
 type Dict = Record<string, unknown>;
 
@@ -21,18 +22,6 @@ function json(body: Dict, status = 200): Response {
 
 function firstName(fullName: string): string {
   return String(fullName || "Student").trim().split(/\s+/)[0] || "Student";
-}
-
-function parseJwtClaims(token: string): Dict | null {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(atob(parts[1]));
-    if (!payload || typeof payload !== "object") return null;
-    return payload as Dict;
-  } catch (_) {
-    return null;
-  }
 }
 
 async function loadTokenContext(db: ReturnType<typeof createClient>, token: string) {
@@ -226,8 +215,8 @@ Deno.serve(async (req) => {
     if (action === "notify_waitlisted") {
       const authHeader = String(req.headers.get("Authorization") || "");
       const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
-      const claims = parseJwtClaims(token);
-      if (!claims || String(claims.role || "") !== "service_role") {
+      // Exact service-key match only: decoding an unverified JWT payload is forgeable.
+      if (!isServiceRoleToken(token, SERVICE_KEY)) {
         return json({ ok: false, error: "Unauthorized" }, 401);
       }
 
