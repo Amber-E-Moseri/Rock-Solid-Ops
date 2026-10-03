@@ -149,6 +149,14 @@ else
 fi
 
 echo ""
+echo "========================================"
+echo "TEST:MIGRATION — C6 claim concurrency (real overlapping sessions)"
+echo "========================================"
+if ! bash "$ROOT/supabase/tests/security/c6-claim-concurrency.test.sh"; then
+  FAIL=1
+fi
+
+echo ""
 if [ "${FAIL:-0}" -ne 0 ]; then
   echo "RESULT: FAIL"
   exit 1
