@@ -42,6 +42,7 @@ deno test --allow-env --allow-net --allow-read --no-prompt --no-check --node-mod
   supabase/functions/_shared/caller-auth.test.ts \
   supabase/functions/_shared/auth-regression.test.ts \
   supabase/functions/cron-contract.test.ts \
+  supabase/functions/deploy-inventory.test.ts \
   supabase/functions/_shared/nexus-assignment.test.ts \
   supabase/functions/_shared/nexus-idempotency.test.ts \
   supabase/functions/_shared/nexus-persistence.test.ts \

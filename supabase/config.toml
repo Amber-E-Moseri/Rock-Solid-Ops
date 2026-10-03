@@ -16,10 +16,21 @@ verify_jwt = false
 entrypoint = "./functions/retry-worker/index.ts"
 # Schedule is defined in ./functions/retry-worker/config.toml
 
+# RETIRED (410 tombstone, October 2026). verify_jwt MUST be false: with true the platform answers 401 before the
+# handler runs, so a stray caller would see "unauthorized" instead of the intended 410 Gone. The tombstone reads
+# no secret and makes no outbound request, so an unauthenticated 410 exposes nothing. This root file is what
+# `supabase functions deploy` reads; supabase/functions/clickup-sync/config.toml must agree (deploy-inventory.test.ts).
 [functions.clickup-sync]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 entrypoint = "./functions/clickup-sync/index.ts"
+
+# RETIRED (410 tombstone, October 2026). Same reasoning as clickup-sync: without this entry the CLI deploys it with
+# the default verify_jwt = true and callers get a platform 401 instead of the 410.
+[functions.notification-dispatcher]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/notification-dispatcher/index.ts"
 
 [functions.missed-class-detector]
 enabled = true
