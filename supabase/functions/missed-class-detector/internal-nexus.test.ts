@@ -34,9 +34,9 @@ Deno.test("M6: Nexus tasks created via ensureNexusTask from shared module", () =
   assert(source.includes("ensureNexusTask(db,"),               "calls ensureNexusTask with db client");
 });
 
-Deno.test("M7: Nexus credentials are read from env, not forwarded from caller", () => {
-  assert(source.includes('Deno.env.get("NEXUS_API_URL")'),     "NEXUS_API_URL read from Deno.env");
-  assert(source.includes('Deno.env.get("NEXUS_API_KEY")'),     "NEXUS_API_KEY read from Deno.env");
+Deno.test("M7: Nexus task credentials come from server-side env, not the caller", () => {
+  assert(source.includes("nexusTaskConfigFromEnv()"), "task API config is read via nexusTaskConfigFromEnv (NEXUS_TASK_API_URL/KEY)");
+  assertEquals(source.includes('Deno.env.get("NEXUS_API_KEY")'), false, "the users-API shared secret is not used for tasks");
   assertEquals(source.includes('req.headers.get("authorization")'), false,
     "caller auth header must not be forwarded to Nexus");
 });

@@ -77,25 +77,32 @@ Deno.test("ID09: Nexus success persists canonical task ID", async () => {
 
 // ── ID12 Ambiguous timeout state ─────────────────────────────────────
 
-Deno.test("ID12: ambiguous timeout becomes TIMEOUT_UNKNOWN or tracked distinctly", async () => {
-  const src = await Deno.readTextFile(new URL("./nexus-tasks.ts", import.meta.url));
-
-  // Timeout should be handled separately from other failures
-  assert(src.includes("isTimeout"), "timeout detection logic present");
-  assert(src.includes(".includes(\"abort\")") || src.includes(".includes('abort')"), "abort detection for timeout");
-  assert(src.includes(".includes(\"timeout\")") || src.includes(".includes('timeout')"), "timeout string detection");
+Deno.test("ID12: ambiguous outcomes (timeout, unconfirmed 2xx) are TIMEOUT_UNKNOWN; definite rejections are FAILED", async () => {
+  const { classifyCreateFailure, NexusTimeoutError, NexusMalformedResponseError, NexusHttpError } = await import("./nexus-tasks.ts");
+  assertEquals(classifyCreateFailure(new NexusTimeoutError("t")), "TIMEOUT_UNKNOWN");
+  assertEquals(classifyCreateFailure(new NexusMalformedResponseError("m")), "TIMEOUT_UNKNOWN");
+  assertEquals(classifyCreateFailure(new NexusHttpError(400, "bad")), "FAILED");
+  assertEquals(classifyCreateFailure(new NexusHttpError(500, "boom")), "FAILED");
+  assertEquals(classifyCreateFailure(new TypeError("fetch failed")), "FAILED");
 });
 
 // ── ID11 Timeout never reports success ───────────────────────────────
 
 Deno.test("ID11: Nexus timeout never resolves with success", async () => {
-  const src = await Deno.readTextFile(new URL("./nexus-tasks.ts", import.meta.url));
-
-  // After any error (timeout or other), the function must return ok: false
-  // This is checked by looking for the error handling path
-  assert(src.includes("if (createErr)"), "error handling path exists");
-  assert(src.includes("ok: false"), "error responses return ok:false");
-  assert(!src.includes("ok: true") || src.indexOf("ok: true") < src.indexOf("if (createErr)"), "no ok:true in error path");
+  const { createNexusTask, NexusTimeoutError } = await import("./nexus-tasks.ts");
+  const server = Deno.serve({ port: 0, onListen: () => {} }, (req) =>
+    new Promise<Response>((resolve) => {
+      req.signal.addEventListener("abort", () => resolve(new Response("{}", { status: 200 })));
+      setTimeout(() => resolve(new Response("{}", { status: 200 })), 3000);
+    }),
+  );
+  try {
+    const url = `http://127.0.0.1:${(server.addr as Deno.NetAddr).port}`;
+    const out = await createNexusTask(url, "k", {}, "rocksolid:t", 100).then(() => "resolved", (e) => e);
+    assert(out instanceof NexusTimeoutError, "timeout must reject with NexusTimeoutError, never resolve");
+  } finally {
+    await server.shutdown();
+  }
 });
 
 // ── ID07/08 Validation tests ─────────────────────────────────────────

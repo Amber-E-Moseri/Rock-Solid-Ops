@@ -17,7 +17,16 @@
 // NT15  C3B Moodle retry behavior unchanged
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { buildDedupeKey, buildTask, buildExternalUniqueKey, createNexusTask, NEXUS_TIMEOUT_MS } from "./nexus-tasks.ts";
+import {
+  buildDedupeKey,
+  buildTask,
+  buildExternalUniqueKey,
+  createNexusTask,
+  NEXUS_TIMEOUT_MS,
+  NexusHttpError,
+  NexusMalformedResponseError,
+  NexusTimeoutError,
+} from "./nexus-tasks.ts";
 
 const nexusSrc  = await Deno.readTextFile(new URL("./nexus-tasks.ts",                    import.meta.url));
 const missedSrc = await Deno.readTextFile(new URL("../missed-class-detector/index.ts",  import.meta.url));
@@ -25,7 +34,7 @@ const retrySrc  = await Deno.readTextFile(new URL("../retry-worker/index.ts",   
 
 // ── NT01 ─────────────────────────────────────────────────────────────────────
 
-Deno.test("NT01: missed_class payload maps to correct Nexus task shape", () => {
+Deno.test("NT01: missed_class payload maps to the Nexus task-api shape", () => {
   const payload = {
     student_id: "S001",
     student_name: "Jane Smith",
@@ -35,20 +44,40 @@ Deno.test("NT01: missed_class payload maps to correct Nexus task shape", () => {
     group_id: "G1",
     subgroup_id: "SG1",
   };
-  const task = buildTask("missed_class", payload, "user-456");
-  assert((task.name as string).includes("Jane Smith"), "task name includes student name");
-  assertEquals(task.priority, 3, "missed_class is normal priority (3)");
-  assertEquals((task.assignees as string[]).length, 1, "assignee is set when provided");
+  const userId = "7c1c7d5e-2b0e-4c43-9a37-1b7a3f1d2c11";
+  const task = buildTask("missed_class", payload, userId);
+  assert((task.title as string).includes("Jane Smith"), "title includes student name");
+  assertEquals(task.priority, "medium", "missed_class is medium priority (Nexus enum)");
+  assertEquals(task.assignee_id, userId, "single assignee_id is set when provided");
+  assert(/^\d{4}-\d{2}-\d{2}$/.test(String(task.due_date)), "due_date is YYYY-MM-DD (Nexus validates this)");
+  assertEquals(task.source_name, "rocksolid");
+  assertEquals(task.source_type, "missed_class");
   assert((task.description as string).includes("missed_class"), "description includes task type");
-  assert(typeof task.due_date === "number" && (task.due_date as number) > Date.now(), "due_date is in the future");
+  // Fields of the retired ClickUp-shaped body must not be sent: Nexus ignores or rejects them.
+  for (const legacy of ["name", "assignees", "list_id", "space_id"]) {
+    assertEquals(legacy in task, false, `${legacy} must not be sent to Nexus`);
+  }
+  assertEquals("assignee_id" in buildTask("missed_class", payload, ""), false, "no assignee_id key when unmapped");
 });
 
 // ── NT02 ─────────────────────────────────────────────────────────────────────
 
-Deno.test("NT02: createNexusTask uses Authorization: Bearer from caller-supplied apiKey", () => {
-  assert(nexusSrc.includes("Authorization: `Bearer ${apiKey}`"), "auth header uses passed-in apiKey");
+Deno.test("NT02: createNexusTask authenticates with x-api-key (not Authorization: Bearer)", async () => {
+  let seen: Headers | null = null;
+  const server = Deno.serve({ port: 0, onListen: () => {} }, (req) => {
+    seen = req.headers;
+    return new Response(JSON.stringify({ task: { id: "t-1" } }), { status: 201 });
+  });
+  try {
+    const port = (server.addr as Deno.NetAddr).port;
+    await createNexusTask(`http://127.0.0.1:${port}`, "nexus-key-123", { title: "t" }, "rocksolid:k", 5000);
+    assertEquals(seen!.get("x-api-key"), "nexus-key-123");
+    assertEquals(seen!.get("authorization"), null, "no Authorization header is sent to Nexus");
+  } finally {
+    await server.shutdown();
+  }
   const fnStart = nexusSrc.indexOf("export async function createNexusTask");
-  const fnEnd   = nexusSrc.indexOf("\nasync function updateSourceNexusTaskId");
+  const fnEnd   = nexusSrc.indexOf("\nexport async function linkEscalationSource");
   const fn = nexusSrc.slice(fnStart, fnEnd > fnStart ? fnEnd : undefined);
   assertEquals(fn.includes("anon"),         false, "no anon key in createNexusTask");
   assertEquals(fn.includes("service_role"), false, "no service_role key in createNexusTask");
@@ -66,14 +95,10 @@ Deno.test("NT03: Nexus timeout aborts the request and throws", async () => {
   );
   try {
     const port = (server.addr as Deno.NetAddr).port;
-    await createNexusTask(`http://127.0.0.1:${port}`, "test-key", { name: "test" }, "rocksolid:test", 100);
+    await createNexusTask(`http://127.0.0.1:${port}`, "test-key", { title: "test" }, "rocksolid:test", 100);
     assert(false, "should have thrown on timeout");
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    assert(
-      msg.toLowerCase().includes("abort") || msg.toLowerCase().includes("signal") || msg.toLowerCase().includes("cancel"),
-      `timeout error must indicate abort; got: "${msg}"`,
-    );
+    assert(e instanceof NexusTimeoutError, `timeout must surface as NexusTimeoutError; got: ${e}`);
   } finally {
     await server.shutdown();
   }
@@ -81,14 +106,46 @@ Deno.test("NT03: Nexus timeout aborts the request and throws", async () => {
 
 // ── NT04 ─────────────────────────────────────────────────────────────────────
 
-Deno.test("NT04: Nexus 200 returns task id from response", async () => {
+Deno.test("NT04: Nexus 201 {task:{id}} returns the task id; 200 {duplicate:true} returns the existing id", async () => {
+  let n = 0;
   const server = Deno.serve({ port: 0, onListen: () => {} }, () =>
-    new Response(JSON.stringify({ id: "nexus-task-abc" }), { status: 200 }),
+    n++ === 0
+      ? new Response(JSON.stringify({ task: { id: "nexus-task-abc" } }), { status: 201 })
+      : new Response(JSON.stringify({ duplicate: true, task: { id: "nexus-task-abc" }, message: "exists" }), { status: 200 }),
   );
   try {
-    const port = (server.addr as Deno.NetAddr).port;
-    const result = await createNexusTask(`http://127.0.0.1:${port}`, "key", {}, "rocksolid:test", 5000);
-    assertEquals(result.id, "nexus-task-abc");
+    const url = `http://127.0.0.1:${(server.addr as Deno.NetAddr).port}`;
+    const created = await createNexusTask(url, "key", {}, "rocksolid:test", 5000);
+    assertEquals(created, { id: "nexus-task-abc", duplicate: false });
+    const replay = await createNexusTask(url, "key", {}, "rocksolid:test", 5000);
+    assertEquals(replay, { id: "nexus-task-abc", duplicate: true });
+  } finally {
+    await server.shutdown();
+  }
+});
+
+Deno.test("NT04b: a 2xx that does not confirm a task id fails closed (NexusMalformedResponseError)", async () => {
+  const bodies: Array<[number, unknown]> = [
+    [201, { id: "legacy-shape" }],             // old/other contract: id not under task
+    [201, { task: {} }],
+    [200, { task: { id: "x" } }],              // 200 without duplicate:true
+    [200, {}],
+  ];
+  let i = 0;
+  const server = Deno.serve({ port: 0, onListen: () => {} }, () => {
+    const [status, body] = bodies[i++];
+    return new Response(JSON.stringify(body), { status });
+  });
+  try {
+    const url = `http://127.0.0.1:${(server.addr as Deno.NetAddr).port}`;
+    for (let k = 0; k < bodies.length; k++) {
+      const err = await createNexusTask(url, "key", {}, "rocksolid:test", 5000).then(() => null, (e) => e);
+      assert(err instanceof NexusMalformedResponseError, `case ${k} must be malformed, got ${err}`);
+    }
+    const notJson = Deno.serve({ port: 0, onListen: () => {} }, () => new Response("<html>", { status: 201 }));
+    const e2 = await createNexusTask(`http://127.0.0.1:${(notJson.addr as Deno.NetAddr).port}`, "k", {}, "rocksolid:t", 5000).then(() => null, (e) => e);
+    assert(e2 instanceof NexusMalformedResponseError, "non-JSON 2xx is malformed");
+    await notJson.shutdown();
   } finally {
     await server.shutdown();
   }
@@ -109,6 +166,7 @@ Deno.test("NT05: Nexus 4xx throws immediately with no retry", async () => {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     assertEquals(callCount, 1, "4xx must not be retried — only one attempt");
+    assert(e instanceof NexusHttpError && (e as NexusHttpError).status === 400, "typed NexusHttpError carrying the status");
     assert(msg.includes("400"), "error message must include status code");
   } finally {
     await server.shutdown();
@@ -117,11 +175,20 @@ Deno.test("NT05: Nexus 4xx throws immediately with no retry", async () => {
 
 // ── NT06 ─────────────────────────────────────────────────────────────────────
 
-Deno.test("NT06: createNexusTask treats 5xx as non-2xx failure (source inspection)", () => {
-  // Single-attempt design: no retry loop. Any !res.ok throws immediately.
-  // This prevents duplicate Nexus tasks when no server-side idempotency key is available.
-  assert(nexusSrc.includes("if (!res.ok)"), "non-2xx check must be present");
-  assert(nexusSrc.includes("throw new Error"), "non-2xx must throw");
+Deno.test("NT06: createNexusTask treats 5xx as a typed non-2xx failure with a single attempt", async () => {
+  let calls = 0;
+  const server = Deno.serve({ port: 0, onListen: () => {} }, () => {
+    calls += 1;
+    return new Response(JSON.stringify({ error: "Internal server error" }), { status: 500 });
+  });
+  try {
+    const url = `http://127.0.0.1:${(server.addr as Deno.NetAddr).port}`;
+    const err = await createNexusTask(url, "key", {}, "rocksolid:test", 5000).then(() => null, (e) => e);
+    assert(err instanceof NexusHttpError && err.status === 500);
+    assertEquals(calls, 1, "no retry loop");
+  } finally {
+    await server.shutdown();
+  }
   assertEquals(nexusSrc.includes("while (attempt"), false, "createNexusTask must NOT have a retry loop");
 });
 
@@ -237,8 +304,19 @@ Deno.test("NT15: C3B Moodle retry eligibility rules are preserved in retry-worke
 
 // ── I01 external_unique_key sent in POST body ────────────────────────────────
 
-Deno.test("I01: outgoing Nexus POST includes external_unique_key", () => {
-  assert(nexusSrc.includes("external_unique_key:"), "external_unique_key included in request body");
+Deno.test("I01: outgoing Nexus POST includes external_unique_key", async () => {
+  let body: Record<string, unknown> = {};
+  const server = Deno.serve({ port: 0, onListen: () => {} }, async (req) => {
+    body = await req.json();
+    return new Response(JSON.stringify({ task: { id: "t" } }), { status: 201 });
+  });
+  try {
+    await createNexusTask(`http://127.0.0.1:${(server.addr as Deno.NetAddr).port}`, "k", { title: "x" }, "rocksolid:the-key", 5000);
+    assertEquals(body.external_unique_key, "rocksolid:the-key");
+    assertEquals(body.title, "x");
+  } finally {
+    await server.shutdown();
+  }
   assert(nexusSrc.includes("buildExternalUniqueKey"), "buildExternalUniqueKey function called");
 });
 
@@ -262,7 +340,8 @@ Deno.test("I04: external_unique_key is namespaced to Rock Solid", () => {
 
 // ── I05/I06 response compatibility ────────────────────────────────────────────
 
-Deno.test("I05/I06: Nexus response task ID extraction unchanged", () => {
-  assert(nexusSrc.includes("created?.id"), "response parser extracts .id field");
+Deno.test("I05/I06: the Nexus task id is read from task.id (task-api contract) and persisted", () => {
+  assert(nexusSrc.includes("task.id"), "response parser reads task.id");
   assert(nexusSrc.includes("nexus_task_id: nexusTaskId"), "task ID persisted to state");
+  assertEquals(nexusSrc.includes("created?.id"), false, "legacy top-level id extraction removed");
 });

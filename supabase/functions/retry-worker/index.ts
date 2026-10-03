@@ -10,9 +10,10 @@ import {
   safeLogAudit,
 } from "../_shared/http.ts";
 import { validateCronAuth } from "../_shared/auth.ts";
-import { ensureNexusTask } from "../_shared/nexus-tasks.ts";
+import { ensureNexusTask, nexusTaskConfigFromEnv } from "../_shared/nexus-tasks.ts";
+import { reconcileUnknownNexusTasks } from "../_shared/nexus-reconcile.ts";
 
-type RetryAction = "retry" | "resolve";
+type RetryAction = "retry" | "resolve" | "reconcile_nexus";
 type RetrySource = "email_queue" | "scheduled_notifications" | "moodle_sync" | "moodle_enrollment_sync" | "failed_syncs";
 
 type RetryRequest = {
@@ -240,12 +241,7 @@ async function maybeEscalateMoodleFailure(
     error_message: String(row.last_error || ""),
   };
 
-  const NEXUS_API_URL = Deno.env.get("NEXUS_API_URL") || "";
-  const NEXUS_API_KEY = Deno.env.get("NEXUS_API_KEY") || "";
-  const nexusRes = await ensureNexusTask(db, "escalation", payload, "retry-worker@system", {
-    nexusUrl: NEXUS_API_URL,
-    nexusApiKey: NEXUS_API_KEY,
-  });
+  const nexusRes = await ensureNexusTask(db, "escalation", payload, "retry-worker@system", nexusTaskConfigFromEnv());
   const taskId = String(nexusRes?.nexus_task_id || "").trim();
   return { escalated: true, nexus_task_id: taskId || null };
 }
@@ -416,8 +412,8 @@ Deno.serve(async (req) => {
     const limit = Math.max(1, Math.min(100, limitInput));
 
     // Validate action
-    if (action && !["retry", "resolve"].includes(action)) {
-      return json({ ok: false, error: "action must be retry|resolve", code: "INVALID_ACTION" }, 400);
+    if (action && !["retry", "resolve", "reconcile_nexus"].includes(action)) {
+      return json({ ok: false, error: "action must be retry|resolve|reconcile_nexus", code: "INVALID_ACTION" }, 400);
     }
 
     // Validate source if provided
@@ -431,7 +427,22 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: idErr.message, code: "INVALID_ID" }, 400);
     }
 
+    // Unknown Nexus outcomes (TIMEOUT_UNKNOWN) are reconciled BEFORE anything in this run can reach
+    // ensureNexusTask. Reconciliation never POSTs; it resolves rows against a Nexus read.
+    if (action === "reconcile_nexus") {
+      const result = await reconcileUnknownNexusTasks(serviceDb, nexusTaskConfigFromEnv(), actorEmail, { limit });
+      await logAudit(serviceDb, actorEmail, "NEXUS_RECONCILE_EXECUTED", "rocksolid_task_links", "batch", "SUCCESS", { trigger: isCronCall ? "cron" : "admin", ...result });
+      return json({ ok: true, mode: "reconcile_nexus", ...result });
+    }
+
     if (isCronCall && !id) {
+      let nexusReconciliation: Record<string, unknown>;
+      try {
+        nexusReconciliation = { ...(await reconcileUnknownNexusTasks(serviceDb, nexusTaskConfigFromEnv(), actorEmail, { limit })) };
+      } catch (err) {
+        console.error("NEXUS_RECONCILE_ERROR", err);
+        nexusReconciliation = { error: "reconcile_failed" };
+      }
       const sweep = await sweepMoodleEnrollmentRetries(serviceDb, limit);
       let escalated = 0;
       for (const row of sweep.candidates || []) {
@@ -449,11 +460,11 @@ Deno.serve(async (req) => {
         "moodle_enrollment_sync",
         "batch",
         "SUCCESS",
-        { source: "moodle_enrollment_sync", selected: sweep.selected, attempted: sweep.attempted, escalated, limit },
+        { source: "moodle_enrollment_sync", selected: sweep.selected, attempted: sweep.attempted, escalated, limit, nexus_reconciliation: nexusReconciliation },
       );
       // Moodle rows marked RETRYING are durable — the scheduled */5 moodle-sync cron
       // discovers them on its next run. No function-to-function invocation required.
-      return json({ ok: true, mode: "auto_sweep", source: "moodle_enrollment_sync", selected: sweep.selected, attempted: sweep.attempted, escalated, limit });
+      return json({ ok: true, mode: "auto_sweep", source: "moodle_enrollment_sync", selected: sweep.selected, attempted: sweep.attempted, escalated, limit, nexus_reconciliation: nexusReconciliation });
     }
 
     if (!id) return json({ ok: false, error: "id is required", code: "MISSING_ID" }, 400);

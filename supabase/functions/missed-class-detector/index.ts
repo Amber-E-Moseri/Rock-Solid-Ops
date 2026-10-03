@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { validateCronAuth } from "../_shared/auth.ts";
-import { ensureNexusTask } from "../_shared/nexus-tasks.ts";
+import { ensureNexusTask, nexusTaskConfigFromEnv } from "../_shared/nexus-tasks.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -95,8 +95,6 @@ Deno.serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-  const NEXUS_API_URL = Deno.env.get("NEXUS_API_URL") || "";
-  const NEXUS_API_KEY = Deno.env.get("NEXUS_API_KEY") || "";
   if (!SUPABASE_URL || !SERVICE_KEY) return json({ ok: false, error: "Missing Supabase env" }, 500);
 
   const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
@@ -213,7 +211,7 @@ Deno.serve(async (req) => {
         class_number: classNumber,
         class_date: classDate,
         reason: "No attendance record for passed session",
-      }, "missed-class-detector@system", { nexusUrl: NEXUS_API_URL, nexusApiKey: NEXUS_API_KEY });
+      }, "missed-class-detector@system", nexusTaskConfigFromEnv());
 
       if (nexusRes?.reused) summary.skipped_duplicate_count += 1;
       if (nexusRes?.nexus_task_id) summary.task_created_count += 1;
@@ -326,7 +324,7 @@ Deno.serve(async (req) => {
         reason: "Registration stuck in REVIEW for more than 48 hours",
         error_code: "REVIEW_STALE_48H",
         error_message: "Applicant remained in REVIEW beyond 48h operational threshold",
-      }, "missed-class-detector@system", { nexusUrl: NEXUS_API_URL, nexusApiKey: NEXUS_API_KEY });
+      }, "missed-class-detector@system", nexusTaskConfigFromEnv());
 
       if (nexusRes?.nexus_task_id) {
         summary.review_escalation_created += 1;

@@ -1,6 +1,19 @@
 // Shared Nexus task creation module.
-// Callers: missed-class-detector, retry-worker.
-// All task-creation logic lives here; no caller should POST directly to clickup-sync.
+// Callers: missed-class-detector, retry-worker (and _shared/nexus-reconcile.ts for recovery).
+// All task-creation logic lives here; nothing else may POST tasks to Nexus.
+//
+// Nexus contract (verified against Amber-E-Moseri/Nexus @ 0611a28, supabase/functions/task-api):
+//   POST {base}/tasks   header  x-api-key: <Nexus API key>   (NOT Authorization: Bearer)
+//     body  { title, description?, priority: urgent|high|medium|low, due_date?: "YYYY-MM-DD",
+//             assignee_id?: <users.id uuid>, source_name?, source_type?, external_unique_key? }
+//     201 { task: { id, ... } }                                  created
+//     200 { duplicate: true, task: { id, ... } }                 external_unique_key already exists
+//     400/401/403/429/5xx { error }                              rejected / not created
+//   One task per external_unique_key (unique index + find-or-create), so replaying a POST with
+//   the same key is safe: it can never create a second task.
+//   GET  {base}/tasks?source=api&limit=<=200   -> { tasks: [...] } (newest first; NO key filter)
+// base = NEXUS_TASK_API_URL, default `${NEXUS_API_URL}/task-api`; key = NEXUS_TASK_API_KEY.
+// Sprint/Team are NOT used: placement comes from the API key's own scope.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -34,9 +47,17 @@ export type EscalationPayload = {
 export interface NexusTaskConfig {
   nexusUrl: string;
   nexusApiKey: string;
-  listId?: string;
-  spaceId?: string;
   timeoutMs?: number;
+}
+
+/** Task API configuration from the environment. Never falls back to NEXUS_API_KEY (a different credential). */
+export function nexusTaskConfigFromEnv(): NexusTaskConfig {
+  const explicit = (Deno.env.get("NEXUS_TASK_API_URL") || "").trim().replace(/\/+$/, "");
+  const base = (Deno.env.get("NEXUS_API_URL") || "").trim().replace(/\/+$/, "");
+  return {
+    nexusUrl: explicit || (base ? `${base}/task-api` : ""),
+    nexusApiKey: (Deno.env.get("NEXUS_TASK_API_KEY") || "").trim(),
+  };
 }
 
 export interface NexusTaskResult {
@@ -48,10 +69,50 @@ export interface NexusTaskResult {
   error?: string;
 }
 
-// Default Nexus organizational identifiers (production values).
-const DEFAULT_LIST_ID = "35cc9695-d49e-4584-8b60-2091c29d3f95";
-const DEFAULT_SPACE_ID = "2aee687a-4dad-447b-ad6b-1e0239a6beb6";
 export const NEXUS_TIMEOUT_MS = 15_000;
+/** A TIMEOUT_UNKNOWN row becomes eligible for reconciliation this long after the timeout. */
+export const RECONCILE_FIRST_DELAY_MS = 5 * 60 * 1000;
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function isUuid(value: unknown): boolean {
+  return typeof value === "string" && UUID_RE.test(value);
+}
+
+// ── Typed failures: the caller must distinguish "definitely rejected" from "outcome unknown". ──
+export class NexusTimeoutError extends Error {
+  constructor(message: string) { super(message); this.name = "NexusTimeoutError"; }
+}
+/** Nexus answered with a non-2xx status: the request was refused (or failed) before/without a confirmed insert. */
+export class NexusHttpError extends Error {
+  status: number;
+  constructor(status: number, message: string) { super(message); this.name = "NexusHttpError"; this.status = status; }
+}
+/** Nexus answered 2xx but the body does not confirm a task: the task MAY exist. */
+export class NexusMalformedResponseError extends Error {
+  constructor(message: string) { super(message); this.name = "NexusMalformedResponseError"; }
+}
+
+export interface NexusCreateResult {
+  id: string;
+  /** true when Nexus reported that the external_unique_key already existed (200 duplicate). */
+  duplicate: boolean;
+}
+
+/** Strict parse of a task-api create response. Anything unconfirmed throws NexusMalformedResponseError. */
+export function parseCreateResponse(status: number, json: unknown): NexusCreateResult {
+  const j = (json && typeof json === "object" ? json : {}) as Record<string, unknown>;
+  const task = (j.task && typeof j.task === "object" ? j.task : {}) as Record<string, unknown>;
+  const id = typeof task.id === "string" ? task.id.trim() : "";
+  if (!id) throw new NexusMalformedResponseError(`Nexus ${status} response did not contain task.id`);
+  if (status === 201) return { id, duplicate: false };
+  if (status === 200 && j.duplicate === true) return { id, duplicate: true };
+  throw new NexusMalformedResponseError(`Nexus ${status} response was not a recognised create/duplicate result`);
+}
+
+/** Request sent, outcome ambiguous (the task may exist) => TIMEOUT_UNKNOWN. Anything else => FAILED. */
+export function classifyCreateFailure(err: unknown): "TIMEOUT_UNKNOWN" | "FAILED" {
+  return err instanceof NexusTimeoutError || err instanceof NexusMalformedResponseError ? "TIMEOUT_UNKNOWN" : "FAILED";
+}
 
 function normalizeText(value: unknown): string {
   return String(value || "").trim();
@@ -92,10 +153,12 @@ export function buildTask(
 ): Record<string, unknown> {
   const now = new Date();
   const dueDate = new Date(now.getTime() + (type === "missed_class" ? dayMs(1) : dayMs(0.5)));
+  // Nexus `assignee_id` takes a single users.id. Omitted (not null) when there is no valid mapping.
+  const assignee = assigneeId ? { assignee_id: assigneeId } : {};
 
   if (type === "missed_class") {
     const p = payload as MissedClassPayload;
-    const name = `Missed Class Follow-up: ${normalizeText(p.student_name || p.student_id || "Unknown Student")}`;
+    const title = `Missed Class Follow-up: ${normalizeText(p.student_name || p.student_id || "Unknown Student")}`;
     const description = [
       "Automated operational escalation from Foundation School.",
       "",
@@ -111,18 +174,20 @@ export function buildTask(
     ].join("\n");
 
     return {
-      name,
+      title,
       description,
-      due_date: dueDate.getTime(),
-      priority: 3,
-      assignees: assigneeId ? [assigneeId] : [],
+      due_date: toIsoDate(dueDate),
+      priority: "medium",
+      source_name: "rocksolid",
+      source_type: "missed_class",
+      ...assignee,
     };
   }
 
   const p = payload as EscalationPayload;
   const high = ["MOODLE_AUTH_OR_WAF_BLOCKED", "AUTH", "TIMEOUT", "NETWORK", "REVIEW_STALE_48H"].includes(normalizeUpper(p.error_code));
   const entity = normalizeText(p.student_name || p.student_id || p.source_id || "Unknown");
-  const name = `Ops Escalation: ${entity}`;
+  const title = `Ops Escalation: ${entity}`;
   const description = [
     "Automated operational escalation from Foundation School.",
     "",
@@ -139,11 +204,13 @@ export function buildTask(
   ].join("\n");
 
   return {
-    name,
+    title,
     description,
-    due_date: dueDate.getTime(),
-    priority: high ? 2 : 3,
-    assignees: assigneeId ? [assigneeId] : [],
+    due_date: toIsoDate(dueDate),
+    priority: high ? "high" : "medium",
+    source_name: "rocksolid",
+    source_type: "escalation",
+    ...assignee,
   };
 }
 
@@ -182,40 +249,70 @@ export async function resolveAssignee(
   return fallbackAssigneeId || "";
 }
 
-// Single-attempt POST to the Nexus tasks endpoint, bounded by timeoutMs.
-// No automatic retry: duplicate-task risk on timeout makes unbounded retry unsafe
-// when no Nexus-side idempotency key is available. Callers rely on rocksolid_task_links
-// FAILED status as the durable retry mechanism (next invocation tries again).
+// Single-attempt POST to the Nexus task API, bounded by timeoutMs (the timer covers reading the body).
+// No automatic retry here: a timed-out request may or may not have created the task. Recovery of that
+// unknown outcome is the job of _shared/nexus-reconcile.ts (find by external_unique_key, then re-POST the
+// SAME key, which Nexus guarantees cannot create a second task). Callers rely on the rocksolid_task_links
+// status as the durable record.
 export async function createNexusTask(
   nexusUrl: string,
   apiKey: string,
   body: Record<string, unknown>,
   externalUniqueKey: string,
   timeoutMs = NEXUS_TIMEOUT_MS,
-): Promise<Record<string, unknown>> {
+): Promise<NexusCreateResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  let res: Response;
+  let status = 0;
+  let json: unknown;
+  let text = "";
   try {
-    res = await fetch(`${nexusUrl}/tasks`, {
+    const res = await fetch(`${nexusUrl}/tasks`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+        "x-api-key": apiKey,
       },
       body: JSON.stringify({ ...body, external_unique_key: externalUniqueKey }),
       signal: controller.signal,
     });
+    status = res.status;
+    text = await res.text();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if ((err as { name?: string })?.name === "AbortError" || /abort|timed? ?out/i.test(msg)) {
+      throw new NexusTimeoutError(`Nexus task create timed out after ${timeoutMs}ms`);
+    }
+    throw err;
   } finally {
     clearTimeout(timer);
   }
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Nexus task create failed (${res.status}): ${text}`);
+  if (status < 200 || status >= 300) {
+    throw new NexusHttpError(status, `Nexus task create failed (${status}): ${text.slice(0, 300)}`);
   }
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new NexusMalformedResponseError(`Nexus ${status} response was not valid JSON`);
+  }
+  return parseCreateResponse(status, json);
+}
 
-  return await res.json();
+/** Link an escalation source row to its Nexus task. Column is named clickup_task_id for backward compat. */
+export async function linkEscalationSource(
+  db: ReturnType<typeof createClient>,
+  source: string,
+  sourceId: string,
+  nexusTaskId: string,
+): Promise<void> {
+  if (!sourceId) return;
+  if (source === "moodle_enrollment_sync") {
+    await db.from("moodle_enrollment_sync").update({ clickup_task_id: nexusTaskId }).eq("id", sourceId);
+  }
+  if (source === "applicants") {
+    await db.from("applicants").update({ clickup_task_id: nexusTaskId }).eq("id", sourceId);
+  }
 }
 
 async function updateSourceNexusTaskId(
@@ -226,13 +323,7 @@ async function updateSourceNexusTaskId(
 ): Promise<void> {
   if (type === "escalation") {
     const p = payload as EscalationPayload;
-    // Column named clickup_task_id for backward compat; stores Nexus task ID.
-    if (p.source === "moodle_enrollment_sync" && p.source_id) {
-      await db.from("moodle_enrollment_sync").update({ clickup_task_id: nexusTaskId }).eq("id", p.source_id);
-    }
-    if (p.source === "applicants" && p.source_id) {
-      await db.from("applicants").update({ clickup_task_id: nexusTaskId }).eq("id", p.source_id);
-    }
+    await linkEscalationSource(db, normalizeText(p.source), normalizeText(p.source_id), nexusTaskId);
     return;
   }
 
@@ -270,6 +361,14 @@ function validateDedupeFields(type: RequestType, payload: MissedClassPayload | E
 // Idempotent task creation: uses atomic Postgres claim to prevent concurrent duplicate POSTs.
 // Returns { ok: true, reused: true } if a task already exists for this event.
 // Returns { ok: false, non_fatal: true } if claim is not owned or Nexus is unreachable.
+//
+// Failure semantics once the claim is owned:
+//   - timeout, or a 2xx that does not confirm a task  -> TIMEOUT_UNKNOWN (task MAY exist; never re-POSTed
+//     by the producer path, resolved by nexus-reconcile)
+//   - any other failure (4xx/5xx/network)             -> FAILED (re-claimable; the stable external key makes
+//     a later POST safe)
+// Persisting writes are guarded by claim_token so a worker whose lease was recovered cannot overwrite the
+// new owner's result.
 export async function ensureNexusTask(
   db: ReturnType<typeof createClient>,
   type: RequestType,
@@ -279,8 +378,6 @@ export async function ensureNexusTask(
 ): Promise<NexusTaskResult> {
   const nexusUrl = config.nexusUrl;
   const nexusApiKey = config.nexusApiKey;
-  const listId = config.listId || DEFAULT_LIST_ID;
-  const spaceId = config.spaceId || DEFAULT_SPACE_ID;
   const timeoutMs = config.timeoutMs || NEXUS_TIMEOUT_MS;
 
   const dedupeKey = buildDedupeKey(type, payload);
@@ -324,70 +421,70 @@ export async function ensureNexusTask(
     return { ok: true, dedupe_key: dedupeKey, nexus_task_id: claim.nexus_task_id, reused: true };
   }
 
-  // If caller is not owner, another invocation claimed this; return in-progress
+  // If caller is not owner, another invocation claimed this (or the outcome is TIMEOUT_UNKNOWN /
+  // RECONCILE_FAILED and awaits reconciliation); return in-progress without POSTing.
   if (!claim.is_owner) {
-    return { ok: false, dedupe_key: dedupeKey, nexus_task_id: null, reused: false, non_fatal: true, error: "another invocation owns this claim" };
+    return { ok: false, dedupe_key: dedupeKey, nexus_task_id: null, reused: false, non_fatal: true, error: `not claim owner (status ${claim.status ?? "unknown"})` };
   }
 
+  const markFailed = async (status: "FAILED" | "TIMEOUT_UNKNOWN", message: string) => {
+    const patch: Record<string, unknown> = { status, error_message: message, updated_at: new Date().toISOString() };
+    if (status === "TIMEOUT_UNKNOWN") {
+      patch.reconcile_attempts = 0;
+      patch.next_reconcile_at = new Date(Date.now() + RECONCILE_FIRST_DELAY_MS).toISOString();
+    }
+    await db.from("rocksolid_task_links").update(patch).eq("dedupe_key", dedupeKey).eq("claim_token", claimToken);
+    await _logAudit(db, actorEmail, "NEXUS_TASK_FAILED", sourceType, sourceId || dedupeKey, { dedupe_key: dedupeKey, error: message, status });
+    return { ok: false, dedupe_key: dedupeKey, nexus_task_id: null, reused: false, non_fatal: true, error: message } as NexusTaskResult;
+  };
+
   if (!nexusUrl || !nexusApiKey) {
-    const msg = "Nexus API secrets are not configured";
-    await db
-      .from("rocksolid_task_links")
-      .update({ status: "FAILED", error_message: msg, updated_at: new Date().toISOString() })
-      .eq("dedupe_key", dedupeKey);
-    await _logAudit(db, actorEmail, "NEXUS_TASK_FAILED", sourceType, sourceId || dedupeKey, { dedupe_key: dedupeKey, error: msg });
-    return { ok: false, dedupe_key: dedupeKey, nexus_task_id: null, reused: false, non_fatal: true, error: msg };
+    return await markFailed("FAILED", "Nexus task API is not configured (NEXUS_TASK_API_URL/NEXUS_API_URL and NEXUS_TASK_API_KEY)");
   }
 
   const groupId = normalizeText((payload as MissedClassPayload).group_id || (payload as EscalationPayload).group_id);
   const subgroupId = normalizeText((payload as MissedClassPayload).subgroup_id || (payload as EscalationPayload).subgroup_id);
   const assigneeId = await resolveAssignee(db, groupId, subgroupId, "");
 
-  const taskBody = { ...buildTask(type, payload, assigneeId), list_id: listId, space_id: spaceId };
+  // A mapped id that is not a valid Nexus user id is a configuration error: fail safely, never POST a
+  // malformed assignee and never silently create an unassigned task for a broken mapping.
+  // (No mapping at all is legitimate: the task is created unassigned and the audit row says so.)
+  if (assigneeId && !isUuid(assigneeId)) {
+    return await markFailed("FAILED", `INVALID_ASSIGNEE_MAPPING: rocksolid_admin_mappings.nexus_user_id for group "${groupId}"/"${subgroupId}" is not a valid user id`);
+  }
+
+  const taskBody = buildTask(type, payload, assigneeId);
   const externalUniqueKey = buildExternalUniqueKey(dedupeKey);
 
-  let created: Record<string, unknown> = {};
-  let createErr: Error | null = null;
+  let created: NexusCreateResult;
   try {
     created = await createNexusTask(nexusUrl, nexusApiKey, taskBody, externalUniqueKey, timeoutMs);
   } catch (err) {
-    createErr = err instanceof Error ? err : new Error(String(err));
+    const e = err instanceof Error ? err : new Error(String(err));
+    return await markFailed(classifyCreateFailure(e), e.message);
   }
 
-  if (createErr) {
-    const errMsg = createErr.message;
-    const isTimeout = errMsg.toLowerCase().includes("abort") || errMsg.toLowerCase().includes("timeout");
-    const failureStatus = isTimeout ? "TIMEOUT_UNKNOWN" : "FAILED";
-
-    await db
-      .from("rocksolid_task_links")
-      .update({ status: failureStatus, error_message: errMsg, updated_at: new Date().toISOString() })
-      .eq("dedupe_key", dedupeKey);
-    await _logAudit(db, actorEmail, "NEXUS_TASK_FAILED", sourceType, sourceId || dedupeKey, { dedupe_key: dedupeKey, error: errMsg, status: failureStatus });
-
-    return { ok: false, dedupe_key: dedupeKey, nexus_task_id: null, reused: false, non_fatal: true, error: errMsg };
-  }
-
-  const nexusTaskId = normalizeText(created?.id);
+  const nexusTaskId = created.id;
 
   await db
     .from("rocksolid_task_links")
-    .update({ nexus_task_id: nexusTaskId || null, status: "CREATED", error_message: null, updated_at: new Date().toISOString() })
-    .eq("dedupe_key", dedupeKey);
+    .update({ nexus_task_id: nexusTaskId, status: "CREATED", error_message: null, next_reconcile_at: null, updated_at: new Date().toISOString() })
+    .eq("dedupe_key", dedupeKey)
+    .eq("claim_token", claimToken);
 
-  if (nexusTaskId) {
-    await updateSourceNexusTaskId(db, type, payload, nexusTaskId).catch(() => { /* non-fatal */ });
-  }
+  await updateSourceNexusTaskId(db, type, payload, nexusTaskId).catch(() => { /* non-fatal */ });
 
   await _logAudit(db, actorEmail, "NEXUS_TASK_CREATED", sourceType, sourceId || dedupeKey, {
     dedupe_key: dedupeKey,
     nexus_task_id: nexusTaskId,
     type,
+    remote_duplicate: created.duplicate,
     assignee_id: assigneeId || null,
-    due_date: toIsoDate(new Date(Number(taskBody.due_date || Date.now()))),
+    assignment: assigneeId ? "mapped_user" : "unassigned_no_mapping",
+    due_date: taskBody.due_date,
   });
 
-  return { ok: true, dedupe_key: dedupeKey, nexus_task_id: nexusTaskId || null, reused: false };
+  return { ok: true, dedupe_key: dedupeKey, nexus_task_id: nexusTaskId, reused: created.duplicate };
 }
 
 async function _logAudit(
@@ -398,13 +495,19 @@ async function _logAudit(
   entityId: string,
   details: Record<string, unknown>,
 ): Promise<void> {
-  await db.from("audit_logs").insert({
-    actor_email: actorEmail,
-    action,
-    entity_type: entityType,
-    entity_id: entityId,
-    status: action.endsWith("FAILED") ? "FAILED" : "SUCCESS",
-    details,
-    logged_at: new Date().toISOString(),
-  }).catch(() => { /* ignore log errors */ });
+  // NOTE: the Supabase query builder is thenable but has NO .catch(); chaining one throws
+  // "catch is not a function" at runtime. Await inside try/catch instead.
+  try {
+    await db.from("audit_logs").insert({
+      actor_email: actorEmail,
+      action,
+      entity_type: entityType,
+      entity_id: entityId,
+      status: action.endsWith("FAILED") ? "FAILED" : "SUCCESS",
+      details,
+      logged_at: new Date().toISOString(),
+    });
+  } catch { /* audit failures must never break task creation */ }
 }
+
+export { _logAudit as logNexusAudit };

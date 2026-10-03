@@ -31,12 +31,12 @@ Deno.test("R6: Nexus escalation via ensureNexusTask from shared module", () => {
   assert(source.includes("ensureNexusTask(db,"),                     "calls ensureNexusTask with db client");
 });
 
-Deno.test("R7: Nexus credentials are read from env in maybeEscalateMoodleFailure", () => {
+Deno.test("R7: Nexus task credentials are read from env in maybeEscalateMoodleFailure", () => {
   const fnStart = source.indexOf("async function maybeEscalateMoodleFailure");
   assert(fnStart !== -1, "maybeEscalateMoodleFailure must exist");
   const fnSnippet = source.slice(fnStart, fnStart + 2000);
-  assert(fnSnippet.includes('Deno.env.get("NEXUS_API_URL")'),        "NEXUS_API_URL read from env inside function");
-  assert(fnSnippet.includes('Deno.env.get("NEXUS_API_KEY")'),        "NEXUS_API_KEY read from env inside function");
+  assert(fnSnippet.includes("nexusTaskConfigFromEnv()"), "task API config read from env inside function");
+  assertEquals(fnSnippet.includes('Deno.env.get("NEXUS_API_KEY")'), false, "users-API shared secret not used for tasks");
 });
 
 Deno.test("R8: maybeEscalateMoodleFailure signature no longer takes supabaseUrl", () => {
