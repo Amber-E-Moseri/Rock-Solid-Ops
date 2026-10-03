@@ -219,13 +219,16 @@ Deno.serve(async (req) => {
 
               newly_completed++;
 
-              // Non-fatal in-app notification for admins.
-              supabase.from("in_app_notifications").insert({
-                recipient_role: "admin",
-                title:          "Course completed",
-                body:           `${applicant.full_name || applicant.email} completed the Moodle course`,
-                type:           "success",
-              }).catch(() => {});
+              // Non-fatal in-app notification for admins. The query builder is thenable but has no
+              // .catch(); await it inside try/catch so the insert is actually sent and cannot throw.
+              try {
+                await supabase.from("in_app_notifications").insert({
+                  recipient_role: "admin",
+                  title:          "Course completed",
+                  body:           `${applicant.full_name || applicant.email} completed the Moodle course`,
+                  type:           "success",
+                });
+              } catch { /* non-fatal */ }
             }
           }
 
@@ -306,11 +309,12 @@ Deno.serve(async (req) => {
               msg.includes("accessdenied") ||
               msg.includes("not available")
             ) {
-              supabase
-                .from("moodle_enrollment_sync")
-                .update({ grade_sync_available: false })
-                .eq("id", row.id)
-                .catch(() => {});
+              try {
+                await supabase
+                  .from("moodle_enrollment_sync")
+                  .update({ grade_sync_available: false })
+                  .eq("id", row.id);
+              } catch { /* non-fatal */ }
             }
             grades_errors.push(`${row.email}: ${msg}`);
           }
