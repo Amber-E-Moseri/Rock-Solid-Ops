@@ -23,3 +23,14 @@ Deno.test("CM02: the concurrency test is wired into the migration gate", async (
   const t = await Deno.readTextFile(new URL("../../tests/security/c6-claim-concurrency.test.sh", import.meta.url));
   assertEquals(t.includes("pg_advisory_lock_shared"), true, "uses a real advisory-lock barrier, not sequential calls");
 });
+
+Deno.test("CM03: 202610030003 adds ONLY the CREATED => id check, NOT VALID first, validated only without legacy violators", async () => {
+  const sql = strip(await read("202610030003_rocksolid_task_links_created_requires_id.sql"));
+  assert(/check \(status <> 'CREATED' or nexus_task_id is not null\) not valid/i.test(sql), "enforced for new writes, no table scan");
+  assert(/validate constraint/i.test(sql) && /v_bad = 0/.test(sql), "validated only when nothing violates");
+  assert(/raise warning/i.test(sql), "legacy violators are reported, never fatal");
+  assertFalse(/status\s*(=|in)\s*\(?'(PENDING|CLAIMING|FAILED|TIMEOUT_UNKNOWN|RECONCILE_FAILED)'/i.test(sql.replace(/status <> 'CREATED'/gi, "")), "no invented constraint for other states");
+  assertFalse(/update public\.rocksolid_task_links|delete from public\.rocksolid_task_links/i.test(sql), "legacy rows are never rewritten");
+  const gate = await Deno.readTextFile(new URL("../../../scripts/test-migration.sh", import.meta.url));
+  assert(gate.includes("c6-created-id-invariant.test.sh"));
+});
