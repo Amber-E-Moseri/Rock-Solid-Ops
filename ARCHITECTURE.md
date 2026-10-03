@@ -8,6 +8,6 @@ Key current state:
 - Registration canonical path is `registration-processor`.
 - Legacy registration processing is archived and non-operational.
 - Canonical audit table is `public.audit_logs` only.
-- Retry-worker includes scheduled auto sweep every 20 minutes.
+- Retry-worker includes a scheduled auto sweep (hourly, `0 * * * *`), which also reconciles TIMEOUT_UNKNOWN Nexus task outcomes.
 
 

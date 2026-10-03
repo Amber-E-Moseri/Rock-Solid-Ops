@@ -116,7 +116,7 @@ Mailchimp has been removed (2026-07-13) — it was dead wiring, not a live integ
 
 ### Step 4: Moodle account created and enrolled
 **Trigger:** `applicants.registration_status` becomes `ASSIGNED` → a row is inserted into `moodle_enrollment_sync` with `sync_status = PENDING`.
-**Handler:** `moodle-sync` edge function (triggered on-demand or by `retry-worker` cron every 20 min).
+**Handler:** `moodle-sync` edge function (triggered on-demand or by `retry-worker` hourly cron).
 **What happens:**
 - Looks up or creates the Moodle user via `core_user_create_users` / `core_user_get_users`
 - Enrolls the user in the course via `enrol_manual_enrol_users`
@@ -193,7 +193,7 @@ All functions live under `supabase/functions/`. They run on Deno. Shared utiliti
 | `notification-batch-processor` | Moves due `scheduled_notifications` into `email_queue` | On-demand / triggered | None (on-demand) |
 | `moodle-sync` | Creates Moodle accounts and enrolls students | On-demand / `retry-worker` | None directly |
 | `moodle-grade-sync` | Checks completion; fetches and stores gradebook data | On-demand / Sync Gradebook button; POST `{ email }` for single student | None (on-demand) |
-| `retry-worker` | Sweeps PENDING/stuck Moodle enrollment rows and retries | Cron | Every 20 min (`*/20 * * * *`) |
+| `retry-worker` | Sweeps PENDING/stuck Moodle enrollment rows and retries | Cron | Hourly (`0 * * * *`) |
 | `attendance-reminder` | Queues reminders to teachers for sessions with no attendance submitted | Cron | On-demand |
 | `missed-class-detector` | Flags students who missed sessions; creates ClickUp tasks | Cron | `15 2 * * *` (daily 02:15 UTC) |
 | `student-engagement-monitor` | Detects never-started and dropped-off students; queues engagement emails | On-demand | None |

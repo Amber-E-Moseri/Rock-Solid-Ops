@@ -13,7 +13,7 @@
 // ID11  Nexus timeout never reports success
 // ID12  ambiguous timeout becomes TIMEOUT_UNKNOWN or equivalent
 // ID13  TIMEOUT_UNKNOWN is NOT blindly re-POSTed
-// ID14  no automatic Nexus POST retry loop exists
+// ID14  no application-level Nexus POST retry loop exists (the HTTP client may still resend; safety is the external_unique_key)
 // ID15  existing producer semantics remain unchanged
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
@@ -33,9 +33,9 @@ Deno.test("ID04: different dedupe keys can be claimed independently", () => {
   assert(k2.startsWith("missed_class:S2:"), "key includes student_id");
 });
 
-// ── ID14 No automatic retry loop ─────────────────────────────────
+// ── ID14 No application-level retry loop ─────────────────────────
 
-Deno.test("ID14: no automatic Nexus POST retry loop exists", async () => {
+Deno.test("ID14: no application-level Nexus POST retry loop exists; duplicate safety is the external_unique_key", async () => {
   const src = await Deno.readTextFile(new URL("./nexus-tasks.ts", import.meta.url));
 
   // createNexusTask must not have a while/for loop for retries
@@ -45,6 +45,14 @@ Deno.test("ID14: no automatic Nexus POST retry loop exists", async () => {
 
   assertEquals(createFn.includes("while (attempt"), false, "no while loop in createNexusTask");
   assertEquals(createFn.includes("for ("), false, "no for loop in createNexusTask");
+
+  // The code must not claim the client never resends: Deno's fetch can resend a POST after a connection reset.
+  const header = src.slice(src.indexOf("// One POST attempt"), createFnStart);
+  assertEquals(/no automatic retry/i.test(header), false, "the comment must not claim 'no automatic retry'");
+  assertEquals(header.includes("external_unique_key"), true, "the comment names the real safety mechanism");
+  assertEquals(header.includes("resend"), true, "the comment states that the HTTP client may resend");
+  // ...and the safety mechanism is actually sent on every request.
+  assertEquals(createFn.includes("external_unique_key: externalUniqueKey"), true, "the key is always in the POST body");
 });
 
 // ── ID15 Existing producer semantics unchanged ───────────────────────

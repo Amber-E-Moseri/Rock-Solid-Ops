@@ -20,9 +20,9 @@ This document describes scheduled Edge Functions and their intended cadence.
 ### Retry Worker
 
 **Function:** `retry-worker`
-- **Schedule:** Every 20 minutes (`*/20 * * * *`)
-- **Auth:** CRON_INVOKE_SECRET
-- **Purpose:** Sweep failed operations; reattempt retryable failures; escalate permanent failures
+- **Schedule:** Hourly (`0 * * * *`). Declared in `supabase/functions/retry-worker/config.toml`, the only machine-readable declaration; `CLAUDE.md` and `docs/OPERATIONAL_HEALTH.md` agree, and commit `6a61fc1` aligned the docs to it. An earlier `*/20` figure in older docs was stale. The cadence actually running in production is UNVERIFIED (operator check; see docs/C6_EDGE_SECURITY_RECONCILIATION_2026-10-03.md).
+- **Auth:** CRON_INVOKE_SECRET (`x-cron-secret`)
+- **Purpose:** Sweep failed operations; reattempt retryable failures; escalate permanent failures; **reconcile TIMEOUT_UNKNOWN Nexus task outcomes (C6: required, not optional)**
 - **Config:** `/supabase/functions/retry-worker/config.toml`
 - **Production Status:** Verify pg_cron job exists and is active
 

@@ -277,11 +277,18 @@ export async function resolveAssignee(
   return fallbackAssigneeId || "";
 }
 
-// Single-attempt POST to the Nexus task API, bounded by timeoutMs (the timer covers reading the body).
-// No automatic retry here: a timed-out request may or may not have created the task. Recovery of that
-// unknown outcome is the job of _shared/nexus-reconcile.ts (find by external_unique_key, then re-POST the
-// SAME key, which Nexus guarantees cannot create a second task). Callers rely on the rocksolid_task_links
-// status as the durable record.
+// One POST attempt to the Nexus task API, bounded by timeoutMs (the timer covers reading the body).
+// This function has NO application-level retry loop: a timed-out request may or may not have created the
+// task, so recovery of that unknown outcome is the job of _shared/nexus-reconcile.ts (find by
+// external_unique_key, then re-POST the SAME key). Callers rely on the rocksolid_task_links status as the
+// durable record.
+//
+// IMPORTANT: that is NOT a guarantee that the request is sent only once on the wire. The runtime's HTTP
+// client may itself resend a POST after certain connection failures (observed in certification: Deno's
+// fetch re-sent the POST once after a connection reset, both before and after Nexus had committed). Duplicate
+// safety therefore rests on Nexus's unique external_unique_key (task-api find-or-create + unique index, which
+// answers `200 duplicate:true` for a replay), NOT on assuming the HTTP client never resends. Do not remove the
+// external_unique_key from the body, and do not treat "we only call fetch once" as a safety argument.
 export async function createNexusTask(
   nexusUrl: string,
   apiKey: string,

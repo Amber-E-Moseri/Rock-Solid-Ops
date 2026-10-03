@@ -26,7 +26,7 @@ Notification pipeline:
     -> email-sender (every 15 minutes)
 
 Operations layer:
-  retry-worker (every 20 min)
+  retry-worker (hourly, `0 * * * *`)
   missed-class-detector
   clickup-sync
   student-engagement-monitor
@@ -336,7 +336,7 @@ Note: current access is primarily role-based; regional data scoping is not globa
 | `phase2-processor` | On-demand | Internal | Assignment processing (legacy/consolidation path) |
 | `moodle-sync` | On-demand | Bearer token | Moodle enrollment |
 | `moodle-grade-sync` | Cron | Cron auth + Bearer | Moodle grade pull |
-| `retry-worker` | `*/20 * * * *` (config.toml) | Cron auth | Retry sweep |
+| `retry-worker` | `0 * * * *` (config.toml; also runs Nexus reconciliation) | Cron auth | Retry sweep |
 | `notification-batch-processor` | On-demand | Cron auth | Scheduled notification batching |
 | `email-sender` | `*/15 * * * *` | Cron auth | Resend delivery |
 | `email-retry` | On-demand | Cron auth | Email retry helper |

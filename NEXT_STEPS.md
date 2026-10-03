@@ -7,6 +7,6 @@ Pilot-critical reminders:
 - Keep only Supabase registration pipeline active.
 - Keep archived legacy registration code out of operational runtime paths.
 - Apply audit canonicalization migration and verify all new writes land in `audit_logs`.
-- Confirm retry-worker schedule is active every 20 minutes.
+- Confirm the retry-worker schedule (`0 * * * *`, hourly) is active in production: C6 Nexus reconciliation runs inside it.
 
 
