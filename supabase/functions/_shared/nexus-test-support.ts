@@ -119,7 +119,7 @@ export class FakeNexusDb {
     }
     const out = (owner: boolean) => [{ row_id: ex.id, nexus_task_id: ex.nexus_task_id, status: ex.status, is_owner: owner }];
     if (ex.nexus_task_id) return out(false);
-    if (ex.status === "TIMEOUT_UNKNOWN" || ex.status === "RECONCILE_FAILED") return out(false);
+    if (ex.status === "TIMEOUT_UNKNOWN" || ex.status === "RECONCILE_FAILED" || ex.status === "ASSIGNEE_REJECTED") return out(false);
     if (ex.claim_token && ["CLAIMING", "PENDING"].includes(ex.status) && (ms(ex.claimed_at) ?? 0) > now - ttlMs) {
       return out(ex.claim_token === a.p_claim_token);
     }
@@ -268,6 +268,8 @@ export type GetMode = "ok" | "down" | "timeout" | "http_500" | "http_401" | "bad
 export class FakeNexus {
   tasks: Row[] = [];
   postMode: PostMode = "ok";
+  /** Body text of the `http_400` response (task-api answers "assignee not found" for an unknown assignee). */
+  badRequestMessage = "assignee not found";
   getMode: GetMode = "ok";
   posts: Array<{ headers: Headers; body: Record<string, any> }> = [];
   gets = 0;
@@ -313,7 +315,7 @@ export class FakeNexus {
       const body = JSON.parse(String(init?.body ?? "{}"));
       this.posts.push({ headers, body });
       if (this.postMode === "http_500") return this.json(500, { error: "Internal server error" });
-      if (this.postMode === "http_400") return this.json(400, { error: "assignee not found" });
+      if (this.postMode === "http_400") return this.json(400, { error: this.badRequestMessage });
       if (this.postMode === "http_429") return this.json(429, { error: "Rate limit exceeded" });
       if (this.postMode === "timeout_without_create") return this.hang(init?.signal);
 

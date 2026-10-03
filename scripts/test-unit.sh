@@ -46,6 +46,7 @@ deno test --allow-env --allow-net --allow-read --no-prompt --no-check --node-mod
   supabase/functions/_shared/nexus-idempotency.test.ts \
   supabase/functions/_shared/nexus-persistence.test.ts \
   supabase/functions/_shared/c6-migrations.test.ts \
+  supabase/functions/_shared/nexus-assignee-policy.test.ts \
   supabase/functions/_shared/nexus-reconcile.test.ts \
   supabase/functions/_shared/nexus-tasks.test.ts \
   supabase/functions/clickup-sync/retired.test.ts \

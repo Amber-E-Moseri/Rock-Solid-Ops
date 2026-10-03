@@ -86,7 +86,34 @@ export class NexusTimeoutError extends Error {
 /** Nexus answered with a non-2xx status: the request was refused (or failed) before/without a confirmed insert. */
 export class NexusHttpError extends Error {
   status: number;
-  constructor(status: number, message: string) { super(message); this.name = "NexusHttpError"; this.status = status; }
+  /** Nexus's own `{ "error": "..." }` text when the body was JSON of that shape, else "". */
+  detail: string;
+  constructor(status: number, message: string, detail = "") {
+    super(message);
+    this.name = "NexusHttpError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
+/** The error string of a task-api `{ error }` body, or "" when the body is not that shape. */
+export function nexusErrorText(body: string): string {
+  try {
+    const j = JSON.parse(body);
+    return j && typeof j === "object" && typeof (j as Record<string, unknown>).error === "string" ? String((j as Record<string, unknown>).error) : "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * A CONFIRMED permanent assignee rejection: task-api answers `400 { error: "assignee not found" }` only when the
+ * supplied assignee_id is absent from public.users (task-api/index.ts: users.maybeSingle() returned no row).
+ * Nothing about that is transient, so retrying the same mapping cannot succeed. Deliberately narrow: any other
+ * 400 (validation of title/priority/due_date/...) or any other status is NOT classified here.
+ */
+export function isAssigneeNotFound(err: unknown): boolean {
+  return err instanceof NexusHttpError && err.status === 400 && err.detail.trim().toLowerCase() === "assignee not found";
 }
 /** Nexus answered 2xx but the body does not confirm a task: the task MAY exist. */
 export class NexusMalformedResponseError extends Error {
@@ -290,7 +317,7 @@ export async function createNexusTask(
   }
 
   if (status < 200 || status >= 300) {
-    throw new NexusHttpError(status, `Nexus task create failed (${status}): ${text.slice(0, 300)}`);
+    throw new NexusHttpError(status, `Nexus task create failed (${status}): ${text.slice(0, 300)}`, nexusErrorText(text));
   }
   try {
     json = JSON.parse(text);
@@ -428,7 +455,12 @@ export async function ensureNexusTask(
     return { ok: false, dedupe_key: dedupeKey, nexus_task_id: null, reused: false, non_fatal: true, error: `not claim owner (status ${claim.status ?? "unknown"})` };
   }
 
-  const markFailed = async (status: "FAILED" | "TIMEOUT_UNKNOWN", message: string, extra: Record<string, unknown> = {}) => {
+  const markFailed = async (
+    status: "FAILED" | "TIMEOUT_UNKNOWN" | "ASSIGNEE_REJECTED",
+    message: string,
+    extra: Record<string, unknown> = {},
+    auditAction = "NEXUS_TASK_FAILED",
+  ) => {
     const patch: Record<string, unknown> = { status, error_message: message, updated_at: new Date().toISOString() };
     if (status === "TIMEOUT_UNKNOWN") {
       patch.reconcile_attempts = 0;
@@ -437,7 +469,7 @@ export async function ensureNexusTask(
     // Fenced by claim_token. If this write itself fails the row stays CLAIMING and the 2-minute lease
     // recovers it (a same-key re-POST is safe); the audit row records whether the state was stored.
     const w = await writeFenced(db, patch, dedupeKey, claimToken);
-    await _logAudit(db, actorEmail, "NEXUS_TASK_FAILED", sourceType, sourceId || dedupeKey, {
+    await _logAudit(db, actorEmail, auditAction, sourceType, sourceId || dedupeKey, {
       dedupe_key: dedupeKey,
       error: message,
       status,
@@ -470,6 +502,16 @@ export async function ensureNexusTask(
     created = await createNexusTask(nexusUrl, nexusApiKey, taskBody, externalUniqueKey, timeoutMs);
   } catch (err) {
     const e = err instanceof Error ? err : new Error(String(err));
+    // Confirmed permanent: the mapped Nexus user does not exist. Stop re-POSTing; needs a human to fix the mapping.
+    // Only when we actually sent an assignee, otherwise "assignee not found" cannot be about our mapping.
+    if (assigneeId && isAssigneeNotFound(e)) {
+      return await markFailed(
+        "ASSIGNEE_REJECTED",
+        `ASSIGNEE_NOT_FOUND: Nexus has no user ${assigneeId} (rocksolid_admin_mappings.nexus_user_id for group "${groupId}"/"${subgroupId}"); fix the mapping or create the user, then release this row`,
+        { assignee_id: assigneeId, group_id: groupId, subgroup_id: subgroupId, needs_manual_attention: true },
+        "NEXUS_TASK_ASSIGNEE_REJECTED",
+      );
+    }
     return await markFailed(classifyCreateFailure(e), e.message);
   }
 
@@ -571,7 +613,7 @@ async function _logAudit(
       action,
       entity_type: entityType,
       entity_id: entityId,
-      status: action.endsWith("FAILED") ? "FAILED" : "SUCCESS",
+      status: action.endsWith("FAILED") || action.endsWith("REJECTED") ? "FAILED" : "SUCCESS",
       details,
       logged_at: new Date().toISOString(),
     });

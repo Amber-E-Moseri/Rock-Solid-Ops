@@ -9,6 +9,7 @@
 # CC03  TIMEOUT_UNKNOWN and RECONCILE_FAILED are never re-claimed (even with an ancient claim)
 # CC04  a live lease is respected; an expired lease is recovered with a NEW token (old token fenced)
 # CC05  a completed row returns its canonical id and is never owned
+# CC06  ASSIGNEE_REJECTED is terminal: never re-claimed by the producer path
 #
 # Real psql processes are released together through an advisory-lock barrier, so the claim calls genuinely
 # overlap. Requires psql and a database that has the full migration chain applied.
@@ -132,6 +133,13 @@ old=$(val "update public.rocksolid_task_links set nexus_task_id='STALE', status=
 claim s-done "$T1" >/dev/null
 sql "update public.rocksolid_task_links set nexus_task_id='NX-1', status='CREATED' where dedupe_key='c6cc:s-done'" >/dev/null
 r=$(claim s-done "$T2"); [ "$r" = "false|CREATED|NX-1" ] && pass "CC05 completed row returns its canonical id, not owned" || fail "CC05 unexpected ($r)"
+
+claim s-rej "$T1" >/dev/null
+sql "update public.rocksolid_task_links set status='ASSIGNEE_REJECTED', claimed_at = now() - interval '1 day' where dedupe_key='c6cc:s-rej'" >/dev/null
+r=$(claim s-rej "$T2")
+[ "$r" = "false|ASSIGNEE_REJECTED|" ] && pass "CC06 ASSIGNEE_REJECTED is terminal: never re-claimed by the producer path" || fail "CC06 ASSIGNEE_REJECTED was re-claimed or changed ($r)"
+sql "update public.rocksolid_task_links set status='FAILED' where dedupe_key='c6cc:s-rej'" >/dev/null
+r=$(claim s-rej "$T2"); [ "${r%%|*}" = "true" ] && pass "CC06 operator release (-> FAILED) makes it claimable again" || fail "CC06 released row not claimable ($r)"
 
 echo ""
 if [ "$FAIL" -ne 0 ]; then echo "RESULT: FAIL"; exit 1; fi

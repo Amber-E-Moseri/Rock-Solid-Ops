@@ -340,6 +340,9 @@ for (const mode of ["http_400", "http_500", "http_429"] as const) {
   Deno.test(`RC15: definite rejection (${mode}) is FAILED, not unknown; reconciler ignores it; producer may retry the same key`, async () => {
     await withEnv(async ({ db, nexus }) => {
       nexus.postMode = mode;
+      // A generic definite rejection. ("assignee not found" is the one 400 that is terminal; see
+      // nexus-assignee-policy.test.ts.)
+      nexus.badRequestMessage = "title is required";
       assertFalse((await ensure(db)).ok);
       const row = db.link(keyOf())!;
       assertEquals(row.status, "FAILED");

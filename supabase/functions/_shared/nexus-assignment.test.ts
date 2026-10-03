@@ -88,14 +88,15 @@ Deno.test("NA04: an invalid mapped id fails safely: no POST, FAILED with INVALID
   });
 });
 
-Deno.test("NA05: Nexus rejecting the assignee (400 assignee not found) is a definite failure, never an unknown outcome", async () => {
+Deno.test("NA05: Nexus rejecting the assignee (400 assignee not found) is a definite, TERMINAL failure (ASSIGNEE_REJECTED), never an unknown outcome", async () => {
   await withEnv(async ({ db, nexus }) => {
     db.addMapping({ group_id: "G1", subgroup_id: "SG1", nexus_user_id: ADMIN_B });
     nexus.postMode = "http_400";
     const r = await ensure(db);
     assertFalse(r.ok);
     const row = db.link(buildDedupeKey("missed_class", payload()))!;
-    assertEquals(row.status, "FAILED");
+    // Was FAILED (re-POSTed forever). Now terminal manual-attention: see nexus-assignee-policy.test.ts.
+    assertEquals(row.status, "ASSIGNEE_REJECTED");
     db.advance(30 * MIN);
     assertEquals((await reconcileUnknownNexusTasks(db as never, CFG, "t")).claimed, 0);
   });
