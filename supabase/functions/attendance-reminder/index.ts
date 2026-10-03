@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authorizeCaller } from "../_shared/caller-auth.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -62,6 +63,8 @@ Deno.serve(async (req) => {
     if (!SUPABASE_URL || !SERVICE_KEY) return json({ ok: false, error: "Missing Supabase env vars" }, 500);
 
     const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+    const callerAuth = await authorizeCaller(req, db, SERVICE_KEY, { allowStaff: true });
+    if (!callerAuth.ok) return json({ ok: false, error: callerAuth.error }, callerAuth.status);
     const now = new Date();
     const nowMs = now.getTime();
     const todayYmd = toYmd(now);

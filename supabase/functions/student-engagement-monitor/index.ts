@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authorizeCaller } from "../_shared/caller-auth.ts";
 import {
   corsHeaders,
   jsonResponse,
@@ -378,6 +379,9 @@ async function getClassInfo(classOptionId: string | null) {
 // ── Handler ───────────────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const callerAuth = await authorizeCaller(req, sb, SUPABASE_SERVICE, { allowStaff: true });
+  if (!callerAuth.ok) return jsonResponse({ ok: false, error: callerAuth.error }, callerAuth.status);
 
   try {
     const cfg = await getConfig();

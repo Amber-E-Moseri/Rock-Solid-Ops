@@ -18,6 +18,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authorizeCaller } from "../_shared/caller-auth.ts";
 import { corsHeaders, jsonResponse, safeLogAudit } from "../_shared/http.ts";
 
 const MOODLE_URL           = Deno.env.get("MOODLE_URL") || "";
@@ -62,6 +63,14 @@ async function callMoodle(
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const callerAuth = await authorizeCaller(
+    req,
+    createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY),
+    SUPABASE_SERVICE_KEY,
+    { allowStaff: true },
+  );
+  if (!callerAuth.ok) return jsonResponse({ ok: false, error: callerAuth.error }, callerAuth.status);
 
   if (!MOODLE_URL || !MOODLE_TOKEN) {
     return jsonResponse(

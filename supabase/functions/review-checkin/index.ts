@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authorizeCaller } from "../_shared/caller-auth.ts";
 import {
   corsHeaders,
   jsonResponse,
@@ -28,6 +29,9 @@ Deno.serve(async (req) => {
   }
 
   const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+
+  const callerAuth = await authorizeCaller(req, db, SERVICE_KEY, { allowStaff: true });
+  if (!callerAuth.ok) return json({ ok: false, error: callerAuth.error }, callerAuth.status);
 
   const summary = {
     scanned: 0,
