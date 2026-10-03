@@ -23,6 +23,25 @@ canonical body supersedes it (main session flagged the conflict to the operator)
 update is isolated in section 2 of `202607141000_waitlist_consolidate_dedup.sql`,
 strippable on its own if the operator reverses.
 
+### `integration/c6-edge-security`
+
+Status: reconciliation complete, deliberately NOT merged and NOT pushed (2026-10-03, per operator brief).
+Not production certified. Full detail: `docs/C6_EDGE_SECURITY_RECONCILIATION_2026-10-03.md`.
+
+Gates before merge authorization:
+1. **Cron cutover plan approved.** Nine migration-defined pg_cron jobs (review-checkin,
+   student-engagement-monitor, waitlist-processor, report-generator x4, moodle-grade-sync,
+   attendance-reminder) send `Authorization: Bearer <service key>`; this branch rejects that and
+   requires `x-cron-secret`. Merging/deploying without re-creating those jobs silently stops them.
+   Live `retry-worker` / `email-sender` / `notification-*` / `missed-class-detector` /
+   `attention-flag-push-sweep` schedules are unknown (external) and must be verified.
+2. Blocked DB/Supabase gates executed where Docker exists: migration replay, RLS/RPC tests,
+   `claim_nexus_task` semantics, SKIP LOCKED concurrency, `nexus-upstream`.
+3. Operator decision on `notification-dispatcher` (unauthenticated, likely legacy).
+4. Operator decision on the cron credential scheme (keep `x-cron-secret`, or additionally accept the
+   exact service key).
+5. Confirm local C6 working copy vs `brief/c6-timeout-hardening` (not comparable from GitHub).
+
 ## Resolved (moot — already merged)
 
 ### `brief/moodle-credential-safety` — RESOLVED 2026-07-23
