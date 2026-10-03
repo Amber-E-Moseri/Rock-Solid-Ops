@@ -59,6 +59,8 @@ deno test --allow-env --allow-net --allow-read --no-prompt --no-check --node-mod
   supabase/functions/notification-batch-processor/notification-batch-processor.test.ts \
   supabase/functions/notification-dispatcher/retired.test.ts \
   supabase/functions/registration-processor/internal-waitlist.test.ts \
+  supabase/functions/retired-health.test.ts \
+  supabase/functions/moodle-grade-sync/builder-catch.test.ts \
   supabase/functions/retry-worker/internal-nexus.test.ts \
   supabase/functions/retry-worker/moodle-retry.test.ts \
   supabase/functions/waitlist-processor/internal-auth.test.ts
