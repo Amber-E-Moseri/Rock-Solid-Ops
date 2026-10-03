@@ -210,3 +210,15 @@ All cron functions use `CRON_INVOKE_SECRET` via `x-cron-secret` header. The secr
 - Use the same secret for INTERNAL_INVOKE_SECRET
 - Reuse CRON_INVOKE_SECRET as a user JWT
 - Expose cron schedules or job IDs publicly
+
+---
+
+## Cutover from the bearer service key (October 2026)
+
+Migration-defined cron jobs created before the E1/E2 hardening send `Authorization: Bearer <service key>`, which the hardened
+functions reject. Re-point them with `supabase/ops/cron-cutover-x-cron-secret.sql`: an operator script (deliberately **not** a
+migration) that reads the secret from Vault at job run time, changes only the command of jobs that already exist, never touches
+a schedule, and raises if pg_cron, pg_net or the Vault secret is missing. Its final query lists any Edge Function job that still lacks
+`x-cron-secret`. Jobs with no definition in this repo (retry-worker, email-sender, notification-batch-processor, missed-class-detector,
+attention-flag-push-sweep) must be checked in `cron.job` and re-pointed by hand with the same command shape.
+Details: `docs/C6_EDGE_SECURITY_RECONCILIATION_2026-10-03.md` §5 and §8.

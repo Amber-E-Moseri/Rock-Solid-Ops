@@ -2998,3 +2998,25 @@ trusted an unsigned JWT `role` claim. Authoritative detail and gates:
 Docker/Supabase gates that could not run in the cloud environment. Recorded in `docs/BRANCH_HOLDS.md`.
 No migration, no schema change, no cron change, no secrets change, no production deployment.
 
+
+---
+
+## 2026-10-03 (second pass) — cron cutover, TIMEOUT_UNKNOWN reconciliation, legacy writer retirement
+
+Branch `integration/c6-edge-security`. Details and gates: `docs/C6_EDGE_SECURITY_RECONCILIATION_2026-10-03.md`.
+
+- **Migration `202610030001_nexus_task_reconciliation.sql`** (new, additive, idempotent; NOT yet applied anywhere, NOT executed:
+  grammar-validated only): reconcile columns on `rocksolid_task_links`; `claim_nexus_reconciliations()` and
+  `resolve_nexus_reconciliation()` (SECURITY DEFINER, service_role only); `claim_nexus_task()` replaced so `RECONCILE_FAILED` is
+  never reclaimed. No new table, so no new RLS.
+- **Nexus contract corrected.** The C6 client matched neither Nexus task endpoint (Bearer auth, ClickUp-shaped body, `created.id`).
+  It now speaks `task-api` (`x-api-key`, `title`/`YYYY-MM-DD`/`assignee_id`, `201 {task}` / `200 {duplicate}`). New env:
+  `NEXUS_TASK_API_URL`, `NEXUS_TASK_API_KEY`. Source-verified against Nexus @ `0611a28`; not exercised live.
+- **Bug fixed:** `_logAudit` chained `.catch()` on the Supabase builder (no such method), throwing on every audit write.
+- **Cron:** `supabase/ops/cron-cutover-x-cron-secret.sql` re-points ten jobs to `x-cron-secret` via Vault. Operator-run, not executed here.
+- **Retired:** `clickup-sync` and `notification-dispatcher` are 410 tombstones.
+- **CI:** `scripts/test-unit.sh` now runs 19 previously unrun suites (20 of 37 never ran).
+
+**HOLD:** not merged, not production certified. Recorded in `docs/BRANCH_HOLDS.md`. No production deployment, cron change or secrets
+change was made by this work.
+
