@@ -507,7 +507,7 @@ task or returns Nexus's `duplicate`.
 
 | Gate | Result |
 |---|---|
-| Deno unit (both `test-unit.sh` invocations, 41 files) | **481 passed, 0 failed** (171 + 310; baseline 447, +34 new tests) |
+| Deno unit (both `test-unit.sh` invocations, 43 files, after integrating the parallel §14 work) | **486 passed, 0 failed** (171 + 315). Baseline 447 = +34 tests added by §15 (PS 8, CM 3, AP 9, DD 6, DI 8) +5 from the parallel work (`builder-catch`, `retired-health`) |
 | SPA Vitest | **148 passed, 0 failed** (22 files) |
 | SPA build | OK |
 | Fresh replay (all 159 migrations, real Postgres 16) | 0 errors |
@@ -516,6 +516,7 @@ task or returns Nexus's `duplicate`.
 | `c6-claim-concurrency.test.sh` | all pass on both (0/144 errors, one owner per key) |
 | `c6-created-id-invariant.test.sh` | all pass (fresh) |
 | Migration gate invariants / C2 contract | 6/6 and 126/126 |
+| §14's own real-DB suites run against these fixes (fresh and upgraded) | `rpc-certification.sql` 37/37; `concurrency.sh` all pass, **S1 first-insert `23505` = 0 across 960 attempts** (its check was tightened from "tolerate 23505" to "0"); `nexus-e2e.ts` E7 updated to `ASSIGNEE_REJECTED` + E7b, **not executed** (needs Docker) |
 | Real `task-api`, new code: 201, 200 duplicate, timeout after commit, lost local persistence (single and double fault), same-key replay, ghost assignee | max Nexus tasks per `external_unique_key` = **1** |
 | Security: cron-secret matrix (`missed-class-detector`, `retry-worker`), fail-closed, tombstones, auth regression suites | 25/25; 410 for the tombstones; auth-regression/caller-auth/cron-contract/e2 suites inside the Deno run |
 
