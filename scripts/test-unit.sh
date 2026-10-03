@@ -35,6 +35,11 @@ cd "$ROOT"
 deno test --allow-env --no-prompt --no-check --node-modules-dir=auto "${DENO_UNIT_TESTS[@]}"
 DENO_EXIT=$?
 
+# In-process handler auth regression (needs read/net to import handlers; SUPABASE_URL is unroutable)
+deno test --allow-env --allow-net --allow-read --no-prompt --no-check --node-modules-dir=auto \
+  supabase/functions/_shared/caller-auth.test.ts \
+  supabase/functions/_shared/auth-regression.test.ts
+
 echo ""
 echo "========================================"
 echo "TEST:UNIT — foundation-spa Vitest"
