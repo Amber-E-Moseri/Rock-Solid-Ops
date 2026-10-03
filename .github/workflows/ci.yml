@@ -126,6 +126,11 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
         run: bash scripts/test-security.sh
 
+      - name: Run C6 database certification
+        env:
+          LOCAL_INTEGRATION_TEST: "true"
+        run: bash scripts/test-c6-db.sh
+
       - name: Stop local Supabase
         if: always()
         run: supabase stop
