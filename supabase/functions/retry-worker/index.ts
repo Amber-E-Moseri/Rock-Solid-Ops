@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { bearerToken, isServiceRoleToken } from "../_shared/caller-auth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   corsHeaders,
@@ -405,7 +406,11 @@ Deno.serve(async (req) => {
 
     const serviceDb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
     const authHeader = req.headers.get("Authorization") || "";
-    const isCronCall = !authHeader.startsWith("Bearer ");
+    // A request with no/invalid Authorization is NOT a cron call: the scheduler must present the
+    // service-role key (Authorization: Bearer <service key>). Anything else needs an admin session.
+    const bearer = bearerToken(req);
+    if (!bearer) return json({ ok: false, error: "Missing bearer token" }, 401);
+    const isCronCall = isServiceRoleToken(bearer, SERVICE_KEY);
     let actorEmail = "retry-worker@system";
     if (!isCronCall) {
       const jwt = authHeader.slice("Bearer ".length).trim();
