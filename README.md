@@ -341,7 +341,7 @@ Note: current access is primarily role-based; regional data scoping is not globa
 | `email-sender` | `*/15 * * * *` | Cron auth | Resend delivery |
 | `email-retry` | On-demand | Cron auth | Email retry helper |
 | `notification-retry-helper` | On-demand | Bearer token | Single-notification reset |
-| `notification-dispatcher` | On-demand | Internal | Notification routing |
+| `notification-dispatcher` | Retired (410 tombstone) | None | Dead rules/dispatcher path; notifications are queued directly |
 | `missed-class-detector` | `15 2 * * *` | Cron auth | Nightly attendance gap detection |
 | `attendance-reminder` | Cron | Cron auth | Attendance reminders |
 | `review-checkin` | Cron | Cron auth | REVIEW follow-up |

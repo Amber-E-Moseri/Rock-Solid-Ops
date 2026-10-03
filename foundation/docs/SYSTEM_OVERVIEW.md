@@ -199,7 +199,7 @@ All functions live under `supabase/functions/`. They run on Deno. Shared utiliti
 | `student-engagement-monitor` | Detects never-started and dropped-off students; queues engagement emails | On-demand | None |
 | `waitlist-processor` | Promotes waitlisted students when slots open | On-demand | None |
 | `review-checkin` | Sends status-update emails to applicants stuck in REVIEW | Cron | See `review-checkin/config.toml` |
-| `notification-dispatcher` | Creates `scheduled_notifications` from trigger events | On-demand | None |
+| `notification-dispatcher` | RETIRED (410 tombstone): dead rules/dispatcher path | — | — |
 | `notification-retry-helper` | Resets a single `scheduled_notification` to PENDING (Retry Center use only) | HTTP POST `{ id }` | **Must never be scheduled** |
 | `report-generator` | Generates admin reports; requires valid user JWT | HTTP POST (admin only) | None |
 | `teacher-portal-api` | Teacher portal API (attendance, class view, grade visibility) | HTTP POST with teacher JWT | None |
@@ -257,7 +257,7 @@ Key distinction: **`class_option`** is the template (teacher + time + fellowship
 | Table | Purpose | Written by | Read by |
 |---|---|---|---|
 | `email_queue` | Pending/sent/failed outbound emails | `registration-processor`, `notification-batch-processor`, any function that sends email directly | `email-sender` |
-| `scheduled_notifications` | Events that should generate emails at a future time | `notification-dispatcher`, `registration-processor`, `phase2-processor` | `notification-batch-processor` |
+| `scheduled_notifications` | Events that should generate emails at a future time | `registration-processor`, `phase2-processor`, waitlist DB trigger | `notification-batch-processor` |
 | `notification_templates` | Full HTML email templates (CSS-class based, used for rich emails) | Migrations | `email-sender`, `notification-batch-processor` |
 | `email_templates` | Simpler HTML email templates (original table) | Migrations, admin | `email-sender` |
 
