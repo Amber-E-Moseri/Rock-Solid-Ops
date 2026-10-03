@@ -29,6 +29,14 @@ export class FakeNexusDb {
     students: [],
   };
   offsetMs = 0;
+  /**
+   * One-shot database fault injection for the query builder: the next `times` operations on `table`/`op`
+   * whose payload satisfies `when` return { data: null, error: { message } } and change nothing.
+   */
+  faults: Array<{ table: string; op: "select" | "insert" | "update"; when?: (payload: Row | null) => boolean; message: string; times: number }> = [];
+  failWrite(f: { table: string; op: "select" | "insert" | "update"; when?: (payload: Row | null) => boolean; message?: string; times?: number }) {
+    this.faults.push({ message: "injected database failure", times: 1, ...f });
+  }
   rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
   private seq = 0;
 
@@ -205,10 +213,16 @@ class Query {
   private orderBy: { col: string; asc: boolean } | null = null;
   private max: number | null = null;
   private single = false;
+  private returning = false;
 
   constructor(private db: FakeNexusDb, private table: string) {}
 
-  select(_cols?: string) { this.op = "select"; return this; }
+  // Like the real client: select() after insert()/update() means "return the affected rows".
+  select(_cols?: string) {
+    if (this.op === "update" || this.op === "insert") this.returning = true;
+    else this.op = "select";
+    return this;
+  }
   insert(p: Row) { this.op = "insert"; this.payload = p; return this; }
   update(p: Row) { this.op = "update"; this.payload = p; return this; }
   eq(c: string, v: unknown) { this.filters.push((r) => r[c] === v); return this; }
@@ -217,20 +231,25 @@ class Query {
   limit(n: number) { this.max = n; return this; }
   maybeSingle() { this.single = true; return this; }
 
-  then<T>(res?: (v: { data: any; error: null }) => T, rej?: (e: unknown) => T) {
+  then<T>(res?: (v: { data: any; error: { message: string } | null }) => T, rej?: (e: unknown) => T) {
     return Promise.resolve().then(() => this.exec()).then(res, rej);
   }
 
-  private exec(): { data: any; error: null } {
+  private exec(): { data: any; error: { message: string } | null } {
     const rows = (this.db.tables[this.table] ??= []);
+    const fault = this.db.faults.find((f) => f.table === this.table && f.op === this.op && f.times > 0 && (!f.when || f.when(this.payload)));
+    if (fault) {
+      fault.times -= 1;
+      return { data: null, error: { message: fault.message } };
+    }
     if (this.op === "insert") {
       rows.push({ ...this.payload });
-      return { data: null, error: null };
+      return { data: this.returning ? [{ ...this.payload }] : null, error: null };
     }
     let matched = rows.filter((r) => this.filters.every((f) => f(r)));
     if (this.op === "update") {
       for (const r of matched) Object.assign(r, this.payload);
-      return { data: null, error: null };
+      return { data: this.returning ? matched.map((r) => ({ ...r })) : null, error: null };
     }
     if (this.orderBy) {
       const { col, asc } = this.orderBy;
@@ -252,6 +271,8 @@ export class FakeNexus {
   getMode: GetMode = "ok";
   posts: Array<{ headers: Headers; body: Record<string, any> }> = [];
   gets = 0;
+  /** Runs after Nexus has decided a POST (task created / duplicate) and before the response is returned. */
+  afterPost: ((body: Record<string, any>) => void) | null = null;
   /** Extra tasks (newest first) that crowd a GET window, e.g. 200 unrelated tasks. */
   filler: Row[] = [];
   private seq = 0;
@@ -306,6 +327,7 @@ export class FakeNexus {
         this.tasks.unshift(task);
         response = this.json(201, { task: { id: task.id, title: task.title } });
       }
+      this.afterPost?.(body);
       if (this.postMode === "timeout_after_create") return this.hang(init?.signal);
       if (this.postMode === "malformed_after_create") return this.json(201, { id: "wrong-shape" });
       return response;

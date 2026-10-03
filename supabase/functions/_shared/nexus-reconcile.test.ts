@@ -397,7 +397,10 @@ Deno.test("RC18: stale writer cannot overwrite the new owner's result (writes ar
     // The guarded UPDATE (claim_token = worker 1's token) matched nothing; the new owner's token stands.
     assertEquals(row.claim_token, "someone-else");
     assertEquals(row.nexus_task_id, null, "stale writer must not persist its result over the new owner");
-    assert(r.ok, "the POST itself succeeded; Nexus holds the task");
+    // Nexus holds the task, but this worker never recorded its id, so it must not claim full success
+    // (see nexus-persistence.test.ts PS06/PS07). The newer owner reports and persists its own result.
+    assertFalse(r.ok, "a fenced-out writer must not be reported as a successful create");
+    assertEquals(nexus.tasks.length, 1, "the POST itself succeeded; Nexus holds the task");
     // The new owner's later POST is safe: same key -> duplicate:true.
     db.links[0].claimed_at = db.now() - 5 * MIN; // lease expired
     const again = await ensure(db);

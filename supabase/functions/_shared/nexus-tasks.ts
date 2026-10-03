@@ -16,6 +16,7 @@
 // Sprint/Team are NOT used: placement comes from the API key's own scope.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { describeError } from "./error-text.ts";
 
 export type RequestType = "missed_class" | "escalation";
 
@@ -427,14 +428,22 @@ export async function ensureNexusTask(
     return { ok: false, dedupe_key: dedupeKey, nexus_task_id: null, reused: false, non_fatal: true, error: `not claim owner (status ${claim.status ?? "unknown"})` };
   }
 
-  const markFailed = async (status: "FAILED" | "TIMEOUT_UNKNOWN", message: string) => {
+  const markFailed = async (status: "FAILED" | "TIMEOUT_UNKNOWN", message: string, extra: Record<string, unknown> = {}) => {
     const patch: Record<string, unknown> = { status, error_message: message, updated_at: new Date().toISOString() };
     if (status === "TIMEOUT_UNKNOWN") {
       patch.reconcile_attempts = 0;
       patch.next_reconcile_at = new Date(Date.now() + RECONCILE_FIRST_DELAY_MS).toISOString();
     }
-    await db.from("rocksolid_task_links").update(patch).eq("dedupe_key", dedupeKey).eq("claim_token", claimToken);
-    await _logAudit(db, actorEmail, "NEXUS_TASK_FAILED", sourceType, sourceId || dedupeKey, { dedupe_key: dedupeKey, error: message, status });
+    // Fenced by claim_token. If this write itself fails the row stays CLAIMING and the 2-minute lease
+    // recovers it (a same-key re-POST is safe); the audit row records whether the state was stored.
+    const w = await writeFenced(db, patch, dedupeKey, claimToken);
+    await _logAudit(db, actorEmail, "NEXUS_TASK_FAILED", sourceType, sourceId || dedupeKey, {
+      dedupe_key: dedupeKey,
+      error: message,
+      status,
+      state_persisted: w.outcome === "written",
+      ...extra,
+    });
     return { ok: false, dedupe_key: dedupeKey, nexus_task_id: null, reused: false, non_fatal: true, error: message } as NexusTaskResult;
   };
 
@@ -466,11 +475,43 @@ export async function ensureNexusTask(
 
   const nexusTaskId = created.id;
 
-  await db
-    .from("rocksolid_task_links")
-    .update({ nexus_task_id: nexusTaskId, status: "CREATED", error_message: null, next_reconcile_at: null, updated_at: new Date().toISOString() })
-    .eq("dedupe_key", dedupeKey)
-    .eq("claim_token", claimToken);
+  // Nexus now holds this task (created, or returned as a duplicate). It is only a SUCCESS for the caller
+  // once the canonical id is durably stored on OUR claimed row. Verify the write instead of assuming it:
+  //   error      -> the local database failed: the remote task EXISTS but we cannot prove we recorded it.
+  //                 Park the row as TIMEOUT_UNKNOWN so reconciliation resolves it (never re-POST blindly).
+  //                 If even that write fails the row stays CLAIMING and the 2-minute lease re-claims it.
+  //   zero rows  -> our claim_token no longer matches: a newer owner holds the row. Do not write, do not
+  //                 report success; that owner persists its own result (same key => same remote task).
+  const persisted = await writeFenced(
+    db,
+    { nexus_task_id: nexusTaskId, status: "CREATED", error_message: null, next_reconcile_at: null, updated_at: new Date().toISOString() },
+    dedupeKey,
+    claimToken,
+  );
+
+  if (persisted.outcome === "error") {
+    return await markFailed(
+      "TIMEOUT_UNKNOWN",
+      `PERSISTENCE_FAILED: Nexus ${created.duplicate ? "returned existing" : "created"} task ${nexusTaskId} but the local link update failed (${persisted.message}); parked for reconciliation`.slice(0, 500),
+      { persistence_failed: true, remote_nexus_task_id: nexusTaskId, remote_duplicate: created.duplicate },
+    );
+  }
+
+  if (persisted.outcome === "lost") {
+    await _logAudit(db, actorEmail, "NEXUS_TASK_CLAIM_LOST", sourceType, sourceId || dedupeKey, {
+      dedupe_key: dedupeKey,
+      remote_nexus_task_id: nexusTaskId,
+      remote_duplicate: created.duplicate,
+    });
+    return {
+      ok: false,
+      dedupe_key: dedupeKey,
+      nexus_task_id: null,
+      reused: false,
+      non_fatal: true,
+      error: "claim lost before the Nexus task id could be stored (a newer claim owns this row)",
+    };
+  }
 
   await updateSourceNexusTaskId(db, type, payload, nexusTaskId).catch(() => { /* non-fatal */ });
 
@@ -485,6 +526,33 @@ export async function ensureNexusTask(
   });
 
   return { ok: true, dedupe_key: dedupeKey, nexus_task_id: nexusTaskId, reused: created.duplicate };
+}
+
+type FencedWrite = { outcome: "written" } | { outcome: "lost" } | { outcome: "error"; message: string };
+
+/**
+ * UPDATE rocksolid_task_links ... WHERE dedupe_key = ? AND claim_token = ?, returning the touched rows so the
+ * caller can tell the three outcomes apart: written (1 row), lost (0 rows: claim_token fencing rejected a
+ * stale worker) and error (database/transport failure). Never throws.
+ */
+async function writeFenced(
+  db: ReturnType<typeof createClient>,
+  patch: Record<string, unknown>,
+  dedupeKey: string,
+  claimToken: string,
+): Promise<FencedWrite> {
+  try {
+    const { data, error } = await db
+      .from("rocksolid_task_links")
+      .update(patch)
+      .eq("dedupe_key", dedupeKey)
+      .eq("claim_token", claimToken)
+      .select("id");
+    if (error) return { outcome: "error", message: describeError(error) };
+    return Array.isArray(data) && data.length > 0 ? { outcome: "written" } : { outcome: "lost" };
+  } catch (e) {
+    return { outcome: "error", message: describeError(e) };
+  }
 }
 
 async function _logAudit(
