@@ -118,16 +118,7 @@ async function ensureAuthorized(req: Request, db: ReturnType<typeof createClient
     return { ok: true, actorEmail: "service@system" };
   }
 
-  // Also accept the service role JWT (decoded role claim = "service_role")
-  try {
-    const parts = token.split(".");
-    if (parts.length === 3) {
-      const claims = JSON.parse(atob(parts[1]));
-      if (claims?.role === "service_role") {
-        return { ok: true, actorEmail: "service@system" };
-      }
-    }
-  } catch (_) {}
+  // NOTE: never trust a decoded JWT `role` claim here (forgeable); only the exact service key is accepted above.
 
   const { data: userData, error: userErr } = await db.auth.getUser(token);
   if (userErr || !userData?.user) return { ok: false, reason: "Invalid session" };

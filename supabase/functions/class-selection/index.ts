@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse, safeLogAudit } from "../_shared/http.ts";
+import { isServiceRoleToken } from "../_shared/caller-auth.ts";
 
 type Dict = Record<string, unknown>;
 
@@ -226,8 +227,8 @@ Deno.serve(async (req) => {
     if (action === "notify_waitlisted") {
       const authHeader = String(req.headers.get("Authorization") || "");
       const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
-      const claims = parseJwtClaims(token);
-      if (!claims || String(claims.role || "") !== "service_role") {
+      // Exact service-key match only: decoding an unverified JWT payload is forgeable.
+      if (!isServiceRoleToken(token, SERVICE_KEY)) {
         return json({ ok: false, error: "Unauthorized" }, 401);
       }
 
