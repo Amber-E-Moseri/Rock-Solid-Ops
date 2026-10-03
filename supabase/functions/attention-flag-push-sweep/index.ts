@@ -18,10 +18,10 @@ import { validateCronAuth } from "../_shared/auth.ts";
  * don't fragment into many notifications, then stamps push_notified_at so each
  * flag is nudged at most once. A skipped/failed run just picks them up next time.
  *
- * Schedule (configure like retry-worker): a pg_cron entry every 5 minutes
- * (cron expression "every 5 min") that net.http_post's this function's URL with
- * an Authorization: Bearer <service_role> header. See retry-worker's cron setup
- * for the exact net.http_post shape.
+ * Schedule: a pg_cron entry every 5 minutes (cron expression "every 5 min") that
+ * net.http_post's this function's URL with an `x-cron-secret: <CRON_INVOKE_SECRET>`
+ * header (validateCronAuth below). A bearer service-role key is NOT accepted. See
+ * docs/C6_EDGE_SECURITY_RECONCILIATION_2026-10-03.md for the cron cutover shape.
  */
 
 const MAX_FLAGS_PER_SWEEP = 200;
