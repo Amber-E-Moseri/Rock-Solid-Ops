@@ -35,11 +35,33 @@ cd "$ROOT"
 deno test --allow-env --no-prompt --no-check --node-modules-dir=auto "${DENO_UNIT_TESTS[@]}"
 DENO_EXIT=$?
 
-# In-process handler auth regression (needs read/net to import handlers; SUPABASE_URL is unroutable)
+# Offline suites that need read/net (in-process handlers on an unroutable SUPABASE_URL, local Deno.serve
+# fakes, source/migration reads): auth regression, cron contract, C6 Nexus/reconciliation, E2 auth, Moodle.
+# nexus-upstream.test.ts is deliberately excluded: it needs LOCAL_INTEGRATION_TEST + a local Supabase stack.
 deno test --allow-env --allow-net --allow-read --no-prompt --no-check --node-modules-dir=auto \
   supabase/functions/_shared/caller-auth.test.ts \
   supabase/functions/_shared/auth-regression.test.ts \
-  supabase/functions/cron-contract.test.ts
+  supabase/functions/cron-contract.test.ts \
+  supabase/functions/_shared/nexus-assignment.test.ts \
+  supabase/functions/_shared/nexus-idempotency.test.ts \
+  supabase/functions/_shared/nexus-reconcile.test.ts \
+  supabase/functions/_shared/nexus-tasks.test.ts \
+  supabase/functions/clickup-sync/retired.test.ts \
+  supabase/functions/e2-wave1-cron-auth.test.ts \
+  supabase/functions/e2-wave2-mixed-auth.test.ts \
+  supabase/functions/email-sender/timeout.test.ts \
+  supabase/functions/missed-class-detector/internal-nexus.test.ts \
+  supabase/functions/moodle-sync/failure-persistence.test.ts \
+  supabase/functions/moodle-sync/moodle-abort.test.ts \
+  supabase/functions/moodle-sync/moodle-sync.test.ts \
+  supabase/functions/moodle-sync/selector.test.ts \
+  supabase/functions/nexus-users-search/timeout.test.ts \
+  supabase/functions/notification-batch-processor/notification-batch-processor.test.ts \
+  supabase/functions/notification-dispatcher/retired.test.ts \
+  supabase/functions/registration-processor/internal-waitlist.test.ts \
+  supabase/functions/retry-worker/internal-nexus.test.ts \
+  supabase/functions/retry-worker/moodle-retry.test.ts \
+  supabase/functions/waitlist-processor/internal-auth.test.ts
 
 echo ""
 echo "========================================"

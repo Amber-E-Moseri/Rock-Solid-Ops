@@ -197,8 +197,8 @@ Deno.test("W2-retry-worker: absent bearer no longer means cron", async () => {
 Deno.test("W2-retry-worker: Nexus task escalation uses server-side credentials", async () => {
   const source = await readSource("./retry-worker/index.ts");
   assert(source.includes("ensureNexusTask("), "ensureNexusTask must be imported and used");
-  assert(source.includes("NEXUS_API_URL"), "NEXUS_API_URL env var must be referenced");
-  assert(source.includes("NEXUS_API_KEY"), "NEXUS_API_KEY must be read server-side");
+  assert(source.includes("nexusTaskConfigFromEnv()"), "Nexus task API URL/key must be read server-side from env");
+  assertEquals(source.includes('Deno.env.get("NEXUS_API_KEY")'), false, "the users-API shared secret must not be used for task creation");
   assert(source.includes("maybeEscalateMoodleFailure"), "escalation path must exist");
   assertEquals(source.includes("triggerClickupEscalation"), false, "removed ClickUp escalation function");
   // x-internal-secret may appear in auth rejection logic, but must not be used for outbound calls
