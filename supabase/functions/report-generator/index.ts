@@ -20,6 +20,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isServiceRoleToken } from "../_shared/caller-auth.ts";
 import { applyAllowedOrigin, corsHeaders, jsonResponse, safeLogAudit } from "../_shared/http.ts";
 
 const SUPABASE_URL         = Deno.env.get("SUPABASE_URL") || "";
@@ -36,6 +37,11 @@ async function requireAdminAccess(req: Request, serviceDb: ReturnType<typeof cre
   const token = getBearerToken(req);
   if (!token) {
     return { ok: false as const, status: 401, error: "Missing bearer token" };
+  }
+
+  // Scheduled reports (pg_cron net.http_post) authenticate with the service-role key.
+  if (isServiceRoleToken(token, SUPABASE_SERVICE_KEY)) {
+    return { ok: true as const, user: null };
   }
 
   const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
