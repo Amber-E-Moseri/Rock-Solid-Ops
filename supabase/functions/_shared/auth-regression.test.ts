@@ -88,3 +88,34 @@ Deno.test("class-selection notify_waitlisted: no Authorization → 401", async (
   assertEquals(res.status, 401);
   await res.body?.cancel();
 });
+
+// ── Input validation reached only by an authorised caller (no DB/network touched) ──
+const svc = `Bearer ${SERVICE_KEY}`;
+const rawPost = (auth: string, raw: string) =>
+  new Request("http://localhost/fn", { method: "POST", headers: { Authorization: auth }, body: raw });
+
+Deno.test("clickup-sync (service key): empty body → 400, malformed JSON → 400, bad type → 400", async () => {
+  const h = await loadHandler("../clickup-sync/index.ts");
+  for (const r of [post(svc, {}), rawPost(svc, "{not json"), post(svc, { type: "bogus" })]) {
+    const res = await h(r);
+    assertEquals(res.status, 400);
+    const j = await res.json();
+    assertEquals(j.ok, false);
+    assertEquals(JSON.stringify(j).includes("stack"), false);
+  }
+});
+
+Deno.test("clickup-sync: non-POST → 405", async () => {
+  const h = await loadHandler("../clickup-sync/index.ts");
+  const res = await h(new Request("http://localhost/fn", { method: "GET", headers: { Authorization: svc } }));
+  assertEquals(res.status, 405);
+  await res.body?.cancel();
+});
+
+Deno.test("retry-worker (service key): invalid action → 400", async () => {
+  const h = await loadHandler("../retry-worker/index.ts");
+  const res = await h(post(svc, { action: "drop_table" }));
+  assertEquals(res.status, 400);
+  const j = await res.json();
+  assertEquals(j.code, "INVALID_ACTION");
+});
