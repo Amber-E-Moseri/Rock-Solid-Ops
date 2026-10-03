@@ -1,9 +1,10 @@
 # C6 + Edge Security Reconciliation — 2026-10-03
 
-**Status: NOT PRODUCTION CERTIFIED. NOT MERGED. See §14 FINAL INFRASTRUCTURE CERTIFICATION (third pass), which supersedes the "blocked" statements in §9 and §11 wherever they conflict.** Integration branch `integration/c6-edge-security`.
-Database, Supabase and deployment gates have not been executed (see [Blocked gates](#9-blocked-gates)).
-Updated 2026-10-03 (second pass: cron cutover, TIMEOUT_UNKNOWN reconciliation, legacy writer
-retirement). Sections 1-3 are unchanged from the first pass.
+**Status: NOT PRODUCTION CERTIFIED. NOT MERGED.** Integration branch `integration/c6-edge-security`.
+Updated 2026-10-03 (fourth pass). History of this document: §14 is the third-pass FINAL INFRASTRUCTURE CERTIFICATION of `b13b7e5` (real Supabase-image
+Postgres + GoTrue + PostgREST); §15 records the findings from the Postgres/Nexus `task-api` certification that were then **closed on this branch** with regression
+tests (several §14 statements describe the pre-fix behaviour and are marked superseded there); §16 lists the **Nexus deployment dependencies**, kept separate.
+Sections 1-3 are unchanged from the first pass; §9 and §11 are superseded by §14-§16 where they conflict. A final certification run is still required.
 
 ## 1. Reference SHAs
 
@@ -291,12 +292,15 @@ First pass was 539 (391 Deno + 148 SPA).
 
 ## 11. Remaining work
 
+Superseded by [§15](#15-post-certification-findings-closed) and [§16](#16-nexus-deployment-dependencies) (§14 records the parallel third-pass run). Current classification:
+
 | Class | Item |
 |---|---|
-| **CODE BLOCKER** | none known |
-| **DEPLOYMENT VERIFICATION** | §9 items 1, 2, 4, 5; five unknown schedules (§8); confirm `task-api` key and its scope |
-| **DATABASE CERTIFICATION** | §9 blocked gates, in particular the claim and reconciliation RPCs and migration replay |
-| **NON-BLOCKING FOLLOW-UP** | `moodle-grade-sync` `.catch` on a query builder (pre-existing); `phase2-processor` / `mock-nexus` non-constant-time secret compare; drop the retired functions from the health-page probe lists; consider a `GET /tasks?external_unique_key=` filter in Nexus (would make "absent" a proof); retire the legacy `clickup_task_id` column names; decide cron credential scheme if the owner prefers also accepting the service key |
+| **ROCK SOLID CODE** | none open (see §15) |
+| **NEXUS CODE** | `check_and_increment_rate_limit` is absent from the Nexus migration chain (§16.1) — **blocks deployment** |
+| **DEPLOYMENT CONFIGURATION** | department-scoped `NEXUS_TASK_API_KEY` on a department with statuses (§16.2); `CRON_INVOKE_SECRET` / `INTERNAL_INVOKE_SECRET` / Vault secret; run the cron cutover script; `ALLOWED_ORIGIN` on Nexus `task-api` |
+| **PRODUCTION VERIFICATION** | the five unknown schedules (§8) and the `retry-worker` cadence; whether production has the rate-limit RPC; legacy `CREATED`/NULL rows (§15.3); CI security job (`wave1-regression`, `nexus-upstream`) |
+| **NON-BLOCKING** | `phase2-processor` / `mock-nexus` non-constant-time secret compare; `GET /tasks?external_unique_key=` filter in Nexus (would make reconciliation "absent" a proof); retire the legacy `clickup_task_id` column names; `foundation/staff/clickup-management.html` edits dead `clickup_admin_*` tables |
 
 ## 12. Appendix A: C6 preservation matrix (current state)
 
@@ -442,3 +446,175 @@ Nexus-side `task-api` rate-limit prerequisite (§14.4 item 1) could make the int
 | **NEXUS** | confirm production `check_and_increment_rate_limit` and `rate_limits` shape; issue a department-scoped, sprint-less `tasks:write`+`tasks:read` key for a department that has status definitions; confirm the `group_space_members` RLS behaviour; one live/staging round-trip with `supabase/tests/c6/nexus-e2e.ts` |
 | **DEPLOYMENT** | set `NEXUS_TASK_API_KEY`/`NEXUS_TASK_API_URL`, `CRON_INVOKE_SECRET`, `INTERNAL_INVOKE_SECRET`, Vault `cron_invoke_secret`; run the cron script in the deploy window; inspect production `cron.job` and re-point the five unknown schedules; confirm no external caller of the retired functions |
 | **NON-BLOCKING** | `23505` first-insert losers are noisy (`ON CONFLICT DO NOTHING` + re-select would return a clean `is_owner=false`); broad default DML grants to `anon`/`authenticated` rely on RLS alone |
+
+## 15. Post-certification findings closed
+
+> **Relationship to §14.** §14 is the parallel real-stack certification of `b13b7e5`. This section records the findings that were closed afterwards. Where §14
+> describes the old behaviour it is superseded here: gate 3's missing CREATED/id check (now `202610030003`), gate 5's "losers get `23505`" (now 0, `202610030002`),
+> gate 16's "a non-user assignee id is a 400 -> `FAILED`" (now terminal `ASSIGNEE_REJECTED`, `202610030004`), and its NON-BLOCKING items for the `23505` noise.
+> §14.4 (Nexus findings) is expanded, with the rate-limit evidence and a recommended Nexus migration, in §16.
+
+
+Source: the infrastructure certification of `b13b7e5f` (real Postgres 16 replays, the unmodified Nexus `task-api`, the unmodified
+C6 Edge Functions under Deno, a fault-injecting proxy between them). Fixes are separate commits on top of `b13b7e5f`; every
+regression test was mutation-tested (the fix was deliberately broken in a scratch copy and the test had to fail).
+
+### 15.1 POST-CERTIFICATION FINDINGS CLOSED
+
+| # | Finding | Root cause | Fix (commit) | Test | Status |
+|---|---|---|---|---|---|
+| 1 | Nexus created the task but the local `CREATED` write failed or was fenced out; the caller was told success, `NEXUS_TASK_CREATED` was audited, the row stayed `CLAIMING` | `ensureNexusTask` never inspected the result of its own `UPDATE ... status='CREATED'` | `c144ea1` The write is `claim_token`-fenced and returns the touched rows. 1 row = persisted, then success audit. DB error = park the row as `TIMEOUT_UNKNOWN` (reconciliation resolves it; never a blind re-POST; if the parking write also fails the 2-minute lease re-claims and the same-key POST is a Nexus duplicate). 0 rows = claim lost: write nothing, no success, no source-link write, `NEXUS_TASK_CLAIM_LOST` audit | `_shared/nexus-persistence.test.ts` PS01-PS08; 6 mutants killed; runtime: lost-persistence single and double fault, 1 Nexus task | **CLOSED** |
+| 2 | 143 of 400 simultaneous first claims raised `23505` | `claim_nexus_task` did `SELECT ... FOR UPDATE` then `INSERT`; for a new key the select locks nothing, so every caller reached the insert | `a6c8ec9` migration `202610030002`: `INSERT ... ON CONFLICT (dedupe_key) DO NOTHING RETURNING id` is the arbiter; losers fall through to the unchanged locked-row logic and get `is_owner=false`. Lease, fencing, `FAILED` retry, `TIMEOUT_UNKNOWN`/`RECONCILE_FAILED` exclusion, grants preserved | `supabase/tests/security/c6-claim-concurrency.test.sh` (real overlapping psql sessions): previous function 42/144 errors, new function 0/144, one owner per key; RPC harness 0/400 | **CLOSED** |
+| 3 | `status='CREATED'` with `nexus_task_id` NULL was possible | No constraint; the pre-C6 `clickup-sync` on `main` wrote `nexus_task_id: nexusTaskId \|\| null, status: 'CREATED'` | `8a132eb` migration `202610030003`: `CHECK (status <> 'CREATED' OR nexus_task_id IS NOT NULL)` added `NOT VALID` (enforced for every new write, never fails on legacy rows) and validated only if no violator exists; otherwise a WARNING with the count. Nothing is asserted for other states; legacy rows are never rewritten | `c6-created-id-invariant.test.sh` CI01-CI05 (fresh chain and legacy upgrade), `c6-migrations.test.ts` CM03 | **CLOSED** (legacy rows: see §15.3) |
+| 4 | A mapping to a nonexistent Nexus user was re-POSTed on every run, forever | `400 assignee not found` left the row `FAILED`, which is re-claimable immediately | `8c03862` only `400` + the exact body `assignee not found`, and only when an `assignee_id` was sent, becomes the new terminal `ASSIGNEE_REJECTED` (migration `202610030004` excludes it from re-claim). Every other 400, and 401/403/404/409/429/5xx, timeouts and network errors keep their retryable behaviour | `nexus-assignee-policy.test.ts` AP01-AP09, `CC06`; 6 edge + 1 SQL mutants killed; runtime: 1 POST across 4 runs, then operator release created the task once | **CLOSED** |
+| 5 | DB-down detector answered `200 {"ok":false,"error":"[object Object]"}` | supabase-js returns PostgREST errors as plain objects; the catch used `String(error)` and returned 200 | `500a768` `describeError` + redaction (JWTs, Nexus keys, service/cron/Nexus secret values), `503 DATABASE_UNAVAILABLE` for connectivity failures and `500 DETECTOR_ERROR` otherwise, partial counters reported, failure audit best-effort | `missed-class-detector/db-failure.test.ts` DD01-DD06 (real handler in-process); 5 mutants killed; runtime: 503, 0 Nexus calls, 0 leaked secrets | **CLOSED** |
+| 6 | `deploy-functions.sh` did not deploy `clickup-sync` or `missed-class-detector` | Hand-maintained list, no tests | `b983e4d` explicit `ACTIVE_FUNCTIONS` + `RETIRED_TOMBSTONES`, both deployed, `set -euo pipefail`; prints the 410 verification commands | `deploy-inventory.test.ts` DI01-DI08; against the previous script and config 5 of 7 fail | **CLOSED** (production redeploy still required, §16.4) |
+| 7 | `clickup-sync` `verify_jwt=true` in root config; `notification-dispatcher` had no root entry | Root config and per-function config disagreed; the CLI default is `verify_jwt=true`, so the platform would answer 401 before the 410 | `b983e4d` root `config.toml`: `clickup-sync` false, `[functions.notification-dispatcher]` added (false). `supabase/functions/<fn>/config.toml` agrees | DI04, DI05; runtime: 410 with and without credentials | **CLOSED** |
+| 8 | Code comment claimed "No automatic retry" | Deno's `fetch` can resend a POST after a connection reset (observed: once before and once after Nexus committed) | `0513498` comment and ID14 corrected: no application-level retry loop; the HTTP client may resend; duplicate safety is Nexus's unique `external_unique_key`. **Retry behaviour unchanged** | ID14 | **CLOSED** |
+| 9 | Health pages probed retired `notification-dispatcher` as a live function | Stale probe lists | `7f39b12` removed from the three active probe lists (`clickup-sync` was never listed). Historical docs untouched | DI08 | **CLOSED** |
+| 10 | `retry-worker` cadence documented as both hourly and every 20 minutes | Stale docs | `0513498` hourly (`0 * * * *`) is the declared intent: `retry-worker/config.toml`, `CLAUDE.md`, `docs/OPERATIONAL_HEALTH.md`, commit `6a61fc1` ("align retry-worker schedule to config.toml (hourly)"). README, ARCHITECTURE, NEXT_STEPS, SYSTEM_OVERVIEW, cron-jobs corrected. The cadence actually running in production is **UNVERIFIED** | — | **CLOSED** (production verification open) |
+
+Existing tests whose assertions encoded the behaviour that was changed were updated, not deleted: RC18 (a fenced-out writer is not `ok`),
+NA05 and RC15-400 (`assignee not found` is terminal; RC15 now uses a generic 400), M4 (non-2xx on detector failure), ID14 (comment).
+
+### 15.2 Operator workflow for `ASSIGNEE_REJECTED`
+
+```sql
+-- find them (also: audit_logs.action = 'NEXUS_TASK_ASSIGNEE_REJECTED', details.assignee_id/group_id/subgroup_id)
+select id, source_type, source_id, error_message, updated_at
+from public.rocksolid_task_links where status = 'ASSIGNEE_REJECTED';
+-- fix rocksolid_admin_mappings.nexus_user_id (or create the user in Nexus), then release:
+update public.rocksolid_task_links set status = 'FAILED', error_message = null
+where status = 'ASSIGNEE_REJECTED' and id = '<id>';   -- next producer run re-POSTs the SAME external_unique_key
+```
+
+### 15.3 Legacy `CREATED`/NULL rows (production check)
+
+The pre-C6 `clickup-sync` could write `CREATED` with a NULL `nexus_task_id`, so production may hold such rows. Migration `202610030003` does
+not fail on them and does not invent ids; it leaves the constraint `NOT VALID` (still enforced for new writes) and prints a WARNING. To see and
+resolve them:
+
+```sql
+select id, dedupe_key, clickup_task_id, created_at from public.rocksolid_task_links where status = 'CREATED' and nexus_task_id is null;
+-- once resolved:
+alter table public.rocksolid_task_links validate constraint rocksolid_task_links_created_requires_nexus_task_id;
+```
+
+A legacy violator is self-healing for C6: `claim_nexus_task` re-claims it (it has no id and is not terminal) and the same-key POST either creates the
+task or returns Nexus's `duplicate`.
+
+### 15.4 Verification after the fixes (sandbox; see caveats)
+
+| Gate | Result |
+|---|---|
+| Deno unit (both `test-unit.sh` invocations, 41 files) | **481 passed, 0 failed** (171 + 310; baseline 447, +34 new tests) |
+| SPA Vitest | **148 passed, 0 failed** (22 files) |
+| SPA build | OK |
+| Fresh replay (all 159 migrations, real Postgres 16) | 0 errors |
+| Upgrade replay (`main`'s 150, legacy rows seeded including a `CREATED`/NULL violator, then the 9 branch migrations) | all apply; legacy rows intact; constraint `NOT VALID` + warning; schema equals the fresh chain except `NOT VALID` vs validated |
+| RPC suite (grants, RLS, claim concurrency, stale lease, SKIP LOCKED, reconciliation) | **51/51 on both**; first-insert `23505` = **0/400** |
+| `c6-claim-concurrency.test.sh` | all pass on both (0/144 errors, one owner per key) |
+| `c6-created-id-invariant.test.sh` | all pass (fresh) |
+| Migration gate invariants / C2 contract | 6/6 and 126/126 |
+| Real `task-api`, new code: 201, 200 duplicate, timeout after commit, lost local persistence (single and double fault), same-key replay, ghost assignee | max Nexus tasks per `external_unique_key` = **1** |
+| Security: cron-secret matrix (`missed-class-detector`, `retry-worker`), fail-closed, tombstones, auth regression suites | 25/25; 410 for the tombstones; auth-regression/caller-auth/cron-contract/e2 suites inside the Deno run |
+
+Caveats: PostgREST/GoTrue were replaced by a purpose-built shim (the sandbox blocks GitHub releases and esm.sh); `pg_cron`/`pg_net`/`vault`/`http` are
+recording stubs; `supabase db reset` is stubbed in the migration gate; `wave1-regression.ts` and `nexus-upstream.test.ts` need a real Supabase stack and were
+**not run** (the CI security job must pass on the PR). The Deno runs needed an uncommitted import map (`esm.sh` → `npm:`) and `--no-lock`.
+
+## 16. NEXUS DEPLOYMENT DEPENDENCIES
+
+These are properties of the Nexus project, not of this repository. Nothing here was changed in Nexus or added to Rock Solid migrations.
+
+### 16.1 Rate-limit RPC (BLOCKER for deployment)
+
+`task-api` calls `rpc('check_and_increment_rate_limit', { p_key_id, p_max_requests: 60 })` on **every** authenticated request and answers
+`503 Rate limit service unavailable` if the RPC errors. Against a database built from the Nexus repo's migrations a valid key gets that 503.
+
+Evidence (Nexus `main` `aedbf32`, verified again; `task-api/` byte-identical to the certified `0611a28`):
+
+* The function is defined only in `supabase/migrations/.bak_20260626000000_rate_limits.sql`, a dot-prefixed file that `supabase db push` never applies. It was added already
+  dot-prefixed in commit `cc9d63d` and, in the history available to this review, has never been a live migration.
+* The live `20260902000001_rate_limiting.sql` creates `public.rate_limits` with a **different shape** (`ip_address`, `email`, `endpoint`, `attempt_count`, …) for IP/email limiting
+  (`_shared/rateLimit.ts`). It is written defensively (`create table if not exists`, index/comment steps guarded by `information_schema.columns` checks), which is repository evidence
+  that a differently-shaped `rate_limits` table already existed in production when it was written.
+
+| Hypothesis | Verdict |
+|---|---|
+| **A** production migration genuinely missing | **Confirmed for the repository chain** |
+| **B** a newer Nexus commit fixed it | **Refuted** (`main` still has no live definition) |
+| **C** production has an out-of-band RPC | **Plausible, cannot be verified from the repo** (see the guarded DO-blocks above). If true, production's `rate_limits` may be the key-shaped table, in which case the IP/email limiter would be the one failing there |
+| **D** the certification replay missed an intended migration | **Refuted** (every non-dot migration was replayed; the only definition is the `.bak_` file) |
+
+Read-only production checks (Nexus project):
+
+```sql
+select to_regprocedure('public.check_and_increment_rate_limit(uuid,integer)');       -- null = missing
+select column_name from information_schema.columns where table_schema='public' and table_name='rate_limits' order by ordinal_position;
+```
+
+**Recommended SEPARATE Nexus fix (a new forward migration in the Nexus repo; do not revive the `.bak_` file):**
+
+```sql
+-- Use a NEW table so it cannot collide with the existing public.rate_limits (ip/email shape, or key shape if production has it).
+create table if not exists public.api_key_rate_limits (
+  key_id        uuid        not null references public.api_keys(id) on delete cascade,
+  window_start  timestamptz not null,
+  request_count integer     not null default 0,
+  primary key (key_id, window_start)
+);
+alter table public.api_key_rate_limits enable row level security;        -- no policies: only service_role (bypass) may touch it
+revoke all on public.api_key_rate_limits from anon, authenticated;
+
+create or replace function public.check_and_increment_rate_limit(p_key_id uuid, p_max_requests integer default 60)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_ws timestamptz := date_trunc('minute', now()); v_we timestamptz := date_trunc('minute', now()) + interval '1 minute'; v_count integer;
+begin
+  delete from public.api_key_rate_limits where key_id = p_key_id and window_start < v_ws;
+  insert into public.api_key_rate_limits (key_id, window_start, request_count) values (p_key_id, v_ws, 1)
+  on conflict (key_id, window_start) do update set request_count = api_key_rate_limits.request_count + 1
+  returning request_count into v_count;
+  return jsonb_build_object('allowed', v_count <= p_max_requests, 'count', v_count,
+    'retry_after', case when v_count > p_max_requests then greatest(0, extract(epoch from (v_we - now()))::integer) else 0 end);
+end $$;
+revoke all on function public.check_and_increment_rate_limit(uuid, integer) from public, anon, authenticated;
+grant execute on function public.check_and_increment_rate_limit(uuid, integer) to service_role;
+```
+
+Behaviour: identical to the `.bak_` function (60 requests per key per minute, `429` + `Retry-After` beyond it, atomic upsert) on its own table. `CREATE OR REPLACE` is safe if production
+already has an equivalent function reading a key-shaped `rate_limits`. Compatibility with the current `rate_limits`: it is not read, altered or dropped. Test in Nexus: after a fresh replay
+a valid key gets `201`; 61 calls in a minute give `429` with `Retry-After`; `anon`/`authenticated` cannot execute the function. This sandbox's certification used the same body under a
+fixture name and confirmed the `60 → 429` behaviour against the real `task-api`.
+
+### 16.2 Key, department and statuses (OPERATOR CONFIGURATION REQUIRED)
+
+| Requirement | Value |
+|---|---|
+| `NEXUS_TASK_API_KEY` permissions | `tasks:write` **and** `tasks:read` (read is used by `TIMEOUT_UNKNOWN` reconciliation) |
+| Scope | **department** (Nexus requires a department or a sprint scope on every key; `api_keys_scope_check`) |
+| Sprint scope | **not required** (and not wanted: a sprint-scoped key places tasks in that sprint) |
+| Sprint / Team membership of the assignee | **not required** (`tasks.assignee_id` is only an FK to `users(id)`; `sync_task_department_id` returns when `sprint_id IS NULL`) |
+| Which department | **OPERATOR CONFIGURATION REQUIRED.** Nothing in this repository identifies it, so no department is chosen in code. The key's department owns every Rock Solid task |
+| Department must have task statuses | The `tasks.status_id` trigger resolves statuses only from the task's own department. A department with none makes `POST /tasks` fail with a 500 (`status_id` NOT NULL). In the replayed Nexus schema Admin, Media, ORS, PFCC and Pastors have 5 active statuses; **General and Programs have none** |
+| Nexus env | `ALLOWED_ORIGIN` must be set on `task-api` or every request returns 500 |
+| Never in the browser | the key is server-side only (`NEXUS_TASK_API_KEY` Edge secret) |
+
+### 16.3 Assignee behaviour (documented, not changed)
+
+Nexus validates only that `assignee_id` exists in `public.users`. Inactive, archived, pending and other-department users are accepted. Rock Solid does not add a restriction.
+An unknown id is `400 assignee not found` (now terminal `ASSIGNEE_REJECTED` on the Rock Solid side, §15).
+
+### 16.4 Deployment checklist (nothing here was done)
+
+1. Nexus: apply the rate-limit fix (§16.1) or confirm production already has the RPC.
+2. Nexus: create the department-scoped key (§16.2); set `NEXUS_TASK_API_KEY` (and `NEXUS_TASK_API_URL` if not `${NEXUS_API_URL}/task-api`) as Edge secrets.
+3. Rock Solid: set `CRON_INVOKE_SECRET` and `INTERNAL_INVOKE_SECRET` (different values); store the cron secret in Vault as `cron_invoke_secret`.
+4. Rock Solid: `scripts/deploy-functions.sh` (deploys **both** tombstones, so the live legacy `clickup-sync` is replaced; verify both answer 410).
+5. Rock Solid: apply migrations `202610030001`-`202610030004`; read the `202610030003` warning if any.
+6. Run `supabase/ops/cron-cutover-x-cron-secret.sql` immediately after deploy (the 9 repo-defined jobs send the service key and get 401 from hardened functions until re-pointed).
+7. Schedules (not provable from the repo, **do not assume they exist**; verify with `select jobid, jobname, schedule, active, command from cron.job where command ilike '%/functions/v1/<fn>%'`):
+   * `missed-class-detector` is **required**: it is the only C6 producer. Declared cadence in docs: daily 02:15 UTC (not in any config).
+   * `retry-worker` is **required**: reconciliation runs inside it. Declared cadence: hourly `0 * * * *` (§15 finding 10). Operator decision if a different cadence is wanted.
+   * `email-sender` (`*/15`), `notification-batch-processor` (`0 9 * * *`): required for email, not C6. `attention-flag-push-sweep`: no declared cadence; VAPID unconfigured.
+8. CI: the PR's security job must run `wave1-regression.ts` and `nexus-upstream.test.ts` (not runnable in the sandbox).
