@@ -25,7 +25,7 @@ strippable on its own if the operator reverses.
 
 ### `integration/c6-edge-security`
 
-Status: code complete for the second pass, deliberately NOT merged (2026-10-03, per operator brief). Not production
+Status: code complete; database and local real-code Nexus gates executed (third pass, see §14 of the reconciliation doc); deliberately NOT merged (2026-10-03, per operator brief). Not production
 certified. Full detail: `docs/C6_EDGE_SECURITY_RECONCILIATION_2026-10-03.md`.
 
 Gates before merge authorization (none is a code failure; all need an environment this branch was not built in):
@@ -37,8 +37,8 @@ Gates before merge authorization (none is a code failure; all need an environmen
 2. **Nexus.** Issue a `task-api` key (`tasks:write` + `tasks:read`, ideally no sprint scope); set `NEXUS_TASK_API_KEY` /
    `NEXUS_TASK_API_URL`. The C6 client was rebuilt to the real `task-api` contract (it matched no Nexus endpoint before); it has
    not been exercised against a live Nexus.
-3. **Database certification.** Replay migrations including `202610030001`; run the live RPC/RLS tests, the atomic-claim and
-   reconciliation RPC semantics, and SKIP LOCKED concurrency. All were BLOCKED (no Docker) and are grammar-validated only.
+3. **Database certification: DONE on a real Supabase Postgres (not the CLI stack).** Fresh replay 156/156, RPC 37/37, concurrency, RLS 56/56 all PASS. Remaining: run `scripts/test-c6-db.sh` on the official `supabase start` stack (wired into CI).
+3b. **Nexus.** Production `check_and_increment_rate_limit` must exist (it is only in an ignored `.bak_` migration in the Nexus repo; fresh installs return 503). A live/staging round-trip has NOT run.
 4. Confirm no external caller of the retired `clickup-sync` / `notification-dispatcher` (they now answer 410).
 5. Confirm the local C6 working copy vs `brief/c6-timeout-hardening` (not comparable from GitHub).
 6. Operator decision, if wanted: also accept the exact service key as a cron credential (not done; contradicts the E1/E2 design).

@@ -95,7 +95,7 @@ supabase migration list
 | `NEXUS_API_URL` | Nexus task management endpoint | Yes |
 | `NEXUS_API_KEY` | Nexus `users` lookup authentication (Bearer) | Yes |
 | `NEXUS_TASK_API_URL` | Nexus task-api base URL (default `${NEXUS_API_URL}/task-api`) | No |
-| `NEXUS_TASK_API_KEY` | Nexus task-api key sent as `x-api-key` (needs `tasks:write` + `tasks:read`); task creation and reconciliation fail closed without it | Yes |
+| `NEXUS_TASK_API_KEY` | Nexus task-api key sent as `x-api-key` (needs `tasks:write` + `tasks:read`; department-scoped, sprint-less; the department needs task-status definitions); task creation and reconciliation fail closed without it | Yes |
 | `PHASE2_WEBHOOK_SECRET` | Phase2 processor authentication (if used) | No |
 | `ATTENDANCE_ADMIN_EMAIL` | Attendance ops contact | No |
 | `TEACHER_PORTAL_URL` | Teacher portal URL | No |

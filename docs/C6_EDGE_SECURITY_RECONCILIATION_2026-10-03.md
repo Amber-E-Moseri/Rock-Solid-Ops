@@ -1,6 +1,6 @@
 # C6 + Edge Security Reconciliation — 2026-10-03
 
-**Status: NOT PRODUCTION CERTIFIED. NOT MERGED.** Integration branch `integration/c6-edge-security`.
+**Status: NOT PRODUCTION CERTIFIED. NOT MERGED. See §14 FINAL INFRASTRUCTURE CERTIFICATION (third pass), which supersedes the "blocked" statements in §9 and §11 wherever they conflict.** Integration branch `integration/c6-edge-security`.
 Database, Supabase and deployment gates have not been executed (see [Blocked gates](#9-blocked-gates)).
 Updated 2026-10-03 (second pass: cron cutover, TIMEOUT_UNKNOWN reconciliation, legacy writer
 retirement). Sections 1-3 are unchanged from the first pass.
@@ -245,7 +245,7 @@ For each: `select jobid, jobname, schedule, active, command from cron.job where 
 it must send `x-cron-secret` (the script's final query lists any job still posting without it). Authentication was **not** weakened for any
 of them.
 
-## 9. Blocked gates
+## 9. Blocked gates (second pass; most were executed in the third pass, see §14)
 
 **BLOCKED, CLOUD ENVIRONMENT LIMITATION** (no Docker daemon, no Supabase stack; re-checked this pass). None counted as passes:
 
@@ -346,3 +346,99 @@ migration is covered in §5.
 | Handler-level auth regression suite | `f488b54`, `d9b3e66` | **CHERRY-PICKED** (`c8df977`, `ccdcf42`) then **MANUALLY RECONCILED** (`22a9038`) to the cron/internal contract; extended to email-sender, notification-batch-processor, missed-class-detector, attention-flag-push-sweep | `auth-regression.test.ts` (57 now; adds 12 cron-acceptance cases) | Pass |
 | Audit report + local-C6 checklist | `aeac841` | **MANUALLY RECONCILED**: report copied with a status banner; `LOCAL_C6_HANDOFF_CHECKLIST.md` **NOT APPLICABLE** (obsolete: C6 already on GitHub) | n/a | n/a |
 | **Medium** — `notification-dispatcher` has no caller authentication | not in the audit (found in first-pass review) | **Second pass: retired as a 410 tombstone** (§7) rather than guarded: unreferenced and documented dead | `notification-dispatcher/retired.test.ts` (3) | Closed in code; confirm no external caller |
+
+## 14. FINAL INFRASTRUCTURE CERTIFICATION (third pass)
+
+Branch `integration/c6-edge-security`, started at `b13b7e5`. Nothing here touched production, merged or pushed to `main`.
+Classification per gate: **PASS / FAIL / BLOCKED / DEPLOYMENT ACTION REQUIRED**. BLOCKED is never counted as PASS.
+
+### 14.1 What the environment actually provided
+
+| Component | Reality |
+|---|---|
+| Docker | The `dockerd` binary was present but not running. It started (`dockerd`) and works. |
+| Official Supabase CLI stack (`supabase start`) | **BLOCKED — ENVIRONMENT LIMITATION.** Its images come from `public.ecr.aws`; the egress policy returns 403 for that registry's blob host. Not bypassed. |
+| Substitute used | The **real Supabase Postgres image** `supabase/postgres:17.6.1.054` (Docker Hub, the same image the CLI stack uses for its database), the **real GoTrue** `v2.188.1`, the **real PostgREST**, and a ~20-line gateway mapping `/auth/v1` and `/rest/v1`. Real roles (`anon`/`authenticated`/`service_role`), `pg_cron 1.6.4`, `pg_net 0.19.5`, `supabase_vault 0.3.1`. |
+| Caveat | This is not the CLI's full stack (no Kong/Storage/Realtime). Everything below that needs only Postgres + auth + REST is real; CI's `supabase start` will re-run the same suites on the official stack. |
+| Environment-only fixes (not repo defects) | The bare image lacks GoTrue's `auth.jwt()`; GoTrue was started first and a fresh replay done. GoTrue needs `GOTRUE_JWT_AUD`/`GOTRUE_JWT_DEFAULT_GROUP_NAME=authenticated` or tokens carry `role:""` (an early all-401 run was invalid for that reason and discarded). |
+
+### 14.2 Gate results
+
+| # | Gate | Result | Evidence |
+|---|---|---|---|
+| 1 | Fresh migration replay from zero | **PASS** | 156 files, first `000_baseline_squash.sql`, last `202610030001_nexus_task_reconciliation.sql`, **0 failures**, 5 warnings (intentional template-placeholder notices in `202605161200`). Re-applying `202610030001` is a no-op (idempotent). |
+| 2 | `scripts/test-migration.sh` invariants | **PASS** | 6/6 (its `supabase db reset` line replaced by the replay above). |
+| 3 | Schema verification | **PASS, with findings** | PK + `UNIQUE(dedupe_key)`; reconcile/claim/retry/timestamp columns present; RLS enabled, admin-only policies; `updated_at` trigger. **Finding:** no `status` CHECK, so the database itself does not prevent an invalid status or `CREATED` without a Nexus id (enforced by RPCs/edge only). Real states are `PENDING, CLAIMING, CREATED, FAILED, TIMEOUT_UNKNOWN, RECONCILE_FAILED` (there is no `CLAIMED`). NON-BLOCKING: consider a `NOT VALID` CHECK. |
+| 4 | RPC certification (real RPCs, as `service_role`) | **PASS** | `supabase/tests/c6/rpc-certification.sql`: 37/37 (each case records input, starting state, returned value, resulting state). |
+| 5 | Atomic claim | **PASS** | 24 workers x 40 keys = 960 simultaneous attempts: exactly one owner per key, one row per key, owner token matches. Losers get `23505` (first-insert race, ~90% of attempts) rather than a graceful `is_owner=false`: safe, noisy, NON-BLOCKING. |
+| 6 | Claim-token fencing | **PASS** | Every loser's finalize updated 0 rows; a stale writer cannot overwrite the new owner (F01); wrong lease token cannot resolve (V03). |
+| 7 | SKIP LOCKED concurrency | **PASS** | 400 due rows, 16 workers: 400 leased, 400 distinct, 0 double-leased, all 16 workers got rows, 0 deadlocks. Concurrent claim+resolve: 400/400 applied, final state consistent. Key-pool contention (24 workers, 12 keys): one owner per key. C1's own `skip_locked_concurrency.test.sh` SC01/SC02 PASS. **Mutation-proven:** with `SKIP LOCKED` removed, 393 rows were double-leased and S4/S5 failed. |
+| 8 | Stale-claim recovery | **PASS** | Real boundary: 119 s held, 121 s recoverable; 24 workers racing for one expired claim: exactly one owner; fresh claim never stolen. |
+| 9 | TIMEOUT_UNKNOWN (DB) | **PASS** | Never reclaimable (30 days old, also `RECONCILE_FAILED`); FOUND -> CREATED + id; ABSENT -> FAILED then claimable; UNKNOWN -> attempts+1, 10 min backoff; **terminal `RECONCILE_FAILED` exactly on the 24th inconclusive attempt, not before**; terminal row refused by both claim paths. |
+| 10 | Concurrent reconciliation | **PASS** | Disjoint leases; leased rows not handed to a second worker; abandoned lease reclaimable after expiry. |
+| 11 | RLS / RPC authorization (real HTTP, real JWTs) | **PASS** | Wave 1 regression 33/33; C6 suite 56/56 (anon, pending, teacher as wrong user, admin, superadmin, service_role on `rocksolid_task_links`, `rocksolid_admin_mappings` and the three RPCs, with DB state verified after every request: the RPCs return 401/403 `42501` and create nothing for everyone but `service_role`); C2 `failed_syncs` contract 126 checks; `nexus-upstream` isolation PASS (previously BLOCKED). **Note:** by policy any `is_admin()` role (admin, superadmin, pastor, principal, regional_secretary, ...) can insert/update task links and re-point assignee mappings; table-level DML grants to `anon`/`authenticated` exist and RLS is the only barrier. Intended design, documented. |
+| 12 | Nexus task-api scopes | **PASS (source + live)** | `POST` requires `tasks:write`, `GET` requires `tasks:read` (real 403s observed). Reconciliation therefore needs **both**; a write-only key makes lookups return 403, which Rock Solid treats as *unknown*, never absent (E6c). |
+| 13 | Key scope without Sprint | **PASS, with a requirement** | `api_keys_scope_check` requires `department_id IS NOT NULL OR sprint_id IS NOT NULL` (live: a key with neither is rejected). A **department-scoped key with no sprint works** (tasks land with `sprint_id` NULL, `task_type=space`). Rock Solid needs no Sprint/Team. The key's department must have active task-status definitions or every create is a 500 (status resolution trigger). |
+| 14 | Real Nexus round-trip | **BLOCKED (live/staging); PASS (real code, local)** | No staging/production Nexus endpoint or key exists here and production was not touched. The authoritative `task-api` source (unmodified copy of `Nexus@0611a28`) was run against a real Nexus Postgres built from Nexus's own migrations. `supabase/tests/c6/nexus-e2e.ts`: 21 PASS, 0 FAIL, 1 UNVERIFIED, reproducible on two consecutive runs. |
+| 15 | Nexus idempotency | **PASS (real code); live BLOCKED** | Same `external_unique_key` posted again (with the Rock Solid link present, with it deleted, and by the raw client): `201 {duplicate:false}` then `200 {duplicate:true}`, **actual Nexus tasks = 1**. |
+| 16 | Real assignment | **PASS (real code)** | `rocksolid_admin_mappings.nexus_user_id` -> `tasks.assignee_id` (also after unknown -> reconcile -> retry). **Sprint required = NO. Team required = NO** (task-api has no team concept). A non-user id is a real 400 -> `FAILED`, nothing created. |
+| 17 | Assignee can see the task in Nexus | **UNVERIFIED** | The replayed Nexus schema raises `infinite recursion detected in policy for relation "group_space_members"` for *any* `authenticated` read of `tasks` (reproduced independently). Either a Nexus fresh-install RLS defect or production differs; cannot be determined here. |
+| 18 | Unknown-outcome safety (real) | **PASS** | Timeout after Nexus created the task: `TIMEOUT_UNKNOWN`, producer rerun made **0** further POSTs, reconcile found it by key (real `GET /tasks`), no POST. Timeout before Nexus saw it: reconcile -> absent -> released; re-POST of the same key created exactly one task. Lookup unavailable (503) or key lacking `tasks:read` (403): stays unknown, attempt counted, no POST. Real 401 / 403 / 400 -> definite `FAILED`. |
+| 19 | Cron pre-flight | **PASS on a test target; production = DEPLOYMENT ACTION REQUIRED** | See §14.3. |
+| 20 | Cron cutover | **PASS on the test target; NOT executed in production -> DEPLOYMENT ACTION REQUIRED** | See §14.3. |
+| 21 | Cron function smoke | **PASS** | `supabase/tests/c6/cron-smoke.ts`: 12 handlers x 5 credentials = 60/60 (no auth, wrong secret, service-role bearer, forged `service_role` JWT all 401; correct `x-cron-secret` passes and runs against the test DB with Resend/Moodle/Nexus unset; `email_queue` stayed empty). `moodle-grade-sync` returns 500 after passing auth because `MOODLE_URL` is unset, as designed. |
+| 22 | Retired functions | **PASS (behaviour); external callers UNKNOWN -> DEPLOYMENT ACTION REQUIRED** | `clickup-sync` and `notification-dispatcher`: 410 for every credential/method (including a real service-role bearer and a forged JWT), **0 outbound requests**, row counts on `rocksolid_task_links`, `scheduled_notifications`, `notification_events`, `email_queue`, `audit_logs`, `moodle_enrollment_sync` unchanged (a seeded `notification_events` row the old dispatcher would have processed stayed untouched). No `cron.job` references either. No repo caller exists; production callers cannot be ruled out from here. |
+| 23 | `moodle-grade-sync` `.catch` bug | **FIXED** | Reproduced first (`...insert(...).catch is not a function` leaked into the response and aborted the student's grade sync; the `grade_sync_available` update was never sent). Fixed minimally (await in try/catch); `builder-catch.test.ts` fails before, passes after; Moodle suites 55/55. The other `.catch` sites in the tree chain real Promises. |
+| 24 | Health probes | **FIXED** | `notification-dispatcher` removed from all three probe lists (`clickup-sync` was never probed); guard test mutation-checked. |
+
+### 14.3 Cron cutover detail
+
+Target: this local database (explicitly safe). Production's `cron.job` could not be inspected, so **the real deployed status of the five unknown
+schedules is UNKNOWN** (`retry-worker`, `email-sender`, `notification-batch-processor`, `missed-class-detector`, `attention-flag-push-sweep`); in this DB
+they are ABSENT because the repo defines none. That is a statement about the repo, not about production.
+
+1. Replayed DB had only `supabase_vault`; `pg_cron`/`pg_net` were available but not created, which is why the legacy cron migrations skip scheduling. Both
+   were created, then a production-shaped state built: the six legacy cron `DO` blocks (dummy key; host rewritten to a local listener so nothing could reach
+   production), `moodle-sync` per `CUTOVER_PLAN.md`, and an unrelated decoy job. **10 jobs on `Authorization: Bearer`.**
+2. Script run **before** the Vault secret existed: refused (`Vault secret 'cron_invoke_secret' is missing`), nothing changed (checked twice).
+3. Script run after: `10 job(s) re-pointed`; names, schedules and active flags **byte-identical** to before; decoy untouched; the secret is a Vault lookup and
+   appears in **no** stored command; verification query returns 0; second run is a no-op.
+4. The stored command of every re-pointed job was fired through pg_net at a listener that applies the repo's real `validateCronAuth`: **10/10 sent
+   `x-cron-secret`, 0 sent `Authorization`, 10/10 accepted**, bodies preserved (the four `report-generator` jobs keep their `report_type`/`period`).
+5. Final inventory in the test DB: **jobs using old auth 0, jobs using `x-cron-secret` 10, decoy 1.**
+
+Production operator procedure is unchanged (header of `supabase/ops/cron-cutover-x-cron-secret.sql`). Do not merge-and-deploy functions before the cutover window
+is scheduled: between function deploy and script run the affected jobs receive 401.
+
+### 14.4 Nexus-side findings (outside this repository; not changed here)
+
+1. **`task-api` depends on `check_and_increment_rate_limit(uuid,int)` (called on every request), which exists only in `supabase/migrations/.bak_20260626000000_rate_limits.sql`, a file
+   the CLI ignores.** Nexus's active chain defines `public.rate_limits` as an IP/email anti-abuse table, which is incompatible with that function. On a fresh Nexus install
+   every `task-api` call returns **503**. Production may differ depending on apply history. **Verify in the production Nexus before relying on `task-api`.** For this
+   certification the RPC was stubbed (`allowed:true`) in the *local* Nexus only, so the real 60 req/min limit is untested (a 429 is handled as a definite `FAILED`, RC15).
+2. A newly created Nexus department has no task-status definitions (only departments existing at backfill time do); seed them or every create is a 500 (`status_id NOT NULL`).
+3. `infinite recursion detected in policy for relation "group_space_members"` for any `authenticated` read in the replayed schema (gate 17).
+4. Nexus's migration chain does not replay cleanly without its Storage service (8 files fail on `storage.buckets`), unrelated to `task-api`.
+
+### 14.5 Totals
+
+| Suite | Passed | Failed | Skipped | Blocked / unverified |
+|---|---|---|---|---|
+| Deno (38 files, exact `test-unit.sh` invocations) | **452** | 0 | 0 | |
+| SPA Vitest (22 files) | **148** | 0 | 0 | |
+| Database: RPC cert 37 · concurrency 13 · C6 RLS-HTTP 56 · Wave 1 33 · C2 contract 126 · C1 SKIP LOCKED 2 · migration invariants 6 · `nexus-upstream` 1 file | **all PASS (274 checks + 1 file)** | 0 | 0 | official `supabase start` stack BLOCKED |
+| Nexus (real code, local): e2e | **21** | 0 | 0 | 1 UNVERIFIED; live/staging BLOCKED |
+| Cron: contract 8 · function smoke 60 · cutover script on test target | **PASS** | 0 | 0 | production inventory UNKNOWN |
+
+### 14.6 Release classification
+
+**CODE-READY / DEPLOYMENT ACTION REQUIRED. Not "READY FOR MERGE AUTHORIZATION".** A live or staging Nexus round-trip has not run, so that required gate is BLOCKED, and the
+Nexus-side `task-api` rate-limit prerequisite (§14.4 item 1) could make the integration non-functional in production regardless of this branch.
+
+| Class | Items |
+|---|---|
+| **CODE** | none known |
+| **DATABASE** | official `supabase start` run of `scripts/test-c6-db.sh` (wired into CI's security job); optional `NOT VALID` status CHECK |
+| **NEXUS** | confirm production `check_and_increment_rate_limit` and `rate_limits` shape; issue a department-scoped, sprint-less `tasks:write`+`tasks:read` key for a department that has status definitions; confirm the `group_space_members` RLS behaviour; one live/staging round-trip with `supabase/tests/c6/nexus-e2e.ts` |
+| **DEPLOYMENT** | set `NEXUS_TASK_API_KEY`/`NEXUS_TASK_API_URL`, `CRON_INVOKE_SECRET`, `INTERNAL_INVOKE_SECRET`, Vault `cron_invoke_secret`; run the cron script in the deploy window; inspect production `cron.job` and re-point the five unknown schedules; confirm no external caller of the retired functions |
+| **NON-BLOCKING** | `23505` first-insert losers are noisy (`ON CONFLICT DO NOTHING` + re-select would return a clean `is_owner=false`); broad default DML grants to `anon`/`authenticated` rely on RLS alone |

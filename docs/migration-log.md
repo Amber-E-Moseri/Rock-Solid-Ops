@@ -3020,3 +3020,16 @@ Branch `integration/c6-edge-security`. Details and gates: `docs/C6_EDGE_SECURITY
 **HOLD:** not merged, not production certified. Recorded in `docs/BRANCH_HOLDS.md`. No production deployment, cron change or secrets
 change was made by this work.
 
+
+---
+
+## 2026-10-03 (third pass) — final database + Nexus certification gate
+
+Executed on a real Supabase Postgres image + real GoTrue + real PostgREST (official CLI stack blocked by egress policy). Fresh replay 156/156
+(0 failures); C6 RPC 37/37; concurrency (atomic claim, fencing, SKIP LOCKED, stale recovery) PASS and mutation-proven; RLS/RPC over HTTP 56/56; Wave 1 33/33;
+C2 126; `nexus-upstream` PASS. Real `task-api` + real Nexus DB: 21 PASS / 0 FAIL / 1 UNVERIFIED. Cron cutover executed on a safe test target only:
+10 jobs re-pointed, all send `x-cron-secret`, none `Authorization`. Fixed: `moodle-grade-sync` builder `.catch` bug. Removed the retired
+`notification-dispatcher` from health probes. **Nexus-side risks found** (rate-limit RPC only in a `.bak_` migration; per-department status definitions; RLS recursion). See §14.
+
+**HOLD unchanged:** not merged, not production certified: live/staging Nexus round-trip, production cron inventory/cutover and the Nexus prerequisites remain operator actions.
+
