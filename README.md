@@ -265,7 +265,7 @@ Pipeline:
 
 ### 10. Nexus Escalation
 
-- Function: `clickup-sync` (retained name; posts to Nexus, not ClickUp)
+- Function: `clickup-sync` — RETIRED (410 tombstone). Task creation lives in `_shared/nexus-tasks.ts`
 - Creates tasks in Nexus for missed classes and operational escalations
 - Admin-to-Nexus-user mapping: `rocksolid_admin_mappings`
 - Idempotency via `rocksolid_task_links`
@@ -346,7 +346,7 @@ Note: current access is primarily role-based; regional data scoping is not globa
 | `attendance-reminder` | Cron | Cron auth | Attendance reminders |
 | `review-checkin` | Cron | Cron auth | REVIEW follow-up |
 | `student-engagement-monitor` | Cron | Cron auth | Engagement monitoring |
-| `clickup-sync` | On-demand | Bearer token | Nexus escalation (retained function name) |
+| `clickup-sync` | Retired (410 tombstone) | None | Superseded by `_shared/nexus-tasks.ts` (`ensureNexusTask`) |
 | `nexus-users-search` | On-demand | Bearer token | Nexus user lookup for admin mapping UI |
 | `waitlist-processor` | On-demand | Internal | Waitlist evaluation |
 | `class-selection` | On-demand | Token | Class selection token handler |
@@ -592,7 +592,7 @@ Never:
 ### July 2026 - Integration Consolidation
 
 - ClickUp replaced with Nexus API for task escalation
-- `clickup-sync` function renamed logically; posts to `NEXUS_API_URL`
+- `clickup-sync` retired (410 tombstone); Nexus tasks are created by `_shared/nexus-tasks.ts`
 - Tables: `rocksolid_admin_mappings`, `rocksolid_task_links`
 
 ### May 2026 - UX & Mobile Improvements

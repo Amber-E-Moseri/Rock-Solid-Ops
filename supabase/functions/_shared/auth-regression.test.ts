@@ -75,7 +75,6 @@ const GUARDED = [
   "attendance-reminder",
   "review-checkin",
   "report-generator",
-  "clickup-sync",
   "email-sender",
   "notification-batch-processor",
   "missed-class-detector",
@@ -194,30 +193,7 @@ const cron = { "x-cron-secret": CRON_SECRET };
 const rawPost = (headers: Record<string, string>, raw: string) =>
   new Request("http://localhost/fn", { method: "POST", headers, body: raw });
 
-Deno.test("clickup-sync (internal secret): empty body → 400, malformed JSON → 400, bad type → 400", async () => {
-  const h = await loadHandler("../clickup-sync/index.ts");
-  for (const r of [post(internal, {}), rawPost(internal, "{not json"), post(internal, { type: "bogus" })]) {
-    const res = await h(r);
-    assertEquals(res.status, 400);
-    const j = await res.json();
-    assertEquals(j.ok, false);
-    assertEquals(JSON.stringify(j).includes("stack"), false);
-  }
-});
-
-Deno.test("clickup-sync: service-role key as bearer is not an internal credential → 401", async () => {
-  const h = await loadHandler("../clickup-sync/index.ts");
-  const res = await h(post(bearer(SERVICE_KEY), { type: "bogus" }));
-  assertEquals(res.status, 401);
-  await res.body?.cancel();
-});
-
-Deno.test("clickup-sync: non-POST → 405", async () => {
-  const h = await loadHandler("../clickup-sync/index.ts");
-  const res = await h(new Request("http://localhost/fn", { method: "GET", headers: internal }));
-  assertEquals(res.status, 405);
-  await res.body?.cancel();
-});
+// clickup-sync is a retired 410 tombstone (see clickup-sync/retired.test.ts); it has no writer behaviour left to guard.
 
 Deno.test("retry-worker (cron secret): invalid action → 400", async () => {
   const h = await loadHandler("../retry-worker/index.ts");

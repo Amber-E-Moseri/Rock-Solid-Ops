@@ -21,7 +21,7 @@
 - Environment-specific secret
 - Passed via `x-internal-secret` HTTP header
 - Used when one Edge Function calls another
-- Examples: registration-processor → waitlist-processor, retry-worker → clickup-sync
+- Examples: registration-processor → waitlist-processor
 - Verified via SHA-256 hash comparison (timing-safe)
 - Cannot be used as substitute for CRON_INVOKE_SECRET or user JWT
 

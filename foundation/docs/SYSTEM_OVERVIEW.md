@@ -204,14 +204,15 @@ All functions live under `supabase/functions/`. They run on Deno. Shared utiliti
 | `report-generator` | Generates admin reports; requires valid user JWT | HTTP POST (admin only) | None |
 | `teacher-portal-api` | Teacher portal API (attendance, class view, grade visibility) | HTTP POST with teacher JWT | None |
 | `admin-api` | Admin operations API (router pattern) | HTTP POST with admin JWT | None |
-| `clickup-sync` | Creates ClickUp tasks for escalations / missed class notices | HTTP POST `{ type }` | None |
+| `clickup-sync` | RETIRED (410 tombstone). Nexus tasks are created by `_shared/nexus-tasks.ts` | — | — |
 | `email-retry` | Resets a single `email_queue` row to Pending | HTTP POST `{ id }` | None |
 | `class-selection` | Handles class time selection links for registered students | HTTP POST | None |
 | `reminder-processor` | **Deprecated tombstone** — renamed to `notification-batch-processor` | Cron (still scheduled) | Every 15 min |
 
 
 
-> **Note:** eport-generator now applies request-origin allow headers before handling requests (pplyAllowedOrigin(req)) to avoid browser edge-invoke transport failures.
+> **Note:** 
+eport-generator now applies request-origin allow headers before handling requests (pplyAllowedOrigin(req)) to avoid browser edge-invoke transport failures.
 
 ---
 
