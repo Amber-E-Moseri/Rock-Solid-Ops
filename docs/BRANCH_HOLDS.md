@@ -65,6 +65,7 @@ Gates before merge:
    end-to-end registration test on staging). The design document lists each item.
 3. Risk R1 (authenticated TRUNCATE) is a separate follow-up brief, not part of this PR.
 4. Production apply is a separate owner decision after the staging rehearsal is clean.
+5. **Unresolved breaking change (R12):** the published teacher availability page reads `teachers` and `batches` columns with the anon key. Merge and apply are blocked until the owner chooses the fix (session token in `availabilityApi.js`, or a wider anon grant).
 
 Design and risk register: `docs/ANON_PRIVILEGE_HARDENING_2026-10-22.md`.
 
