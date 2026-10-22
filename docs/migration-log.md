@@ -2878,3 +2878,93 @@ Result labels: **PASS** = verified with evidence. **FAIL** = verified not to mee
 ### 7. CI on PR #6 (registration repair)
 
 - Head `0ab80dee`. Migration gate: PASS. Unit tests: PASS. Netlify deploy preview: PASS. Security regression: PASS (run `39716908550`, 2m7s). Head `0ab80dee`, PR #6 open and not merged.
+
+## 2026-10-22 — Registration repair: production execution record and post-release verification
+
+Result labels: **PASS** = verified with evidence. **FAIL** = verified not to meet the requirement. **UNVERIFIED** = not testable here, with the reason. No credentials, connection details, passphrases or file contents are recorded here.
+
+### 1. Authorisation and sequence
+
+- Owner approval (conditional) for the controlled repair associated with PR #6 at head `a3ebc4b1`, with conditions: verified head and green CI; PR #9 backup procedure reviewed; fresh encrypted backup verified before SQL; production target confirmed; full preflight repeated; merge introduces no unrelated application change; only the reviewed two-column additive migration; history method A from a verified production-linked directory; registration form checked without creating records.
+- PR #6 merged at merge commit `6cfaf021f6a870c5df6a2d8de364df028255be49`, pinned to head `a3ebc4b1`. Changed files: migration, rollback script in `supabase/ops/` (not executed), test harness, and runbook. No application code changed. PASS.
+- PR #9 (backup script and runbook) was reviewed at head `bb39c06d` and was not merged in this sequence. The script run was byte-identical to the reviewed head. PASS.
+
+### 2. Backups
+
+| Backup | Snapshot time (UTC) | Scope | Verification |
+|---|---|---|---|
+| Pre-repair dump (encrypted) | 2026-10-22 05:42:09 | `public` schema with data | Checksum PASS; archive lists 56 table-data entries PASS |
+| Pre-repair history export (encrypted) | 2026-10-22 05:42:09 | `supabase_migrations.schema_migrations`, 159 rows | Checksum PASS |
+| Post-repair dump (encrypted) | 2026-10-22 05:44:54 | `public` schema with data | Checksum PASS; 56 table-data entries PASS |
+| Post-repair history export (encrypted) | 2026-10-22 05:44:54 | 160 rows | Checksum PASS |
+
+Storage: a local folder outside every Git repository, restricted to the operator account. No plaintext copies remain. Platform backups and PITR are unavailable on the Free plan. This is recorded as a limitation, not a PASS.
+
+### 3. Execution
+
+| Step | Result |
+|---|---|
+| Target confirmed as production project `xelpsttqhrcqmttmjory` (production-linked directory; live site configuration) | PASS |
+| Preflight before the DDL: both columns absent; target version not recorded; 159 history rows; 13 class-option rows; 4 policies; PostgreSQL 17.6; original-columns checksum `e5037229c4c14e479fa2fd738fe66b48`; registration filter returns 13 | PASS |
+| Reviewed two-column DDL applied in one transaction with a validation block (`ALTER TABLE public.class_options ADD COLUMN IF NOT EXISTS is_online BOOLEAN NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS confirmed_start_date DATE NULL`) | PASS |
+| First history attempt (method A) stopped by the CLI because the migration file was not in its working directory. No change was made. The reviewed file from `main` was copied into the production-linked working directory (checksum verified), and method A was run again. | PASS (method unchanged) |
+| Method A: `supabase migration repair --status applied 202610220100 --linked` from the production-linked directory | PASS: `[202610220100] => applied` |
+| History after the change: 160 rows; one new row `202610220100 repair_class_options_registration_columns`; no existing row changed | PASS |
+
+### 4. Post-repair production schema verification (read-only, 2026-10-22)
+
+| Check | Result |
+|---|---|
+| `is_online` | `boolean`, NOT NULL, default `false` |
+| `confirmed_start_date` | `date`, nullable, no default |
+| Class-option rows | 13 |
+| Rows with NULL `is_online` | 0 |
+| Rows with a post-repair value (`is_online` true or start date set) | 0 |
+| Open, active rows | 13 |
+| Original-columns checksum | `e5037229c4c14e479fa2fd738fe66b48` (unchanged) |
+| Policies on `class_options` | 4 (unchanged) |
+| Migration history latest version | `202610220100` |
+| PostgreSQL version | 17.6 |
+
+### 5. Live registration UI (read-only; no submission, no test application)
+
+- Hosted form `foundation/registration/registration-form.html` loads. Its class-options request returns **200 with 13 rows** (same request and filters as the form's own code). PASS.
+- No missing-column text on the page, and no request returns an error status. The console shows no errors. PASS.
+- Fellowship filtering, using the form's own filter function on the loaded classes: **10 of 37 fellowships** have at least one open class (CNA, DAL, MUN, ULETH, UMANITOBA, UNB, UPEI, UREGINA, USASK, UWINNIPEG). **27 fellowships have no open class**, and no open class is marked REGIONAL, so the regional fallback has nothing to show. No campus is administratively closed. **This is a class-coverage gap in the data, not a repair defect.** It predates the repair, because before the repair the form failed entirely. FAIL for those 27 fellowships. Requires an administrative decision.
+- Classes with a confirmed start date: 0 of 13. Attendance and reminder logic that depends on it will skip these classes until a teacher's first attendance submission sets the date. UNVERIFIED in operation.
+- The fellowship-specific rendering was computed with the form's own logic, not by filling in the form. Visual confirmation through the form UI is UNVERIFIED.
+
+### 6. Registration processing health (read-only, aggregates since 2026-10-22 05:42 UTC)
+
+- New applicant rows since the repair: **0** (47 in total). No registration-processing failures recorded since the repair, because there were no submissions. PASS (no new failures). UNVERIFIED for live submissions, which were not made.
+- Unresolved error submissions (all time): `mailchimp-sync` 13, `phase2-processor` 13. These predate the repair and none is new. Pre-existing, FAIL, needs triage.
+
+### 7. Email and notification queue health (read-only)
+
+- `email_queue`: 95 Sent, 5 Failed (oldest from 2026-05-20), 0 Pending. Failed rows are older than the repair; none are new. Latest queued email created 2026-10-08. No new email since the repair. PASS for pending (0). FAIL for pre-existing failures (5), needs triage.
+- `scheduled_notifications`: 2 Sent, 4 Resolved, none new since the repair.
+- `notification_events`: none since the repair.
+- Cron jobs `email-sender`, `notification-batch-processor`, `waitlist-processor`, `moodle-sync` and `retry-worker` are active and succeeded on every 5-minute run since 05:45 UTC. PASS.
+
+### 8. Moodle synchronisation (read-only)
+
+- Scheduled job `moodle-sync` and `moodle-grade-sync` are active. `moodle-sync` succeeded on every run since 05:45 UTC, and the audit log shows `MOODLE_SYNC_RUN` with status `SUCCESS` on each run. PASS for internal job execution.
+- `moodle_enrollment_sync`: 28 SYNCED, 1 FAILED (`ALREADY_EXISTS`, from 2026-10-04). No new enrollment rows since 2026-10-08. Nothing new to sync, so there is no new error. PASS (no new errors).
+- `MOODLE_SYNC_STUCK_RESET` ran with status `SUCCESS` on each run. The reset counts were **not** inspected, because audit detail fields can contain personal data. UNVERIFIED.
+- The external Moodle service was not called. Its reachability and any WAF blocking are UNVERIFIED.
+- **Security observation (FAIL, not changed):** `public.moodle_enrollment_sync` has a column named `temp_password`. Its contents were not read. Whether it holds plaintext credentials must be checked by the owner, and the column should be reviewed for removal or protection under a separate change.
+
+### 9. New errors after the repair
+
+- No new registration, email, notification or application error is recorded since 05:42 UTC on 2026-10-22. Cron runs since 05:45 UTC all succeeded. PASS.
+- Audit actions since the repair are limited to scheduled job runs (`EMAIL_SENDER_RUN`, `MOODLE_SYNC_RUN`, `MOODLE_SYNC_STUCK_RESET`), all `SUCCESS`.
+
+### 10. Known remaining issues (not changed in this record)
+
+- Class coverage: 27 of 37 fellowships have no open class (section 5). Requires an administrative decision.
+- Pre-existing unresolved error submissions (`mailchimp-sync`, `phase2-processor`) and five old failed emails. Require triage.
+- Missing production objects from the drift inventory, unchanged by this repair: waitlist notify triggers, multicampus validation triggers, `attendance-reminder-daily` cron, `attendance_log.session_status`, and audit objects.
+- `moodle_enrollment_sync.temp_password` column (section 8). Needs owner review.
+- CLI login role `cli_login_postgres` remains in production after expiry. Needs owner decision on removal.
+- Free plan: no platform backup or PITR. Auth users are not covered by the logical backup.
+- Live submissions, the admin class editor save, and teacher attendance after the repair are UNVERIFIED.
