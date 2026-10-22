@@ -2944,11 +2944,11 @@ Storage: a local folder outside every Git repository, restricted to the operator
 - `email_queue`: 95 Sent, 5 Failed (oldest from 2026-05-20), 0 Pending. Failed rows are older than the repair; none are new. Latest queued email created 2026-10-08. No new email since the repair. PASS for pending (0). FAIL for pre-existing failures (5), needs triage.
 - `scheduled_notifications`: 2 Sent, 4 Resolved, none new since the repair.
 - `notification_events`: none since the repair.
-- Cron jobs `email-sender`, `notification-batch-processor`, `waitlist-processor`, `moodle-sync` and `retry-worker` are active and succeeded on every 5-minute run since 05:45 UTC. PASS.
+- Cron jobs `email-sender`, `notification-batch-processor`, `waitlist-processor` and `moodle-sync` are active. Every run observed since 05:45 UTC (05:45, 05:50 and 05:55) succeeded. PASS for the observed runs. `retry-worker` is active, but no run appears in the window checked (it may run less often). UNVERIFIED.
 
 ### 8. Moodle synchronisation (read-only)
 
-- Scheduled job `moodle-sync` and `moodle-grade-sync` are active. `moodle-sync` succeeded on every run since 05:45 UTC, and the audit log shows `MOODLE_SYNC_RUN` with status `SUCCESS` on each run. PASS for internal job execution.
+- Scheduled job `moodle-sync` and `moodle-grade-sync` are active. `moodle-sync` succeeded on each observed run (05:45, 05:50 and 05:55 UTC), and the audit log shows `MOODLE_SYNC_RUN` with status `SUCCESS` for each. PASS for internal job execution.
 - `moodle_enrollment_sync`: 28 SYNCED, 1 FAILED (`ALREADY_EXISTS`, from 2026-10-04). No new enrollment rows since 2026-10-08. Nothing new to sync, so there is no new error. PASS (no new errors).
 - `MOODLE_SYNC_STUCK_RESET` ran with status `SUCCESS` on each run. The reset counts were **not** inspected, because audit detail fields can contain personal data. UNVERIFIED.
 - The external Moodle service was not called. Its reachability and any WAF blocking are UNVERIFIED.
@@ -2956,7 +2956,7 @@ Storage: a local folder outside every Git repository, restricted to the operator
 
 ### 9. New errors after the repair
 
-- No new registration, email, notification or application error is recorded since 05:42 UTC on 2026-10-22. Cron runs since 05:45 UTC all succeeded. PASS.
+- No new registration, email, notification or application error is recorded since 05:42 UTC on 2026-10-22. Every observed cron run since 05:45 UTC succeeded. PASS.
 - Audit actions since the repair are limited to scheduled job runs (`EMAIL_SENDER_RUN`, `MOODLE_SYNC_RUN`, `MOODLE_SYNC_STUCK_RESET`), all `SUCCESS`.
 
 ### 10. Known remaining issues (not changed in this record)
