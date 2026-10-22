@@ -95,7 +95,10 @@ export default function TeacherManagementPage() {
         <input className="rso-input" placeholder="Subgroup" value={subgroup} onChange={(e) => setSubgroup(e.target.value)} />
       </Toolbar>
 
-      <p style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '0.5rem' }}>{filtered.length} teachers</p>
+      {/* No count while loading or after a failed query: "0 teachers" would read as a successful empty result. */}
+      {!isLoading && !isError && (
+        <p style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '0.5rem' }}>{filtered.length} teachers</p>
+      )}
 
       {isLoading ? <Skeleton variant="rows" rows={6} /> : isError ? (
         <ErrorBanner message="Could not load teachers." onRetry={refetch} />

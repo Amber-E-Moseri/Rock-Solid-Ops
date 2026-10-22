@@ -106,7 +106,7 @@ export default function AvailabilityApprovalPage() {
           { label: 'Rejected', value: kpis.rejected, color: 'var(--color-danger)' },
         ].map(k => (
           <Card key={k.label}>
-            <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', color: k.color || 'var(--text)' }}>{loading ? '—' : k.value}</div>
+            <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', color: k.color || 'var(--text)' }}>{loading || loadError ? '—' : k.value}</div>
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginTop: 4 }}>{k.label}</div>
           </Card>
         ))}
@@ -116,7 +116,7 @@ export default function AvailabilityApprovalPage() {
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
           <div style={{ fontSize: 14, fontWeight: 800 }}>Teacher Submissions</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>{filtered.length} submission{filtered.length !== 1 ? 's' : ''}</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>{loadError ? '' : `${filtered.length} submission${filtered.length !== 1 ? 's' : ''}`}</div>
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -181,8 +181,8 @@ export default function AvailabilityApprovalPage() {
                           <Button size="sm" variant="secondary" onClick={() => openDrawer(s)}>Review</Button>
                           {s.status === 'pending' && (
                             <>
-                              <Button size="sm" variant="primary" onClick={() => doSetStatus([s.id], 'approved')} disabled={saving}>✓</Button>
-                              <Button size="sm" variant="danger" onClick={() => doSetStatus([s.id], 'rejected')} disabled={saving}>✕</Button>
+                              <Button size="sm" variant="primary" onClick={() => doSetStatus([s.id], 'approved')} disabled={saving} aria-label={`Approve ${s.teacher_name || 'submission'}`}>✓</Button>
+                              <Button size="sm" variant="danger" onClick={() => doSetStatus([s.id], 'rejected')} disabled={saving} aria-label={`Reject ${s.teacher_name || 'submission'}`}>✕</Button>
                             </>
                           )}
                         </div>
@@ -215,8 +215,8 @@ export default function AvailabilityApprovalPage() {
                     <Button size="sm" variant="secondary" onClick={() => openDrawer(s)}>Review</Button>
                     {s.status === 'pending' && (
                       <>
-                        <Button size="sm" variant="primary" onClick={() => doSetStatus([s.id], 'approved')} disabled={saving}>✓</Button>
-                        <Button size="sm" variant="danger" onClick={() => doSetStatus([s.id], 'rejected')} disabled={saving}>✕</Button>
+                        <Button size="sm" variant="primary" onClick={() => doSetStatus([s.id], 'approved')} disabled={saving} aria-label={`Approve ${s.teacher_name || 'submission'}`}>✓</Button>
+                        <Button size="sm" variant="danger" onClick={() => doSetStatus([s.id], 'rejected')} disabled={saving} aria-label={`Reject ${s.teacher_name || 'submission'}`}>✕</Button>
                       </>
                     )}
                   </div>
@@ -238,7 +238,7 @@ export default function AvailabilityApprovalPage() {
                 <div style={{ fontSize: 16, fontWeight: 800 }}>{drawerItem.teacher_name || drawerItem.teacher_email || 'Teacher'}</div>
                 <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginTop: 2 }}>{fmtMonth(drawerItem.month)} · {drawerItem.teacher_email || ''}</div>
               </div>
-              <Button size="sm" variant="secondary" onClick={() => setDrawerItem(null)}>✕</Button>
+              <Button size="sm" variant="secondary" onClick={() => setDrawerItem(null)} aria-label="Close review drawer">✕</Button>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>

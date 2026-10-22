@@ -70,3 +70,31 @@ describe('AdminManagementPage staff list states', () => {
     expect(screen.getAllByRole('button', { name: 'Edit Role' })).toHaveLength(2);
   });
 });
+
+describe('AdminManagementPage teachers tab states', () => {
+  const TEACHER_ROW = { teacher_id: 't1', full_name: 'Tia Teacher', email: 'tia@example.com', group_id: 'G1', subgroup_id: 'S1' };
+  const TEACHER_META = { rows: [TEACHER_ROW], idKey: 'teacher_id', nameKey: 'full_name' };
+
+  it('shows an error banner with retry on the teachers tab, not "No teachers"', () => {
+    setStaff({ data: { rows: [], idKey: 'id' } });
+    vi.mocked(useTeachers).mockReturnValue({ ...idle, isError: true, error: new Error('down'), refetch: vi.fn(), data: undefined });
+    render(<AdminManagementPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Teachers' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not load teachers. down');
+    expect(screen.queryByText('No teachers')).toBeNull();
+  });
+
+  it('renders the table and the mobile card view with the teacher actions on each', () => {
+    setStaff({ data: { rows: [], idKey: 'id' } });
+    vi.mocked(useTeachers).mockReturnValue({ ...idle, data: TEACHER_META });
+    render(<AdminManagementPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Teachers' }));
+
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(screen.getAllByText('Tia Teacher')).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(2);
+  });
+});
