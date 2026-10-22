@@ -617,5 +617,16 @@
   overflow-wrap: anywhere;
 }
 
+/* Admin tables: keep the Actions column visible when the table scrolls sideways (tablet widths,
+   above the 640px card breakpoint). Opt-in per table so other pages are unchanged. */
+.rso-table--sticky-actions th:last-child,
+.rso-table--sticky-actions td:last-child {
+  position: sticky;
+  right: 0;
+  background: var(--surface);
+  box-shadow: -6px 0 6px -6px rgba(0, 0, 0, 0.12);
+  z-index: 2;
+}
+
 .rso-cell-strong { font-weight: 600; }
 .rso-cell-meta { font-size: 11px; color: var(--color-text-muted); }

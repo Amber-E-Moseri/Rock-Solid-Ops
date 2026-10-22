@@ -53,12 +53,18 @@ export async function performAction(teacherId, action, reason, actorEmail, teach
   const patch = patches[action];
   if (!patch) throw new Error(`Unknown action: ${action}`);
 
+  // Suspend the pending availability first. If that write is refused, the teacher record must not change,
+  // and the refusal is surfaced rather than reported as success.
+  if (action === 'suspend') {
+    const { error: availabilityError } = await supabase.from('teacher_availability')
+      .update({ status: 'Suspended' }).eq('teacher_id', teacherId).eq('status', 'Tentative');
+    if (availabilityError) {
+      throw new Error(`Teacher not suspended. Availability could not be updated: ${availabilityError.message}`);
+    }
+  }
+
   const { error } = await supabase.from('teachers').update(patch).eq('teacher_id', teacherId);
   if (error) throw error;
-
-  if (action === 'suspend') {
-    await supabase.from('teacher_availability').update({ status: 'Suspended' }).eq('teacher_id', teacherId).eq('status', 'Tentative');
-  }
 
   if (teacherUserId) {
     const profileActive = action === 'activate' || action === 'unsuspend';

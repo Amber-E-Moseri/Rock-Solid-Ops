@@ -69,6 +69,14 @@ describe('AdminManagementPage staff list states', () => {
     expect(screen.getAllByText('Ann Admin')).toHaveLength(2);
     expect(screen.getAllByRole('button', { name: 'Edit Role' })).toHaveLength(2);
   });
+
+  it('keeps the Actions column reachable on tablet widths (sticky-actions table, cards below 640px)', () => {
+    setStaff({ data: { rows: [STAFF_ROW], idKey: 'id' } });
+    render(<AdminManagementPage />);
+
+    expect(screen.getByRole('table')).toHaveClass('rso-table--sticky-actions');
+    expect(document.querySelector('.rso-table-cards')).not.toBeNull();
+  });
 });
 
 describe('AdminManagementPage teachers tab states', () => {

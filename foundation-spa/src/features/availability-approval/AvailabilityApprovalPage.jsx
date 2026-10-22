@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import {
   fetchAvailabilitySlots, approveSlot, groupSlots, computeKpis, filterSlots,
-  statusInfo, canApprove, formatTime, APPROVAL_CERTIFIED, APPROVAL_HOLD_MESSAGE,
+  statusInfo, canApprove, formatTime, APPROVAL_CERTIFIED, APPROVAL_HOLD_MESSAGE, APPROVER_ROLES,
 } from './lib/availabilityApproval.js';
 
 const STATUS_FILTERS = [
@@ -118,7 +118,15 @@ export default function AvailabilityApprovalPage() {
         ) : loadError ? (
           <ErrorBanner message={`Could not load availability. ${loadError}`} onRetry={load} />
         ) : slots.length === 0 ? (
-          <EmptyState icon="📭" title="No availability slots" subtitle="No teacher has submitted availability yet." />
+          // Read access to slot rows is limited to approver roles (RLS). For other roles an empty list
+          // means "not visible to this account", not "no teacher has submitted".
+          <EmptyState
+            icon="📭"
+            title="No availability slots"
+            subtitle={APPROVER_ROLES.includes(role)
+              ? 'No teacher has submitted availability yet.'
+              : 'Slot data is limited to approvers and to each teacher’s own records, so none is visible to this account.'}
+          />
         ) : groups.length === 0 ? (
           <EmptyState icon="🔍" title="No slots match" subtitle="Try a different search or status." />
         ) : (
@@ -186,7 +194,7 @@ function SlotGroup({ group, canApproveSlot, onApprove, disabled }) {
       </div>
 
       <div className="rso-table-wrap" style={{ border: 'none', borderRadius: 0 }}>
-        <table className="rso-table">
+        <table className="rso-table rso-table--sticky-actions">
           <thead><tr><th>Day</th><th>Time</th><th>Status</th><th>Class option</th><th>Action</th></tr></thead>
           <tbody>
             {group.slots.map((s) => {

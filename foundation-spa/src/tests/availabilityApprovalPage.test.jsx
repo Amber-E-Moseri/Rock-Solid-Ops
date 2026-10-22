@@ -68,6 +68,16 @@ describe('AvailabilityApprovalPage states', () => {
     vi.mocked(fetchAvailabilitySlots).mockResolvedValue([]);
     renderPage();
     expect(await screen.findByText('No availability slots')).toBeInTheDocument();
+    expect(screen.getByText('No teacher has submitted availability yet.')).toBeInTheDocument();
+  });
+
+  it('does not claim "no submissions" to a non-approver whose slot rows are filtered by access rules', async () => {
+    auth.profile = { role: 'regional_secretary', email: 'rs@example.com' };
+    vi.mocked(fetchAvailabilitySlots).mockResolvedValue([]);
+    renderPage();
+    expect(await screen.findByText('No availability slots')).toBeInTheDocument();
+    expect(screen.queryByText('No teacher has submitted availability yet.')).toBeNull();
+    expect(screen.getByText(/limited to approvers/)).toBeInTheDocument();
   });
 });
 

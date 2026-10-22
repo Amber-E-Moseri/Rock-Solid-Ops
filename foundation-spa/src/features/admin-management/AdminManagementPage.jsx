@@ -169,7 +169,7 @@ export default function AdminManagementPage() {
         filteredStaff.length === 0 ? <EmptyState icon="📭" title="No staff" subtitle={search ? 'No records matched your search' : 'Add a record to get started'} /> : (
           <>
           <div className="rso-table-wrap">
-            <table className="rso-table">
+            <table className="rso-table rso-table--sticky-actions">
               <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Active</th><th>Actions</th></tr></thead>
               <tbody>
                 {filteredStaff.map((r) => {
@@ -211,7 +211,7 @@ export default function AdminManagementPage() {
         filteredTeachers.length === 0 ? <EmptyState icon="📭" title="No teachers" subtitle={search ? 'No records matched your search' : 'Add a record to get started'} /> : (
           <>
           <div className="rso-table-wrap">
-            <table className="rso-table">
+            <table className="rso-table rso-table--sticky-actions">
               <thead><tr><th>Name</th><th>Email</th><th>Group</th><th>Subgroup</th><th>Active</th><th>Auth</th><th>Actions</th></tr></thead>
               <tbody>
                 {filteredTeachers.map((r) => {

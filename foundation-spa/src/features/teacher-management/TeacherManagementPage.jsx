@@ -107,7 +107,7 @@ export default function TeacherManagementPage() {
       ) : (
         <>
         <div className="rso-table-wrap">
-          <table className="rso-table">
+          <table className="rso-table rso-table--sticky-actions">
             <thead><tr><th>Name</th><th>Email</th><th>Fellowship</th><th>Subgroup</th><th>Status</th><th>Class</th><th>Created</th><th>Actions</th></tr></thead>
             <tbody>
               {filtered.map((t) => (
