@@ -24,7 +24,7 @@ const EXCLUDED_DIRS = new Set(["archive", "docs", "sql", "edge-functions", "node
 
 // Files under foundation/ that are never published.
 const EXCLUDED_FILE =
-  /(\.md|\.txt|\.sql|\.example|\.claspignore|\.map|\.test\.[cm]?[jt]sx?|\.bak[^/]*)$|^(README|serve\.json|__|_template\.html$|\.env)/i;
+  /(\.md|\.txt|\.sql|\.example|\.claspignore|\.map|\.test\.[cm]?[jt]sx?|\.bak[^/]*)$|^(README|serve\.json|__|\.env)/i;
 
 // Patterns that must not appear in any published path.
 const FORBIDDEN_PATH = [
