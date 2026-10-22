@@ -25,8 +25,32 @@ This section records what actually happened, so that the original order in secti
 | Written owner approval of the exact DDL and history method A | **Not given.** The owner has authorised preparation only. |
 | Fresh encrypted public and migration-history backup (checklist step 3) | **Not taken.** |
 | Preflight P1–P9 and the P3 checksum (checklist steps 4–5) | **Not run.** No production SQL is authorised. |
-| Production DDL (checklist step 6) | **Not executed.** |
-| History row, method A (checklist step 7) | **Not recorded.** |
+| Production DDL (checklist step 6) | **Completed by another agent.** Confirmed by read-only checks in section 0c. Not executed by this review. |
+| History row, method A (checklist step 7) | **Recorded.** Version `202610220100` present, name `repair_class_options_registration_columns`, history count 160. Confirmed read-only in section 0c. The recording method used is not established by this review. |
+
+## 0c. Production status reconciliation (read-only, 2026-10-22)
+
+The owner asked for a reconciliation before any further production action. This section records read-only checks against production (project `xelpsttqhrcqmttmjory`, PostgreSQL 17.6). No write, DDL, migration repair or history change was made by this review.
+
+| Check | Expected (this package) | Observed | Result |
+|---|---|---|---|
+| `class_options.is_online` present | 1 | 1 | Match |
+| `class_options.confirmed_start_date` present | 1 | 1 | Match |
+| Definition `is_online` | `boolean`, NOT NULL, default `false` | `boolean`, NOT NULL, default `false` | Match |
+| Definition `confirmed_start_date` | `date`, nullable | `date`, nullable, no default | Match |
+| `class_options` rows | 13 | 13 | Match |
+| Checksum of original columns | `e5037229c4c14e479fa2fd738fe66b48` | `e5037229c4c14e479fa2fd738fe66b48` | Match |
+| Migration history rows | 160 | 160 | Match |
+| `202610220100` recorded | present | present | Match |
+| `202605190900` and `202605190930` recorded | present | present | Match |
+
+**Conclusion.** Production matches the state the package expects after the repair. The repair is therefore recorded as completed. The DDL and history row were applied by another agent. This review did not apply them, and the method used is not established here. The checksum covers the original columns only, so it confirms that no existing class option was changed.
+
+**Consequences.**
+- Checklist steps 6 and 7 are complete.
+- Steps 8 to 12 (post-repair checks, registration check, class-editor check and queue monitoring) are not part of this review and remain to be recorded by the owner.
+- Step 13 (a fresh encrypted backup of the repaired state) is still outstanding.
+- The rollback in `supabase/ops/` is not to be used, unless the owner authorises it separately.
 
 ## 0a. PR #9 safety review (recorded 2026-10-22)
 
