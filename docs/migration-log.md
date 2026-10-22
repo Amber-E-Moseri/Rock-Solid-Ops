@@ -2828,3 +2828,53 @@ standing branch-per-brief workflow.
 - Deploy previews use the production Supabase project, because the environment variables are scoped to all contexts. Do not authenticate on previews until a non-production project is scoped to the deploy-preview context, or preview password protection is enabled.
 
 **Gate:** owner approval to merge and deploy PR #3 was given for this release. The SPA migration and the C6 rollout are not part of this release.
+
+## 2026-10-22 — Post-release closure, registration drift investigation, staging review, SPA certification
+
+Result labels: **PASS** = verified with evidence. **FAIL** = verified not to meet the requirement. **UNVERIFIED** = not testable here, with the reason.
+
+### 1. Release documentation (PR #4)
+
+- **PASS.** PR #4 (`docs/migration-log.md`, +31 lines, no deletions) was checked: head `45be52e`, checks passing (Migration gate, Security regression, Unit tests, Netlify deploy preview). Merged as merge commit `45be66477a97eb6cec5aed489e18bcaf2d467450`.
+- The netlify hotfix (PR #3, deploy `6ad9778270515d1c2c7562d5`) was not changed.
+
+### 2. Registration class-list failure
+
+- **Root cause (PASS):** `public.class_options` lacks `is_online` and `confirmed_start_date`. Both come from migration `202605190900`, which production records as applied with the same statement text as the repo. The registration form (`foundation/registration/registration-form.html:1715`) selects both columns, so the request fails with Postgres `42703`.
+- **Only registration-path mismatch (PASS):** of 35 registration-path columns checked (applicants writes, `fellowship_map`, `batches`, `batch_campus_registration_settings`, `class_options`), only those two are missing. The reserve-slot RPC `insert_applicant_reserve_slot` is present.
+- **Wider drift (FAIL, not fixed):** 843 schema objects checked against the repo migrations. 202 are missing in production, including 142 from `000_baseline_squash` (many replaced by later migrations). Non-baseline: 60 objects across 22 migrations. Production has no `attendance-reminder-daily` cron job, although the migration defines it. Waitlist notify triggers, `audit_logs.actor_id` and its redirect trigger, and the multicampus validation triggers are also absent.
+- **Remote-only history (FAIL, not fixed):** 9 migration versions recorded as applied in production (`202609231000`…`202610030004`) come from the unmerged C1 and C6 branches, not from `main`.
+- **Staging comparison (PASS):** `rocksolid-staging` has both `class_options` columns, so staging is a working reference for the repair DDL. Production-only drift relative to staging: 140 objects (47 non-baseline). Shared gaps: 62 (13 non-baseline).
+- **Remediation (PASS, not executed):** branch `fix/registration-class-options-drift`, migration `202610220100_repair_class_options_registration_columns.sql` (idempotent, the same DDL as `202605190900`). Isolated PGlite test: 17 of 17 PASS. CI migration gate on PR #6: PASS. Security regression on PR #6: PENDING at time of writing; the result is recorded in section 7.
+- **Production execution (UNVERIFIED, awaiting approval):** no production SQL has been run. The runbook is `docs/REGISTRATION_CLASS_OPTIONS_REPAIR_2026-10-22.md`.
+
+### 3. Rocksolid-staging exposure
+
+- **Repository files published (PASS, none found):** every probed repository path returns the SPA shell (1,878 bytes, identical for all paths), including `/README.md`, `/supabase/config.toml`, `/foundation/sql/README.md`, `/supabase/migrations/…sql`, `/.git/config` and `/foundation-spa/.env.local`. The earlier exposure report came from status codes (200) produced by the SPA fallback, not from file contents.
+- **Sensitive content (PASS):** the built bundle contains one JWT, with role `anon`. It contains no `service_role`, `sb_secret_`, private-key or Resend-key patterns.
+- **Activity (PASS):** staging `schema_migrations` lists 159 versions (same as production; latest `202610030004`). Applicants: 11. Last applicant and audit dates: 2026-09-19. Class options: 2. No activity for about a month.
+- **Allowlist reuse (PASS):** the static-publish allowlist (`scripts/build-static-publish.mjs`) applies to a static site. A staging SPA build would need the SPA allowlist from `brief/spa-cutover`. Staging was deployed manually, so no Git-based build change is needed.
+- **Decision (UNVERIFIED, owner decision):** restrict or retire. No deployment, deletion or setting change was made.
+
+### 4. SPA certification (`brief/spa-cutover`, not merged)
+
+- **Test suite (PASS):** 22 files, 148 tests, all passing on this branch.
+- **Teacher sign-out, unit (PASS):** a new test file, `foundation-spa/src/tests/teacherSignOut.test.jsx` (2 tests), renders the shared shell for a teacher, clicks Sign Out, and verifies `signOut` runs and the app returns to `/auth/login`. Test-only commit `238f567`.
+- **Teacher sign-out, live (UNVERIFIED):** no teacher test account. The sign-out control is present in the shared sidebar footer for all roles.
+- **Login layout at 375px (PASS):** no horizontal overflow. The form renders correctly (local dev server, SPA branch).
+- **Unauthenticated redirects (PASS):** `/staff/dashboards` and `/teacher/index` redirect to `/auth/login?next=…`.
+- **Attendance and staff responsive screens (UNVERIFIED):** behind authentication. Attendance logic is covered by existing unit tests (`teacherAttendance.test.js`, `attendance.test.js`, passing).
+- **Static teacher portal sign-out (UNVERIFIED, PR #5):** PR #5 adds a Sign out button to the static teacher portal (`foundation/teacher/index.html`), which is what production serves. Its checks pass (Migration gate, Security regression, Unit tests, Netlify preview). Not merged. Owner decision.
+- **Known SPA gap (FAIL, not fixed):** the SPA login's default `next` is `/staff/dashboards`, so a teacher who signs in without `next` is sent to a route they cannot access. The fix exists on `brief/teacher-portal-ux` (unmerged). Two login screens are in use.
+
+### 5. Authenticated workflows
+
+- **UNVERIFIED:** teacher and admin sign-in, sign-out, navigation, session persistence, attendance submission, and staff responsive screens. No safe test accounts were used. This is a release blocker for the SPA and does not affect the static production release, whose files are byte-identical to pre-release.
+
+### 6. Holds recorded
+
+`docs/BRANCH_HOLDS.md`: `fix/registration-class-options-drift` (production execution), `rocksolid-staging` (deployment and retirement), and production schema drift with remote-only C1/C6 versions.
+
+### 7. CI on PR #6 (registration repair)
+
+- Head `0ab80dee`. Migration gate: PASS. Unit tests: PASS. Netlify deploy preview: PASS. Security regression: PENDING at time of writing (run `39716908550`). This section will be updated with the final result.
