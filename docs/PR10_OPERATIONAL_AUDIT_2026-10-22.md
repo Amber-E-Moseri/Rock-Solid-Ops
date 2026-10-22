@@ -123,3 +123,11 @@ Downstream evidence would come from database state (for example `email_queue` st
 - **PR #10: NO-GO for merge.** It remains draft.
 - **Cron authentication (B2):** observed production cron requests use `x-cron-secret`, and this slice shows 200 responses from scheduled functions. This is strong but incomplete evidence. A release should not rely on it alone.
 - **Next operational action:** obtain the full log export for 23:50 to 05:45 UTC (item 9.1) and, with approval, the pg_net timeout parameter (item 9.3). No production change should be made until the timeout cause is known.
+
+## 12. Recorded conclusions
+
+- All 53 exported Edge Function invocations returned HTTP 200.
+- The export covers 2026-10-22, 12:55 to 13:50 UTC.
+- The original 201 pg_net timeouts occurred in an earlier window (2026-10-21 23:50 to 2026-10-22 05:45 UTC). The two windows do not overlap.
+- No function-level failure can be inferred from the earlier timeout records. pg_net records transport outcomes only, and no function-side logs cover that window.
+- PR #10 remains NO-GO for merge. It stays draft, with auto-merge disabled.
