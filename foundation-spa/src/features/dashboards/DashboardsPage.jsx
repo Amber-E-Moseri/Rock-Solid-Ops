@@ -9,6 +9,7 @@ import { useAuth } from '../../hooks/useAuth.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useBatches, useScope, useDashboardData } from './hooks/useDashboard.js';
 import { retryAllFailedMoodleSyncs, exportCapacityCsv, fmtDate, fmtTime, relativeMinutes, isRegionalSecretary } from './lib/dashboard.js';
+import { MOODLE_RETRY_CERTIFIED, MOODLE_RETRY_HOLD_MESSAGE } from '../../releaseHolds.js';
 import { HorizontalBarChart, DoughnutChart, SparklineChart, ProgressBar, FunnelGrid } from './components/MiniCharts.jsx';
 
 const STATUS_VARIANT = { ASSIGNED: 'success', PENDING: 'info', WAITLISTED: 'warning', DUPLICATE: 'danger', REVIEW: 'warning', INACTIVE: 'neutral' };
@@ -33,13 +34,14 @@ export default function DashboardsPage() {
   }, [queryClient]);
 
   const handleRetryMoodle = useCallback(async () => {
+    if (!MOODLE_RETRY_CERTIFIED) return;
     setRetrying(true);
     try {
       await retryAllFailedMoodleSyncs();
       queryClient.invalidateQueries({ queryKey: ['dashboard-data'] });
-      toast('Moodle sync retry initiated', 'success');
-    } catch {
-      toast('Retry failed', 'error');
+      toast('Moodle sync retry completed', 'success');
+    } catch (e) {
+      toast(`Retry failed: ${e.message || 'unknown error'}`, 'error');
     } finally {
       setRetrying(false);
     }
@@ -230,9 +232,12 @@ export default function DashboardsPage() {
             <div style={{ marginTop: 10, fontSize: 12, color: 'var(--muted)' }}>
               Last successful sync: {fmtTime(moodle.lastSuccess)}
             </div>
-            <Button size="sm" variant="secondary" onClick={handleRetryMoodle} disabled={retrying} style={{ marginTop: 12 }}>
+            <Button size="sm" variant="secondary" onClick={handleRetryMoodle} disabled={!MOODLE_RETRY_CERTIFIED || retrying} title={MOODLE_RETRY_CERTIFIED ? undefined : MOODLE_RETRY_HOLD_MESSAGE} style={{ marginTop: 12 }}>
               {retrying ? 'Retrying…' : 'Retry all failed'}
             </Button>
+            {!MOODLE_RETRY_CERTIFIED && (
+              <div role="status" style={{ marginTop: 8, fontSize: 12, color: 'var(--muted)' }}>{MOODLE_RETRY_HOLD_MESSAGE}</div>
+            )}
           </Card>
         )}
 
@@ -240,8 +245,8 @@ export default function DashboardsPage() {
         <Card>
           <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: 'var(--text)' }}>Quick Actions</div>
           <div style={{ display: 'grid', gap: 8 }}>
-            <Button size="sm" variant="secondary" onClick={() => navigate('/staff/teacher-schedule')}>Approve Teacher Slots</Button>
-            <Button size="sm" variant="secondary" onClick={handleRetryMoodle} disabled={retrying}>Retry all failed Moodle syncs</Button>
+            <Button size="sm" variant="secondary" onClick={() => navigate('/staff/teacher-schedule')}>View Teacher Schedule</Button>
+            <Button size="sm" variant="secondary" onClick={handleRetryMoodle} disabled={!MOODLE_RETRY_CERTIFIED || retrying} title={MOODLE_RETRY_CERTIFIED ? undefined : MOODLE_RETRY_HOLD_MESSAGE}>Retry all failed Moodle syncs</Button>
             <Button size="sm" variant="secondary" onClick={() => navigate('/staff/audit-log')}>View audit log</Button>
             <Button size="sm" variant="secondary" onClick={() => d?.capacity && exportCapacityCsv(d.capacity)}>
               <Download size={14} style={{ marginRight: 4 }} />

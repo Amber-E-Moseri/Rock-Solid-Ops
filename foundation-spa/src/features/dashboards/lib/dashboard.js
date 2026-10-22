@@ -1,4 +1,5 @@
 import { supabase } from '../../../supabase.js';
+import { MOODLE_RETRY_CERTIFIED, MOODLE_RETRY_HOLD_MESSAGE } from '../../../releaseHolds.js';
 
 // ── Scope resolution ────────────────────────────────────────────────────────
 
@@ -262,20 +263,26 @@ async function fetchActivityFeed() {
 // ── Retry action ────────────────────────────────────────────────────────────
 
 export async function retryAllFailedMoodleSyncs() {
+  // Held: the endpoint and authorization contract are unverified, so no request is sent.
+  if (!MOODLE_RETRY_CERTIFIED) throw new Error(MOODLE_RETRY_HOLD_MESSAGE);
   const { data: sess } = await supabase.auth.getSession();
   const token = sess?.session?.access_token;
-  const { data: failedRows } = await supabase
+  const { data: failedRows, error } = await supabase
     .from('moodle_enrollment_sync')
     .select('id')
     .in('sync_status', ['FAILED', 'RETRYING'])
     .limit(100);
+  if (error) throw error;
+  let failed = 0;
   for (const row of (failedRows || [])) {
-    await fetch(`${window.location.origin}/functions/v1/moodle-sync`, {
+    const res = await fetch(`${window.location.origin}/functions/v1/moodle-sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify({ id: row.id, limit: 1 }),
     });
+    if (!res.ok) failed += 1;
   }
+  if (failed > 0) throw new Error(`${failed} Moodle sync retr${failed === 1 ? 'y' : 'ies'} failed`);
 }
 
 // ── CSV export ──────────────────────────────────────────────────────────────

@@ -148,3 +148,9 @@ export async function callApprovalRpc({ id, actorEmail, actorId }) {
   }
   return { classOptionId: row.class_option_id, classSlotId: row.class_slot_id };
 }
+
+// Retired submission-model write. The slot model above replaces it. Kept as a fail-closed
+// entry point so older callers and the release-hold tests see a refusal, never a write.
+export async function setSubmissionStatus() {
+  throw new Error(APPROVAL_HOLD_MESSAGE);
+}
