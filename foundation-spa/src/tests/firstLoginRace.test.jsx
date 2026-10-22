@@ -13,13 +13,20 @@ const harness = vi.hoisted(() => {
     profileGate: null,
     profileError: null,
     profileCalls: 0,
+    sessionGate: null,
   };
   h.notify = async (event, session) => {
     await Promise.all([...h.listeners].map((cb) => cb(event, session)));
   };
   h.supabase = {
     auth: {
-      getSession: async () => ({ data: { session: h.session } }),
+      // The snapshot is taken when the call starts, like the real client. A test can
+      // hold the response open to simulate a slow initial session read.
+      getSession: async () => {
+        const snapshot = h.session;
+        if (h.sessionGate) await h.sessionGate;
+        return { data: { session: snapshot } };
+      },
       onAuthStateChange: (cb) => {
         h.listeners.add(cb);
         return { data: { subscription: { unsubscribe: () => h.listeners.delete(cb) } } };
@@ -137,6 +144,7 @@ describe('first-login race', () => {
     harness.profileGate = null;
     harness.profileError = null;
     harness.profileCalls = 0;
+    harness.sessionGate = null;
     visited = [];
   });
 
@@ -161,6 +169,22 @@ describe('first-login race', () => {
     release();
 
     await waitFor(() => expect(screen.getByText('Teacher portal')).toBeInTheDocument(), { timeout: 2000 });
+  });
+
+  it('a stale initial session read cannot overwrite a sign-in that completed while it was pending', async () => {
+    let releaseSession;
+    harness.sessionGate = new Promise((resolve) => { releaseSession = resolve; });
+    renderApp('/auth/login?next=%2Fstaff%2Fdashboards');
+
+    await submitLogin(ADMIN.user.email, ADMIN.password);
+    await waitFor(() => expect(screen.getByText('Admin dashboard')).toBeInTheDocument(), { timeout: 2000 });
+
+    // The initial getSession resolves last and reports no session.
+    releaseSession();
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(screen.getByText('Admin dashboard')).toBeInTheDocument();
+    expect(harness.session).not.toBeNull();
   });
 
   it('a single sign-in loads the profile once', async () => {
