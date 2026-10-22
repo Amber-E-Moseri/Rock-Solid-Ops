@@ -1,7 +1,7 @@
 # Registration class-list repair and production schema drift (2026-10-22)
 
-**Status:** repair migration written and tested on an isolated database. **Not executed on production.**
-Production execution requires explicit owner approval (see section 9).
+**Status:** repair migration reviewed; a reproducible PostgreSQL 17 harness and a hardened rollback are in this PR. **Not executed on production.**
+**Production SQL status: NO-GO** until the owner separately authorizes execution. Production execution also requires a verified logical backup first (sections 12 and 13). Production history recording needs its own approval (section 11).
 
 Branch: `fix/registration-class-options-drift` (from `origin/main` `45be664`). Isolated from the Netlify hotfix (PR #3, deployed) and from the SPA and C6 branches.
 
@@ -190,7 +190,7 @@ SELECT class_option_id, is_online, confirmed_start_date FROM public.class_option
 WHERE active AND enrollment_open AND deleted_at IS NULL;   -- expect 13 rows at 2026-10-22
 ```
 
-**Rollback:** `rollback_class_options_repair.sql` (drops both columns). Use only if the repair causes a failure. It removes any `is_online` or `confirmed_start_date` values written after the repair, so export them first. It also restores the registration failure. Then remove the version row from `schema_migrations`.
+**Rollback:** `supabase/ops/202610220100_rollback_class_options_repair.sql`. Read section 12 (rollback conditions and data loss) before any use. It refuses to run unless the operator sets three session settings and confirms the export row count (section 12.2). It is not part of `supabase/migrations/`, so `supabase db push` never runs it. Removing the history row is a separate step (section 11).
 
 **Operational readiness before cutover:** the registration form will accept applications again. Confirm the notification and email queues are running, and that the admin team is ready to handle new applicant rows.
 
@@ -198,12 +198,126 @@ WHERE active AND enrollment_open AND deleted_at IS NULL;   -- expect 13 rows at 
 
 ## 10. GO / NO-GO
 
-- **GO** for a separately approved production execution of **this exact DDL only** (`202610220100`), after the preflight queries pass and the rollout procedure above is followed.
+- **Production SQL: NO-GO** until the owner separately authorizes execution. It is not authorized by this PR.
+- Conditions to lift the NO-GO, all required: (a) a verified logical backup and a restore rehearsal (sections 12–13); (b) the preflight queries in section 9 pass on production, read by the owner; (c) the owner approves the exact DDL `202610220100` and the history-recording method (section 11); (d) PR #6 is reviewed and merged by the owner, and no other production change is bundled with it.
+- **GO** (after those conditions) for production execution of **this exact DDL only**, following section 9.
 - **NO-GO** for applying the other 60 drifted objects, or the 9 remote-only C6 and C1 versions, in the same change. Each needs its own review.
 - **NO-GO** for any SPA or C6 production change as part of this repair.
 
 ## 11. Evidence summary
 
 - Production catalog reads: read-only SELECT statements through the Supabase CLI against project `xelpsttqhrcqmttmjory`, in read-only sessions. No writes.
-- Isolated test: 17 of 17 PASS (section 7).
-- The repo has no existing automated test for this migration. The test harness is kept outside the repo, because it uses synthetic data only.
+- Isolated test (PGlite, earlier): 17 of 17 PASS (section 7). PGlite is not PostgreSQL 17; this result is superseded by the harness below.
+- **Reproducible PostgreSQL 17 harness (in this PR):** `supabase/tests/class-options-repair/run.sh`. Results in section 14.
+- Earlier production catalogue reads (the drift tables in sections 3 and 4) were read-only, through the CLI, in read-only sessions. They were not repeated for this PR, and they remain the reference for the drift classification.
+
+## 12. Rollback: conditions, guards and data loss
+
+### 12.1 When a rollback is allowed
+
+Only when the repair itself causes a production failure and the owner decides to revert. A rollback is **not** the answer to:
+
+- a re-run of the migration (it is idempotent);
+- a history-row mismatch (resolve the history, do not drop columns);
+- slow registrations or a single failed request.
+
+### 12.2 Procedure (destructive; owner only)
+
+1. **Export the post-repair values first.** Run in psql and store the file somewhere secure (not in the repo):
+
+   ```sql
+   \copy (SELECT class_option_id, is_online, confirmed_start_date FROM public.class_options WHERE is_online IS DISTINCT FROM false OR confirmed_start_date IS NOT NULL) TO 'class_options_post_repair_YYYYMMDD.csv' WITH (FORMAT csv, HEADER)
+   ```
+
+2. **Verify the export.** The data rows in the CSV must equal the count from `SELECT count(*) FROM public.class_options WHERE is_online IS DISTINCT FROM false OR confirmed_start_date IS NOT NULL`. Check the file is readable.
+3. **Set the three session settings, in the same psql session, before the script:**
+
+   ```sql
+   SET rso.rollback_authorization = 'DISCARD_CLASS_OPTIONS_REPAIR_COLUMNS';
+   SET rso.rollback_export_confirmed = 'yes';
+   SET rso.rollback_expected_rows = '<N>';   -- N = verified export row count (may be 0)
+   ```
+
+4. **Run** `supabase/ops/202610220100_rollback_class_options_repair.sql` with `-f`.
+
+The script refuses (and changes nothing) unless every guard passes:
+
+| Guard | Refuses when |
+|---|---|
+| Authorization | `rso.rollback_authorization` is not exactly `DISCARD_CLASS_OPTIONS_REPAIR_COLUMNS` |
+| Export confirmation | `rso.rollback_export_confirmed` is not `yes` |
+| Expected count | `rso.rollback_expected_rows` is not set |
+| Repaired state | either column is missing (the state is not the repaired one) |
+| Count match | the live count of rows with post-repair values differs from `rso.rollback_expected_rows` |
+
+The drop runs in one transaction, after all guards pass. A failure rolls the whole transaction back.
+
+### 12.3 Potential data loss
+
+Dropping the columns deletes every post-repair value of `is_online` and `confirmed_start_date`. **The export file is the only copy.** The rollback does not keep the values in the database.
+
+Re-applying the migration afterwards restores the columns with the defaults (`is_online = false`, `confirmed_start_date = NULL`). It does **not** restore the exported values. If they are needed, the owner must restore them from the CSV with a reviewed `UPDATE`, after the re-apply.
+
+### 12.4 What a rollback leaves behind
+
+- The registration form fails again with 42703 (the pre-repair state).
+- `supabase_migrations.schema_migrations` still records `202610220100`. Remove that row only with separate approval (section 15), or the history will claim a state the database no longer has. That mismatch is the same pattern that caused this incident.
+
+## 13. Backup prerequisites and Free-plan limits
+
+- The production project `foundation-school` (`xelpsttqhrcqmttmjory`) is on the **Supabase Free plan**. The dashboard states that the Free plan does not include managed project backups, and it offers no point-in-time recovery.
+- **The only recovery path for production is a logical backup that the owner takes and stores.** Supabase cannot restore production from its own backups.
+- A rollback script is not a backup. It drops columns; it does not preserve data.
+- Before any production SQL, the owner must have: (a) a logical backup of the relevant schema and data, (b) confirmation it is readable, and (c) a successful restore rehearsal into an isolated database. The procedure is in `docs/PRODUCTION_LOGICAL_BACKUP_PLAN_2026-10-22.md`.
+- Recovery limitation: without a verified backup, a bad repair or a bad rollback on production cannot be undone by the platform.
+
+## 14. Test evidence: PostgreSQL 17 harness
+
+Command (from the repository root, with PostgreSQL 17 installed):
+
+```bash
+PG_BIN="/c/Program Files/PostgreSQL/17/bin" bash supabase/tests/class-options-repair/run.sh
+```
+
+The harness creates a throwaway cluster in a temp directory on a private port, loads synthetic data only (13 open class options), replays the repo's forward migration file and rollback file, and deletes the cluster at the end. It does not read or write any real database.
+
+**Result on 2026-10-22, PostgreSQL 17.11, Windows, synthetic data: 30 passed, 0 failed.**
+
+| Area | Checks | Result |
+|---|---|---|
+| Registration query fails before repair | 1 | PASS (42703) |
+| Forward migration applies; registration query succeeds (anon) | 2 | PASS (13 rows) |
+| Original class-option values unchanged (checksum over the original columns) | 2 | PASS |
+| Defaults on existing rows (`is_online = false`, `confirmed_start_date NULL`) | 3 | PASS |
+| Idempotent re-apply; values unchanged | 2 | PASS |
+| Admin writes under the representative policy (update, visible read-back, insert) | 3 | PASS |
+| Teacher (non-admin) write denied under the representative policy | 1 | PASS |
+| `NOT NULL` on `is_online` enforced | 1 | PASS |
+| Attendance read of `confirmed_start_date` | 1 | PASS |
+| Rollback refused: no authorization, no export confirmation, no expected count, count mismatch | 4 | PASS |
+| Refused rollback leaves the post-repair value in place | 1 | PASS |
+| Authorized rollback with matching count succeeds; columns gone; values unchanged | 3 | PASS |
+| Registration query fails again after rollback | 1 | PASS |
+| Rollback refused when columns are already absent | 1 | PASS |
+| Re-apply after rollback; registration query succeeds; values unchanged | 3 | PASS |
+
+**Limits.**
+- The RLS policies in the harness are **representative**, written for the test. They are not a copy of production policies, so production admin writes are not proven by this harness.
+- The harness runs SQL directly. It does not test PostgREST, the registration form in a browser, or the Edge Functions.
+- CI does not run this harness. It needs a local PostgreSQL 17 installation. Adding it to CI is a separate change.
+
+## 15. Migration-history recording
+
+- Production `supabase_migrations.schema_migrations` contains versions that are not in this repository (section 4). `supabase db push` refuses to run against that history.
+- **Record the version only after the DDL has succeeded and the validation queries pass.** Recording it first is the cause of this incident: the history said "applied" while the DDL was absent.
+- Two methods, both **requiring explicit owner approval**:
+  - **A.** `supabase migration repair --status applied 202610220100`, run from the repo against project `xelpsttqhrcqmttmjory`. Preferred if the CLI can run it without touching other versions.
+  - **B.** Manual insert into `supabase_migrations.schema_migrations`, in the same transaction as the DDL, with the same name and statement text as the repo file. Fallback only.
+- **If the rollback runs, the history row must be removed in the same change**, with separate approval. Otherwise the history claims an applied state the database no longer has.
+- No history change is made by this PR.
+
+## 16. Scope of this PR
+
+- The forward migration file `supabase/migrations/202610220100_repair_class_options_registration_columns.sql` is **unchanged** from the reviewed version.
+- Added: the rollback (`supabase/ops/`), the harness (`supabase/tests/class-options-repair/`), the backup plan (`docs/PRODUCTION_LOGICAL_BACKUP_PLAN_2026-10-22.md`), and this runbook update.
+- Not in this PR: any drift repair beyond the two columns, any C6, SPA or other migration change, any production action.
