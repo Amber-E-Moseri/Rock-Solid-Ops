@@ -52,7 +52,8 @@ export const ROUTE_ACCESS = Object.freeze({
 
   // Teacher portal
   '/teacher/index': OPERATIONAL_AND_TEACHER,
-  '/teacher/attendance': OPERATIONAL_AND_TEACHER,
+  // Teacher attendance is for teacher accounts only. Staff use /staff/attendance.
+  '/teacher/attendance': Object.freeze(['teacher']),
   '/teacher/availability': OPERATIONAL_AND_TEACHER,
   '/teacher/progress': OPERATIONAL_AND_TEACHER,
 });

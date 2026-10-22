@@ -18,7 +18,7 @@ export default function AdminPortalPage() {
     { label: 'Enrolled', value: stats.data?.enrolled ?? '—' },
     { label: 'Active Batches', value: stats.data?.activeBatches ?? '—' },
     { label: 'Pending Review', value: stats.data?.pending ?? '—', accent: true },
-    { label: 'Teachers', value: stats.data?.teachers ?? '—' },
+    { label: 'Active Teachers', value: stats.data?.teachers ?? '—' },
   ], [stats.data]);
 
   const regCards = [
