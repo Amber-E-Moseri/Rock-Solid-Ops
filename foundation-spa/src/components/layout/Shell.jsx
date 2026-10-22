@@ -18,7 +18,7 @@ const TEACHER_MODE_ELIGIBLE = new Set(['regional_secretary', 'admin', 'superadmi
 const TEACHER_KEYS = new Set(['attendance', 'schedule', 'progress', 'help']);
 // Teacher-facing targets for shared nav items. Teachers cannot open the staff routes
 // (routeRoles.js), so their links must point at the teacher routes instead.
-const TEACHER_PATHS = { schedule: '/teacher/index', progress: '/teacher/progress' };
+const TEACHER_PATHS = { schedule: '/teacher/index', progress: '/teacher/progress', attendance: '/teacher/attendance' };
 
 const NAV_SECTIONS = [
   {
@@ -46,7 +46,8 @@ const NAV_SECTIONS = [
   {
     label: 'Teaching',
     items: [
-      { key: 'attendance',    label: 'Attendance',      path: '/teacher/attendance', Icon: CheckSquare },
+      // Staff and admins get the staff attendance view; teachers get their own page via TEACHER_PATHS.
+      { key: 'attendance',    label: 'Attendance',      path: '/staff/attendance', Icon: CheckSquare, roles: OPERATIONAL_ROLES },
       { key: 'schedule',      label: 'Schedule',        path: '/staff/teacher-schedule', Icon: CalendarCheck },
       { key: 'progress',      label: 'Student Progress', path: '/staff/student-progress', Icon: TrendingUp },
     ],

@@ -32,6 +32,8 @@ export default function AttendancePage() {
   useEffect(() => { load(); }, [load]);
 
   const kpis = useMemo(() => computeKpis(classes), [classes]);
+  // A failed or pending read has no data, so its KPIs show a dash rather than a zero.
+  const kpiPending = loading || Boolean(loadError);
   const selected = classes.find(c => c.id === selId) || null;
   const cc = selected ? counts(selected) : null;
 
@@ -72,10 +74,10 @@ export default function AttendancePage() {
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
         {[
-          { label: 'Submission rate', value: loading ? '—' : kpis.rate },
-          { label: 'Classes missing', value: loading ? '—' : kpis.missing, color: kpis.missing > 0 ? 'var(--color-danger)' : undefined },
-          { label: 'Flagged · multi-session', value: loading ? '—' : kpis.flagged, color: kpis.flagged > 0 ? 'var(--color-danger)' : undefined },
-          { label: 'On-time rate', value: loading ? '—' : kpis.onTime, color: 'var(--color-warning)' },
+          { label: 'Submission rate', value: loading || loadError ? '—' : kpis.rate },
+          { label: 'Classes missing', value: loading || loadError ? '—' : kpis.missing, color: kpis.missing > 0 ? 'var(--color-danger)' : undefined },
+          { label: 'Flagged · multi-session', value: loading || loadError ? '—' : kpis.flagged, color: kpis.flagged > 0 ? 'var(--color-danger)' : undefined },
+          { label: 'On-time rate', value: loading || loadError ? '—' : kpis.onTime, color: 'var(--color-warning)' },
         ].map(k => (
           <Card key={k.label}>
             <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1, color: k.color || 'var(--text)' }}>{k.value}</div>
@@ -131,7 +133,7 @@ export default function AttendancePage() {
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 800 }}>{pct}</div>
                       <div style={{ fontSize: 10.5, color: 'var(--muted)', fontWeight: 700 }}>
-                        {st === 'ok' ? 'Submitted' : st === 'miss' ? 'Missing' : 'In progress'}
+                        {st === 'ok' ? 'Submitted' : st === 'miss' ? 'Missing' : st === 'unknown' ? 'Not recorded' : 'In progress'}
                       </div>
                     </div>
                   </div>
@@ -210,7 +212,9 @@ export default function AttendancePage() {
                   display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
                 }}>
                   <span style={{ fontSize: 12.5, color: 'var(--muted)', fontWeight: 600 }}>
-                    {selected.submitted ? 'Submitted · you can update and re-submit.' : `${cc.m} of ${cc.total} still unmarked.`}
+                    {selected.submitted === null || selected.submitted === undefined
+                      ? 'Attendance status is not loaded in this view.'
+                      : selected.submitted ? 'Submitted · you can update and re-submit.' : `${cc.m} of ${cc.total} still unmarked.`}
                   </span>
                   <Button variant="secondary" onClick={markAllPresent} style={{ marginLeft: 'auto' }}>Mark all present</Button>
                   {!ATTENDANCE_SUBMIT_CERTIFIED && <p role="status" style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>{ATTENDANCE_SUBMIT_HOLD_MESSAGE}</p>}

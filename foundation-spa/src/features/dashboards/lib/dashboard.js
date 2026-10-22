@@ -146,7 +146,8 @@ async function fetchCapacity(params) {
 
 async function fetchStaleQueue(params) {
   const { data, error } = await supabase.rpc('get_stale_queue_items', params);
-  if (error) return { count: 0 };
+  // A failed query is unknown (null), not a count of zero.
+  if (error) return null;
   return { count: Number(data?.[0]?.cnt || 0) };
 }
 
@@ -218,19 +219,23 @@ async function fetchDuplicateSummary(batchId) {
     .limit(200);
   if (batchId) query = query.eq('batch_id', batchId);
   const { data, error } = await query;
-  if (error) return { count: 0, newestDate: null };
+  // A failed query is unknown (count null), not a count of zero.
+  if (error) return { count: null, newestDate: null };
   const rows = data || [];
   return { count: rows.length, newestDate: rows[0]?.created_at || null };
 }
 
+// "Active" teachers follow the lifecycle column, teachers.status = 'ACTIVE', the same definition as the admin
+// portal and teacher management. The tracked schema has no verified certification field, so no "certified"
+// count is produced. A failed query is unknown (null), not zero.
 async function fetchTeacherKpis(batchId) {
-  const [a, b] = await Promise.all([
-    supabase.rpc('get_active_certified_teachers_count'),
+  const [active, teaching] = await Promise.all([
+    supabase.from('teachers').select('teacher_id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
     supabase.rpc('get_currently_teaching_count', { p_batch_id: batchId || null }),
   ]);
   return {
-    activeCertified: Number(a?.data?.[0]?.count ?? a?.data ?? 0),
-    currentlyTeaching: Number(b?.data?.[0]?.count ?? b?.data ?? 0),
+    activeTeachers: active.error ? null : (active.count ?? 0),
+    currentlyTeaching: teaching.error ? null : Number(teaching.data?.[0]?.count ?? teaching.data ?? 0),
   };
 }
 

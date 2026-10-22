@@ -133,7 +133,7 @@ export default function DashboardsPage() {
         <KpiCard value={reg?.waitlisted} label="Waitlisted" variant="warn" asOf={d?.fetchedAt} />
         <KpiCard value={reg?.pendingReview} label="Pending Review" variant="danger" asOf={d?.fetchedAt} />
         <KpiCard value={reg?.duplicates} label="Duplicates" variant="muted" asOf={d?.fetchedAt} />
-        <KpiCard value={teacherKpis?.activeCertified} label="Active/Certified Teachers" asOf={d?.fetchedAt} />
+        <KpiCard value={teacherKpis?.activeTeachers} label="Active Teachers" asOf={d?.fetchedAt} />
         <KpiCard value={teacherKpis?.currentlyTeaching} label="Currently Teaching" asOf={d?.fetchedAt} />
         <KpiCard value={stale?.count} label="Stale Reviews (>48 h)" variant={stale?.count > 10 ? 'danger' : 'warn'} asOf={d?.fetchedAt} />
       </div>
@@ -145,12 +145,14 @@ export default function DashboardsPage() {
             <div>
               <div style={{ fontSize: 14, fontWeight: 800 }}>Duplicate Registrations</div>
               <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--danger)', lineHeight: 1.1, marginTop: 4 }}>
-                {d.duplicates.count.toLocaleString()}
+                {d.duplicates.count == null ? '—' : d.duplicates.count.toLocaleString()}
               </div>
               <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>
-                {d.duplicates.count > 0
-                  ? `Newest duplicate: ${fmtDate(d.duplicates.newestDate)}`
-                  : 'No unresolved duplicate groups in your current scope.'}
+                {d.duplicates.count == null
+                  ? 'Duplicate count could not be loaded.'
+                  : d.duplicates.count > 0
+                    ? `Newest duplicate: ${fmtDate(d.duplicates.newestDate)}`
+                    : 'No unresolved duplicate groups in your current scope.'}
               </div>
             </div>
             <Button variant="secondary" onClick={() => navigate('/staff/applicant-directory?duplicate=unresolved_only')}>
