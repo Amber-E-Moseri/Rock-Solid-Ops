@@ -7,7 +7,7 @@ import { PageHeader, Toolbar, SearchInput, Skeleton, EmptyState, Badge, Button, 
 
 export default function TeacherManagementPage() {
   const { profile } = useAuth();
-  const { addToast } = useToast();
+  const addToast = useToast();
   const qc = useQueryClient();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin';
 

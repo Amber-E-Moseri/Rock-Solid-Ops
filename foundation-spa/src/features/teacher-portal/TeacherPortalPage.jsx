@@ -15,7 +15,7 @@ const MILESTONES = ['milestone_1', 'milestone_2', 'milestone_3', 'milestone_4'];
 
 export default function TeacherPortalPage() {
   const { profile } = useAuth();
-  const { addToast } = useToast();
+  const addToast = useToast();
   const isAdmin = ADMIN_ROLES.includes(profile?.role);
 
   const params = new URLSearchParams(window.location.search);
