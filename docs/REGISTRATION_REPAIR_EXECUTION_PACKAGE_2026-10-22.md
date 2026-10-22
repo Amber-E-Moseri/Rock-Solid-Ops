@@ -4,6 +4,53 @@
 
 This package is for the owner's review. It records current state, read-only preflight results, the exact execution order, the history-recording method, and the recovery safeguards. It does not authorise a merge, a history change, a deploy or a production data change.
 
+## 0. Execution-order record and current release gate (added 2026-10-22, after owner decision)
+
+This section records what actually happened, so that the original order in sections 9b and 10 is preserved and not described as completed. The original text below is unchanged.
+
+**Deviation from the approved order.**
+- Step S1 and checklist step 2 required PR #9 to merge first, then PR #6 at the approved head.
+- Actual order: **PR #6 was merged first.** Merge commit `6cfaf02` on `main` (2026-10-22 05:42:37 UTC; 01:42:36 -0400), from head `a3ebc4b1d`. PR #9 was still open at that time.
+- The merge triggered a Netlify production build (`6cfaf021f`, published 05:42:51 UTC). The merge changed six files, all under `docs/`, `supabase/migrations/`, `supabase/ops/` or `supabase/tests/`. It changed nothing under `foundation/`, `_headers`, `netlify.toml` or `scripts/build-static-publish.mjs`. The static application is therefore unchanged.
+- **Owner decision (2026-10-22):** keep the PR #6 merge on `main`. Do not revert. Merge-order discrepancy acknowledged. No production SQL is authorised by that decision.
+
+**What this changes.** Only the order of merges. The DDL, the history-recording method, and the approval and preflight requirements are unchanged.
+
+**Current release gate (2026-10-22).**
+
+| Gate | Status |
+|---|---|
+| PR #6 merged on `main` at `a3ebc4b1d` (via `6cfaf02`) | Done. Owner decision: keep. |
+| PR #9 (backup authority) merged | **Not done.** Open at `bb39c06d8`. Not yet safe to merge, see section 0a. |
+| Written owner approval of the exact DDL and history method A | **Not given.** The owner has authorised preparation only. |
+| Fresh encrypted public and migration-history backup (checklist step 3) | **Not taken.** |
+| Preflight P1–P9 and the P3 checksum (checklist steps 4–5) | **Not run.** No production SQL is authorised. |
+| Production DDL (checklist step 6) | **Not executed.** |
+| History row, method A (checklist step 7) | **Not recorded.** |
+
+## 0a. PR #9 safety review (recorded 2026-10-22)
+
+PR #9 is **not** documentation-only. It adds `scripts/backup/backup-prod-logical.sh`, which runs `pg_dump` against production. CI on `bb39c06d8` passed. Before PR #9 is merged, these defects must be fixed:
+
+1. **Plaintext on disk.** The script writes the plain dump to `BACKUP_DIR` before encrypting it. With `set -e`, a failed `gpg` step exits and leaves the plaintext behind. The runbook says plaintext is never written. Encryption should be a pipe, `pg_dump | gpg`.
+2. **Migration history omitted.** The script header says "plus the migration-history table", but the `pg_dump` call uses only `--schema=public`. The history export is a separate manual SQL step, so the header is inaccurate.
+3. **Passphrase on disk.** `PASS_FILE` keeps the gpg passphrase in a file on disk. The owner's rule is that the passphrase is not stored with the backup. This needs an explicit decision.
+4. **Temporary CLI role.** The runbook notes that the CLI creates a temporary login role that may remain in the database. Its cleanup is not described.
+
+## 0b. Backup evidence and reconciliation (recorded 2026-10-22)
+
+Three backups are referenced across the work. They have different snapshot times and must not be merged into one claim.
+
+| Backup | Snapshot (UTC) | Scope | Source of evidence | Status |
+|---|---|---|---|---|
+| Public-schema dump (`rso_prod_20261022_051829Z.dump.gpg`) | 05:18:29 | `public` and `supabase_migrations`, with data | Verified in this session: encrypted AES-256, sha256 recorded, restored into isolated PostgreSQL 17.11 with 0 errors. Public checks identical to production, including deep checksums. | Verified. Limits: Auth excluded. |
+| Auth export (`rso_prod_auth_20261022_053307Z.dump.gpg`) | 05:33:07 | `auth.users` and `auth.identities` | Verified in this session: encrypted AES-256, sha256 recorded. Restored with 0 errors. Auth checksums identical. The three missing foreign keys restored and validated. | Verified. Sessions, one-time tokens, MFA, WebAuthn, OAuth and SCIM excluded. |
+| Public-schema dump plus history export (PR #9 runbook) | 04:33:51 | `public` with data, and history export of 159 rows | Reported by the separate backup agent. The restore evidence (61 of 62 items identical, the difference is 3 `audit_logs` rows written after the snapshot) is that agent's report. I have not re-verified it. | Reported, not independently verified here. Its file location is not recorded in this package. |
+
+**Recovery consequence.** The two verified backups cover the public schema, the migration history, and the Auth users and identities. None of the three backups includes the Auth platform configuration (JWT secret, SMTP, redirect URLs, provider settings). That has to be recorded separately by the owner.
+
+**Before the DDL.** Take a fresh encrypted backup immediately before execution (checklist step 3). The other agent's backup is older and cannot stand in for it.
+
 ## 1. Current state (final preparation, 2026-10-22)
 
 | Item | Head | CI | Notes |
