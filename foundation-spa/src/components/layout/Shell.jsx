@@ -16,6 +16,9 @@ const OPERATIONAL_ROLES = ['regional_secretary', 'principal', 'subgroup_admin', 
 const SYSTEM_ADMIN_ROLES = ['admin', 'superadmin'];
 const TEACHER_MODE_ELIGIBLE = new Set(['regional_secretary', 'admin', 'superadmin']);
 const TEACHER_KEYS = new Set(['attendance', 'schedule', 'progress', 'help']);
+// Teacher-facing targets for shared nav items. Teachers cannot open the staff routes
+// (routeRoles.js), so their links must point at the teacher routes instead.
+const TEACHER_PATHS = { schedule: '/teacher/index', progress: '/teacher/progress' };
 
 const NAV_SECTIONS = [
   {
@@ -152,7 +155,7 @@ export default function Shell({ children, pageTitle }) {
       if (isTeacherRole) return TEACHER_KEYS.has(item.key);
       if (Array.isArray(item.roles) && item.roles.length > 0) return item.roles.includes(role);
       return true;
-    }),
+    }).map((item) => (isTeacherRole && TEACHER_PATHS[item.key] ? { ...item, path: TEACHER_PATHS[item.key] } : item)),
   })).filter((s) => s.items.length > 0);
 
   const profileName = profile?.full_name || profile?.email || 'Admin';
@@ -175,7 +178,7 @@ export default function Shell({ children, pageTitle }) {
           {!collapsed && (
             <div className="sb-brand">
               <div className="sb-name">Rock Solid</div>
-              <div className="sb-sub">Admin Portal</div>
+              <div className="sb-sub">{isTeacherRole ? 'Teacher Portal' : 'Admin Portal'}</div>
             </div>
           )}
           <button
@@ -237,7 +240,7 @@ export default function Shell({ children, pageTitle }) {
               {mobileOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
             <nav className="topbar-breadcrumb" aria-label="Breadcrumb">
-              <span>Admin</span>
+              <span>{isTeacherRole ? 'Teacher' : 'Admin'}</span>
               {pageTitle && (
                 <>
                   <span className="sep">/</span>
