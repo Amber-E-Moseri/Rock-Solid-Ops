@@ -87,7 +87,8 @@ export default function AdminManagementPage() {
     return <EmptyState icon="🚫" title="Access Denied" subtitle="You don't have permission to view this page." />;
   }
 
-  const isLoading = tab === 'staff' ? staff.isLoading : teachers.isLoading;
+  // isPending (not isLoading) so a paused offline query with no data shows the skeleton, not an empty list.
+  const isPending = tab === 'staff' ? staff.isPending : teachers.isPending;
   const activeQuery = tab === 'staff' ? staff : teachers;
 
   // Row actions are shared by the table cell and the mobile card view.
@@ -164,7 +165,7 @@ export default function AdminManagementPage() {
 
       {activeQuery.isError ? (
         <ErrorBanner message={`Could not load ${tab === 'staff' ? 'staff' : 'teachers'}. ${activeQuery.error?.message || ''}`.trim()} onRetry={() => activeQuery.refetch()} />
-      ) : isLoading ? <Skeleton variant="rows" rows={6} /> : tab === 'staff' ? (
+      ) : isPending ? <Skeleton variant="rows" rows={6} /> : tab === 'staff' ? (
         filteredStaff.length === 0 ? <EmptyState icon="📭" title="No staff" subtitle={search ? 'No records matched your search' : 'Add a record to get started'} /> : (
           <>
           <div className="rso-table-wrap">

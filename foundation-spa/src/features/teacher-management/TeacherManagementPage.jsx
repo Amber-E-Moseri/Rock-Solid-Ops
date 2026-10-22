@@ -27,7 +27,7 @@ export default function TeacherManagementPage() {
   const [linkModal, setLinkModal] = useState(null);
   const [unlinkModal, setUnlinkModal] = useState(null);
 
-  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['teacher-mgmt'], queryFn: fetchTeachers, staleTime: 60_000 });
+  const { data, isPending, isError, refetch } = useQuery({ queryKey: ['teacher-mgmt'], queryFn: fetchTeachers, staleTime: 60_000 });
   const teachers = data?.teachers ?? [];
   const classMap = data?.classMap ?? new Map();
 
@@ -96,11 +96,11 @@ export default function TeacherManagementPage() {
       </Toolbar>
 
       {/* No count while loading or after a failed query: "0 teachers" would read as a successful empty result. */}
-      {!isLoading && !isError && (
+      {!isPending && !isError && (
         <p style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '0.5rem' }}>{filtered.length} teachers</p>
       )}
 
-      {isLoading ? <Skeleton variant="rows" rows={6} /> : isError ? (
+      {isPending ? <Skeleton variant="rows" rows={6} /> : isError ? (
         <ErrorBanner message="Could not load teachers." onRetry={refetch} />
       ) : filtered.length === 0 ? (
         <EmptyState icon="📭" title="No teachers" subtitle={search ? 'No records matched your search' : 'No teachers in this status'} />

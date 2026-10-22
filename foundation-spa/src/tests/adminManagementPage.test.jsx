@@ -24,7 +24,7 @@ vi.mock('../context/ToastContext.jsx', () => ({
 }));
 
 const STAFF_ROW = { id: 's1', full_name: 'Ann Admin', email: 'ann@example.com', role: 'admin', is_active: true };
-const idle = { isLoading: false, isError: false, error: null, refetch: vi.fn() };
+const idle = { isPending: false, isFetching: false, isError: false, error: null, refetch: vi.fn() };
 
 function setStaff(state) {
   vi.mocked(useStaff).mockReturnValue({ ...idle, ...state });
@@ -37,7 +37,7 @@ beforeEach(() => {
 
 describe('AdminManagementPage staff list states', () => {
   it('shows a skeleton while loading, not an empty list', () => {
-    setStaff({ isLoading: true, data: undefined });
+    setStaff({ isPending: true, data: undefined });
     render(<AdminManagementPage />);
     expect(screen.queryByText('No staff')).toBeNull();
     expect(screen.queryByRole('table')).toBeNull();
