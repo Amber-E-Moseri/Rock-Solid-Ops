@@ -33,7 +33,7 @@ function fmtDate(iso) {
 export default function RoleAuditPage() {
   const { profile } = useAuth();
   const isSuperadmin = profile?.role === 'superadmin';
-  const { addToast } = useToast();
+  const addToast = useToast();
 
   const { data, isLoading, refetch } = useRoleAuditData();
   const changeRole = useChangeRole();
