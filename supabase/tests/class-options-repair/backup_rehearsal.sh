@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rehearses the logical-backup tooling from docs/PRODUCTION_LOGICAL_BACKUP_PLAN_2026-10-22.md
+# Rehearses the logical-backup tooling from docs/PRODUCTION_BACKUP_AND_RECOVERY_2026-10-22.md (PR #9)
 # on SYNTHETIC data only, using a throwaway PostgreSQL 17 cluster on a private port.
 #
 # It never connects to a real database. It proves: pg_dump (custom format, serializable-deferrable)

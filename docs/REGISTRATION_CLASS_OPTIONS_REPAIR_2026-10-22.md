@@ -162,13 +162,26 @@ FROM public.class_options;
 SELECT class_option_id FROM public.class_options WHERE active AND enrollment_open AND deleted_at IS NULL LIMIT 1;
 ```
 
-**Procedure (after approval):**
+**Procedure (after approval).** The authoritative operator checklist, with stop conditions, is `docs/REGISTRATION_REPAIR_EXECUTION_PACKAGE_2026-10-22.md` (PR #11). The steps below are the same, in brief.
 
-1. Confirm P1–P4 match the expected values above.
-2. Run `supabase/migrations/202610220100_repair_class_options_registration_columns.sql` inside one transaction (`BEGIN; … COMMIT;`).
-3. Record the version in `supabase_migrations.schema_migrations`. Do **not** use `supabase db push`, which will not work cleanly while production has remote-only versions (section 8). Use the approved mechanism.
-4. Run the validation queries below.
-5. Load the registration form (unauthenticated) and confirm the class list renders. Do not submit a registration.
+1. **Confirm the link before any CLI command.** The CLI directory must contain `supabase/.temp/project-ref` with the value `xelpsttqhrcqmttmjory`. Stop otherwise. The repository is linked to staging and must never be used for production commands.
+2. **Take a fresh encrypted backup immediately before execution** (`scripts/backup/backup-prod-logical.sh`, PR #9). Verify its checksum.
+3. **Re-run P1–P4 from the production-linked directory.** P3 must equal the values recorded in the approval.
+4. **Apply the migration text in one transaction.** Use the file content unchanged, between `BEGIN;` and `COMMIT;`, with the validation block in PR #11, step S4.
+5. **Record the history row** (section 15), only after step 4 commits and V1–V4 pass.
+6. **Run V1–V4.**
+7. **Load the registration form** (unauthenticated) and confirm the class list renders. Do not submit a registration.
+
+**P3 (checksum of the original columns; record before the change; harness definition):**
+
+```sql
+SELECT count(*) AS rows, md5(string_agg(row_to_json(x)::text, '|' ORDER BY class_option_id)) AS checksum
+FROM (SELECT class_option_id, class_id, teacher_id, teacher_name, fellowship_codes, group_id, subgroup_id, day, class_time,
+             active, enrollment_open, max_capacity, label_suffix, deleted_at, created_by, updated_by, created_at, updated_at
+      FROM public.class_options) x;
+```
+
+Expected on 2026-10-22: 13 rows, checksum `e5037229c4c14e479fa2fd738fe66b48`. The checksum includes `updated_at`, so it changes if any row is updated; that is a stop condition.
 
 **Validation (read-only):**
 
@@ -181,13 +194,11 @@ WHERE table_schema = 'public' AND table_name = 'class_options' AND column_name I
 -- V2: no NULL is_online
 SELECT count(*) FROM public.class_options WHERE is_online IS NULL;  -- expect 0
 
--- V3: the checksum from P3 is unchanged (the repair must not change existing values)
-SELECT count(*) AS rows, md5(string_agg(class_option_id || active::text || enrollment_open::text || coalesce(deleted_at::text, ''), ',' ORDER BY class_option_id)) AS checksum
-FROM public.class_options;   -- expect the P3 values
+-- V3: the P3 checksum is unchanged (the repair must not change existing values)
+-- run the P3 query above; expect 13 rows and e5037229c4c14e479fa2fd738fe66b48
 
--- V4: registration query succeeds
-SELECT class_option_id, is_online, confirmed_start_date FROM public.class_options
-WHERE active AND enrollment_open AND deleted_at IS NULL;   -- expect 13 rows at 2026-10-22
+-- V4: registration filter returns the open classes
+SELECT count(*) FROM public.class_options WHERE active = true AND enrollment_open = true AND deleted_at IS NULL;  -- expect 13
 ```
 
 **Rollback:** `supabase/ops/202610220100_rollback_class_options_repair.sql`. Read section 12 (rollback conditions and data loss) before any use. It refuses to run unless the operator sets three session settings and confirms the export row count (section 12.2). It is not part of `supabase/migrations/`, so `supabase db push` never runs it. Removing the history row is a separate step (section 11).
@@ -268,7 +279,7 @@ Re-applying the migration afterwards restores the columns with the defaults (`is
 - The production project `foundation-school` (`xelpsttqhrcqmttmjory`) is on the **Supabase Free plan**. The dashboard states that the Free plan does not include managed project backups, and it offers no point-in-time recovery.
 - **The only recovery path for production is a logical backup that the owner takes and stores.** Supabase cannot restore production from its own backups.
 - A rollback script is not a backup. It drops columns; it does not preserve data.
-- Before any production SQL, the owner must have: (a) a logical backup of the relevant schema and data, (b) confirmation it is readable, and (c) a successful restore rehearsal into an isolated database. The procedure is in `docs/PRODUCTION_LOGICAL_BACKUP_PLAN_2026-10-22.md`.
+- Before any production SQL, the owner must have: (a) a logical backup of the relevant schema and data, (b) confirmation it is readable, and (c) a successful restore rehearsal into an isolated database. The single authoritative procedure is `docs/PRODUCTION_BACKUP_AND_RECOVERY_2026-10-22.md` with `scripts/backup/backup-prod-logical.sh` (PR #9). It must merge before, or with, this PR.
 - Recovery limitation: without a verified backup, a bad repair or a bad rollback on production cannot be undone by the platform.
 
 ## 14. Test evidence: PostgreSQL 17 harness
@@ -282,6 +293,8 @@ PG_BIN="/c/Program Files/PostgreSQL/17/bin" bash supabase/tests/class-options-re
 The harness creates a throwaway cluster in a temp directory on a private port, loads synthetic data only (13 open class options), replays the repo's forward migration file and rollback file, and deletes the cluster at the end. It does not read or write any real database.
 
 **Result on 2026-10-22, PostgreSQL 17.11, Windows, synthetic data: 30 passed, 0 failed.**
+
+Reproduced by the reviewer on 2026-10-22 at head `5a893ce0`, with PostgreSQL 17.6 binaries (`PG_BIN` set to a 17.6 bin directory): **30 passed, 0 failed**. The backup-tooling harness (`backup_rehearsal.sh`) also passed 12 of 12 with the PostgreSQL 17.6 `pg_dump`.
 
 | Area | Checks | Result |
 |---|---|---|
@@ -306,18 +319,19 @@ The harness creates a throwaway cluster in a temp directory on a private port, l
 - The harness runs SQL directly. It does not test PostgREST, the registration form in a browser, or the Edge Functions.
 - CI does not run this harness. It needs a local PostgreSQL 17 installation. Adding it to CI is a separate change.
 
-## 15. Migration-history recording
+## 15. Migration-history recording (corrected 2026-10-22)
 
-- Production `supabase_migrations.schema_migrations` contains versions that are not in this repository (section 4). `supabase db push` refuses to run against that history.
-- **Record the version only after the DDL has succeeded and the validation queries pass.** Recording it first is the cause of this incident: the history said "applied" while the DDL was absent.
-- Two methods, both **requiring explicit owner approval**:
-  - **A.** `supabase migration repair --status applied 202610220100`, run from the repo against project `xelpsttqhrcqmttmjory`. Preferred if the CLI can run it without touching other versions.
-  - **B.** Manual insert into `supabase_migrations.schema_migrations`, in the same transaction as the DDL, with the same name and statement text as the repo file. Fallback only.
-- **If the rollback runs, the history row must be removed in the same change**, with separate approval. Otherwise the history claims an applied state the database no longer has.
-- No history change is made by this PR.
+- **Before:** 159 rows in `supabase_migrations.schema_migrations`, including `202605190900` and `202605190930`.
+- **Expected after execution:** 160 rows. One new row: version `202610220100`, name `repair_class_options_registration_columns`. No other row changes.
+- **Target rule (mandatory):** every history command runs from a directory whose `supabase/.temp/project-ref` equals `xelpsttqhrcqmttmjory`. **Never** run it from the repository. The repository is linked to **staging** (`hblahcaozlttknkzvkib`), so a command run there would change staging, not production. The earlier wording "run from the repo against project `xelpsttqhrcqmttmjory`" was wrong and is withdrawn.
+- **Method A (preferred):** `supabase migration repair --status applied 202610220100 --linked`, from the production-linked directory, only after the DDL transaction has committed and V1–V4 pass. Stop if the command reports any other version or an error.
+- **Method B (fallback only; needs its own approval):** insert the row inside the same transaction as the DDL, with the same version and name, and statements equal to the file text.
+- **Never:** edit, delete or re-order `202605190900` or `202605190930`, and never mark any version reverted as part of this repair.
+- **Verification after recording:** count is 160; the three versions `202605190900`, `202605190930` and `202610220100` are present; no other row changed.
+- **Removing the row (rollback only):** a separate step with its own approval (section 12.4).
 
 ## 16. Scope of this PR
 
 - The forward migration file `supabase/migrations/202610220100_repair_class_options_registration_columns.sql` is **unchanged** from the reviewed version.
-- Added: the rollback (`supabase/ops/`), the harness (`supabase/tests/class-options-repair/`), the backup plan (`docs/PRODUCTION_LOGICAL_BACKUP_PLAN_2026-10-22.md`), and this runbook update.
+- Added: the rollback (`supabase/ops/`), the harness (`supabase/tests/class-options-repair/`), a pointer to the single backup runbook (`docs/PRODUCTION_BACKUP_AND_RECOVERY_2026-10-22.md`, PR #9), and this runbook update.
 - Not in this PR: any drift repair beyond the two columns, any C6, SPA or other migration change, any production action.
