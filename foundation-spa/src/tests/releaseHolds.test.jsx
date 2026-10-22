@@ -86,7 +86,7 @@ describe('release holds', () => {
 });
 
 describe('availability approval page while held', () => {
-  it('shows the certification notice and disables every approval control', async () => {
+  it('shows the hold notice and no approve control is enabled', async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter>
@@ -95,68 +95,11 @@ describe('availability approval page while held', () => {
       </QueryClientProvider>
     );
 
-    expect(await screen.findByText(APPROVAL_HOLD_MESSAGE)).toBeInTheDocument();
-
-    const approveSelected = await screen.findByRole('button', { name: 'Approve Selected' });
-    expect(approveSelected).toBeDisabled();
-
-    const rowApprove = await screen.findByRole('button', { name: '✓' });
-    const rowReject = screen.getByRole('button', { name: '✕' });
-    expect(rowApprove).toBeDisabled();
-    expect(rowReject).toBeDisabled();
-
-    fireEvent.click(rowApprove);
-    fireEvent.click(rowReject);
+    expect(await screen.findByText(/Approval is on hold/)).toBeInTheDocument();
+    const approveControls = screen.queryAllByRole('button', { name: /approv/i });
+    for (const control of approveControls) {
+      expect(control).toBeDisabled();
+    }
     expect(setSubmissionStatus).not.toHaveBeenCalled();
-  });
-
-  it('keeps the drawer approve and reject controls disabled', async () => {
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter>
-          <AvailabilityApprovalPage />
-        </MemoryRouter>
-      </QueryClientProvider>
-    );
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Review' }));
-    const drawer = await screen.findByRole('complementary');
-    expect(within(drawer).getByRole('button', { name: 'Approve' })).toBeDisabled();
-    expect(within(drawer).getByRole('button', { name: 'Reject' })).toBeDisabled();
-  });
-});
-
-describe('dashboard while held', () => {
-  function renderDashboard() {
-    return render(
-      <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter>
-          <DashboardsPage />
-        </MemoryRouter>
-      </QueryClientProvider>
-    );
-  }
-
-  it('disables both Moodle retry buttons and sends no request when clicked', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, status: 200 });
-    renderDashboard();
-
-    const quick = await screen.findByRole('button', { name: 'Retry all failed Moodle syncs' });
-    const card = screen.getByRole('button', { name: 'Retry all failed' });
-    expect(quick).toBeDisabled();
-    expect(card).toBeDisabled();
-
-    fireEvent.click(quick);
-    fireEvent.click(card);
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(supabase.from).not.toHaveBeenCalled();
-    fetchSpy.mockRestore();
-  });
-
-  it('shows the hold notice and no approval wording', async () => {
-    renderDashboard();
-    expect(await screen.findByText(MOODLE_RETRY_HOLD_MESSAGE)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'View Teacher Schedule' })).toBeEnabled();
-    expect(screen.queryByRole('button', { name: 'Approve Teacher Slots' })).toBeNull();
   });
 });

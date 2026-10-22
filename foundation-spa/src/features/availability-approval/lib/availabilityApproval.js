@@ -1,4 +1,5 @@
 import { supabase } from '../../../supabase.js';
+import { APPROVAL_CERTIFIED, APPROVAL_HOLD_MESSAGE } from '../../../releaseHolds.js';
 
 // Slot model: one row of public.teacher_availability per teacher, batch, day and time slot.
 // Columns verified against the authoritative migrations (000_baseline_squash, 202605071200,
@@ -114,11 +115,9 @@ export function filterSlots(slots, { search = '', status = '' }) {
   });
 }
 
-// Approval is ON HOLD. The RPC creates class options and class slots, and its contract is under review
-// (see migration-log 2026-10-22, "Approval contract audit"). Keep this false until that review signs off.
-// While false, the page shows Approve disabled and approveSlot refuses to call the RPC.
-export const APPROVAL_CERTIFIED = false;
-export const APPROVAL_HOLD_MESSAGE = 'Approval is on hold pending contract review.';
+// Approval gate and hold wording live in releaseHolds.js (single source). While
+// APPROVAL_CERTIFIED is false the page shows Approve disabled and approveSlot refuses the RPC.
+export { APPROVAL_CERTIFIED, APPROVAL_HOLD_MESSAGE };
 
 export function canApprove(slot, role) {
   return APPROVER_ROLES.includes(role) && statusInfo(slot.status).key === 'awaiting';

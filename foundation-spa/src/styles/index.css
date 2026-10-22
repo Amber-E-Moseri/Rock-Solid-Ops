@@ -56,8 +56,6 @@ a:hover { text-decoration: underline; }
 .rso-content {
   margin-left: 220px;
   flex: 1;
-  /* Let wide tables scroll inside .rso-table-wrap instead of widening the whole shell. */
-  min-width: 0;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -238,6 +236,10 @@ a:hover { text-decoration: underline; }
 .user-name { font-weight: 600; color: var(--text); line-height: 1.2; }
 .user-role { font-size: 10px; color: var(--muted); font-weight: 600; text-transform: capitalize; }
 
+@media (max-width: 480px) {
+  .user-meta { display: none; }
+}
+
 /* ── Icon button ── */
 .icon-btn {
   width: 32px;
@@ -278,7 +280,15 @@ a:hover { text-decoration: underline; }
   }
   .rso-content {
     margin-left: 0 !important;
+    min-width: 0;
   }
+  /* Keep the top bar inside the viewport: the breadcrumb truncates and the
+     user chip gives up its name and role text on phones (see .user-meta). */
+  .rso-topbar { padding: 0 var(--space-3); gap: var(--space-2); min-width: 0; }
+  .topbar-left { min-width: 0; }
+  .topbar-breadcrumb { min-width: 0; overflow: hidden; white-space: nowrap; }
+  .topbar-page { overflow: hidden; text-overflow: ellipsis; }
+  .topbar-right { flex-shrink: 0; }
   .ham-btn { display: flex; }
   .rso-sidebar-backdrop.show { display: block; }
   .sb-section-label, .sb-label-text, .sb-brand { display: unset !important; }

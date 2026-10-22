@@ -16,3 +16,12 @@ export const APPROVAL_HOLD_MESSAGE =
 
 export const MOODLE_RETRY_HOLD_MESSAGE =
   'Moodle retry is on hold pending endpoint and authorization certification.';
+
+// Teacher attendance and outcome submission write to the live roster. Keep this
+// false until the submit path is certified against the staging contract. While
+// false the teacher page disables Submit and Submit Outcomes, and the save
+// functions refuse before any request is sent.
+export const ATTENDANCE_SUBMIT_CERTIFIED = false;
+
+export const ATTENDANCE_SUBMIT_HOLD_MESSAGE =
+  'Attendance submission is on hold pending certification. Nothing has been saved.';

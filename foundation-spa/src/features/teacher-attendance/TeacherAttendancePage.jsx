@@ -1,14 +1,15 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useToast } from '../../context/ToastContext.jsx';
+import { ATTENDANCE_SUBMIT_CERTIFIED, ATTENDANCE_SUBMIT_HOLD_MESSAGE } from '../../releaseHolds.js';
 import {
   lookupTeacher, getClassOptions, loadRoster, searchPerson, getMilestones,
   submitAttendance, submitOutcomes, fetchAttendanceHistory, SESSIONS, initials,
 } from './lib/teacherAttendance.js';
-import { PageHeader, Button, Skeleton, EmptyState, Badge, Modal, SearchInput } from '../../components/ui/index.js';
+import { Button, Skeleton, EmptyState, Badge, Modal, SearchInput } from '../../components/ui/index.js';
 
 const STEPS = ['Teacher', 'Class', 'Action', 'Session', 'Attendance'];
-function stepIdx(step) { return { teacher: 0, class: 1, action: 2, session: 3, attendance: 4, review: 4, outcomes: 4 }[step] ?? 0; }
+function stepIdx(step) { return { teacher: 0, class: 1, action: 2, session: 3, attendance: 4, review: 4, saved: 4, outcomes: 4 }[step] ?? 0; }
 
 export default function TeacherAttendancePage() {
   const { profile } = useAuth();
@@ -40,6 +41,12 @@ export default function TeacherAttendancePage() {
 
   // Step outcomes
   const [milestones, setMilestones] = useState([]);
+  const [outcomesLoading, setOutcomesLoading] = useState(false);
+  const [milestoneError, setMilestoneError] = useState(null);
+  // Client-side save guards. The server is the source of truth; these only stop
+  // this page from sending the same roster twice.
+  const savingRef = useRef(false);
+  const submittedRef = useRef(false);
   const [outcomes, setOutcomes] = useState({});
 
   // Auto-search on mount if teacher email known
@@ -74,6 +81,7 @@ export default function TeacherAttendancePage() {
 
   async function loadRosterData() {
     if (!selectedTeacher || !selectedClass || sessions.length === 0) return;
+    submittedRef.current = false;
     setLoading(true);
     try {
       const result = await loadRoster(selectedTeacher.teacherId, selectedClass.classOptionId, sessions);
@@ -88,6 +96,12 @@ export default function TeacherAttendancePage() {
   }
 
   async function handleSubmit() {
+    // Held: no roster write until attendance submission is certified (releaseHolds.js).
+    if (!ATTENDANCE_SUBMIT_CERTIFIED) return;
+    // Ignore repeat presses while a save is in flight, and never resend a roster the
+    // server has already confirmed.
+    if (savingRef.current || submittedRef.current) return;
+    savingRef.current = true;
     setLoading(true);
     try {
       const rosterMembers = roster.filter((r) => !r.isGuest);
@@ -109,8 +123,27 @@ export default function TeacherAttendancePage() {
         classOptionId: selectedClass.classOptionId, classSession: sessions.join(','),
         classDate, records, guestRecords,
       });
-      // Advance the UI before the toast: the attendance is already saved, so a
-      // toast failure must never leave the user on Review with a resubmit path.
+      // Confirmed by the server. Enter the saved state before anything else, so no
+      // later failure can bring the Submit button back.
+      submittedRef.current = true;
+      setStep('saved');
+    } catch (e) {
+      notifySafely(e.message, 'error');
+      return;
+    } finally {
+      savingRef.current = false;
+      setLoading(false);
+    }
+    notifySafely('Attendance submitted', 'success');
+    await loadOutcomes();
+  }
+
+  // Secondary read after a confirmed save. A failure is shown inline with a retry;
+  // it never repeats the attendance write.
+  async function loadOutcomes() {
+    setOutcomesLoading(true);
+    setMilestoneError(null);
+    try {
       const ms = await getMilestones(sessions);
       if (ms.length > 0) {
         setMilestones(ms);
@@ -119,12 +152,21 @@ export default function TeacherAttendancePage() {
       } else {
         resetToClassSelect();
       }
-      addToast('Attendance submitted', 'success');
-    } catch (e) { addToast(e.message, 'error'); }
-    finally { setLoading(false); }
+    } catch (e) {
+      setMilestoneError(e.message || 'Could not load outcome questions.');
+    } finally {
+      setOutcomesLoading(false);
+    }
+  }
+
+  // A toast is informational. A failing toast must not change the save outcome.
+  function notifySafely(message, type) {
+    try { addToast(message, type); } catch (err) { console.warn('[attendance] toast failed', err); }
   }
 
   async function handleOutcomes(submitted) {
+    // Held: no outcome write until attendance submission is certified (releaseHolds.js).
+    if (!ATTENDANCE_SUBMIT_CERTIFIED) return;
     setLoading(true);
     try {
       const presentIds = roster.filter((r) => attendance[r.id]);
@@ -151,6 +193,8 @@ export default function TeacherAttendancePage() {
   }
 
   function resetToClassSelect() {
+    submittedRef.current = false;
+    setMilestoneError(null);
     setSessions([]); setRoster([]); setAttendance({}); setMilestones([]); setOutcomes({});
     setSelectedClass(null); setStep('class');
   }
@@ -181,46 +225,43 @@ export default function TeacherAttendancePage() {
   }
 
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
-      {/* Stepper */}
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-        {STEPS.map((label, i) => (
-          <div key={label} style={{
-            padding: '0.3rem 0.75rem', borderRadius: 'var(--r-sm)', fontSize: '11px', fontWeight: 600,
-            background: stepIdx(step) === i ? 'var(--primary)' : stepIdx(step) > i ? 'var(--color-success)' : 'var(--surface)',
-            color: stepIdx(step) >= i ? '#fff' : 'var(--muted)',
-          }}>{label}</div>
-        ))}
-      </div>
+    <div className="rso-tp-stack">
+      <ol className="rso-tp-stepper" aria-label="Attendance steps">
+        {STEPS.map((label, i) => {
+          const state = stepIdx(step) === i ? 'is-current' : stepIdx(step) > i ? 'is-done' : '';
+          return (
+            <li key={label} className={`rso-tp-step ${state}`.trim()}
+              aria-current={stepIdx(step) === i ? 'step' : undefined}>{label}</li>
+          );
+        })}
+      </ol>
 
       {loading && <Skeleton variant="rows" rows={3} />}
 
       {/* Step 1 — Teacher */}
       {step === 'teacher' && !loading && (
         <div>
-          <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '0.75rem' }}>Find Teacher</h2>
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-            <input className="rso-input" style={{ flex: 1 }} placeholder="Search by name or email…" value={teacherQuery}
+          <h2 className="rso-tp-heading">Find Teacher</h2>
+          <div className="rso-tp-row">
+            <input className="rso-input rso-tp-row-grow" aria-label="Search teachers" placeholder="Search by name or email…" value={teacherQuery}
               onChange={(e) => setTeacherQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && doTeacherSearch(teacherQuery)} />
             <Button variant="primary" onClick={() => doTeacherSearch(teacherQuery)}>Search</Button>
           </div>
-          <div style={{ display: 'grid', gap: '0.5rem' }}>
+          <div className="rso-tp-stack-tight">
             {teacherResults.map((t) => (
-              <div key={t.teacherId} className="rso-card" onClick={() => setSelectedTeacher(t)}
-                style={{ padding: '0.75rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem',
-                  border: selectedTeacher?.teacherId === t.teacherId ? '2px solid var(--primary)' : '2px solid transparent' }}>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '11px' }}>
-                  {initials(t.fullName)}
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600 }}>{t.fullName}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--muted)' }}>{t.email} · {t.subGroupLabel}</div>
-                </div>
-              </div>
+              <button key={t.teacherId} type="button" className="rso-card rso-tp-pick"
+                aria-pressed={selectedTeacher?.teacherId === t.teacherId}
+                onClick={() => setSelectedTeacher(t)}>
+                <span className="rso-tp-avatar" aria-hidden="true">{initials(t.fullName)}</span>
+                <span>
+                  <span className="rso-tp-name rso-tp-line">{t.fullName}</span>
+                  <span className="rso-tp-meta rso-tp-line">{t.email} · {t.subGroupLabel}</span>
+                </span>
+              </button>
             ))}
           </div>
-          <div style={{ marginTop: '1rem' }}>
+          <div className="rso-tp-actions">
             <Button variant="primary" disabled={!selectedTeacher} onClick={goToClasses}>Continue</Button>
           </div>
         </div>
@@ -229,22 +270,22 @@ export default function TeacherAttendancePage() {
       {/* Step 2 — Class */}
       {step === 'class' && !loading && (
         <div>
-          <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '0.75rem' }}>Select Class</h2>
-          <div style={{ display: 'grid', gap: '0.5rem' }}>
+          <h2 className="rso-tp-heading">Select Class</h2>
+          <div className="rso-tp-stack-tight">
             {classOptions.map((c) => (
-              <div key={c.classOptionId} className="rso-card" onClick={() => setSelectedClass(c)}
-                style={{ padding: '0.75rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  border: selectedClass?.classOptionId === c.classOptionId ? '2px solid var(--primary)' : '2px solid transparent' }}>
-                <div>
-                  <div style={{ fontWeight: 600 }}>{c.classOptionId}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--muted)' }}>{c.day} · {c.time} · Batch {c.batch || c.batchId || c.batch_id}</div>
-                </div>
+              <button key={c.classOptionId} type="button" className="rso-card rso-tp-pick rso-tp-pick-spread"
+                aria-pressed={selectedClass?.classOptionId === c.classOptionId}
+                onClick={() => setSelectedClass(c)}>
+                <span>
+                  <span className="rso-tp-name rso-tp-line">{c.classOptionId}</span>
+                  <span className="rso-tp-meta rso-tp-line">{c.day} · {c.time} · Batch {c.batch || c.batchId || c.batch_id}</span>
+                </span>
                 <Badge variant="info">{c.enrolledCount} enrolled</Badge>
-              </div>
+              </button>
             ))}
             {classOptions.length === 0 && <EmptyState icon="📭" title="No active classes" subtitle="This teacher has no active class options." />}
           </div>
-          <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+          <div className="rso-tp-actions">
             <Button variant="ghost" onClick={() => setStep('teacher')}>Back</Button>
             <Button variant="primary" disabled={!selectedClass} onClick={() => setStep('action')}>Continue</Button>
           </div>
@@ -254,62 +295,62 @@ export default function TeacherAttendancePage() {
       {/* Step 3 — Action */}
       {step === 'action' && !loading && (
         <div>
-          <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '0.75rem' }}>Choose Action</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div className="rso-card" onClick={() => setStep('session')} style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer' }}>
-              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>✅</div>
-              <div style={{ fontWeight: 700 }}>Mark Attendance</div>
-            </div>
-            <div className="rso-card" style={{ padding: '2rem', textAlign: 'center', cursor: 'pointer', opacity: 0.6 }}>
-              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📊</div>
-              <div style={{ fontWeight: 700 }}>View Student Progress</div>
-              <div style={{ fontSize: '11px', color: 'var(--muted)' }}>Coming soon</div>
-            </div>
+          <h2 className="rso-tp-heading">Choose Action</h2>
+          <div className="rso-tp-grid-2">
+            <button type="button" className="rso-card rso-tp-choice" onClick={() => setStep('session')}>
+              <span className="rso-tp-choice-icon rso-tp-line" aria-hidden="true">✅</span>
+              <span className="rso-tp-name rso-tp-line">Mark Attendance</span>
+            </button>
+            <button type="button" className="rso-card rso-tp-choice" disabled>
+              <span className="rso-tp-choice-icon rso-tp-line" aria-hidden="true">📊</span>
+              <span className="rso-tp-name rso-tp-line">View Student Progress</span>
+              <span className="rso-tp-meta rso-tp-line">Coming soon</span>
+            </button>
           </div>
-          <div style={{ marginTop: '1rem' }}><Button variant="ghost" onClick={() => setStep('class')}>Back</Button></div>
+          <div className="rso-tp-actions">
+            <Button variant="ghost" onClick={() => setStep('class')}>Back</Button>
+          </div>
         </div>
       )}
 
       {/* Step 4 — Session */}
       {step === 'session' && !loading && (
         <div>
-          <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '0.75rem' }}>Select Session & Date</h2>
-          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          <h2 className="rso-tp-heading">Select Session & Date</h2>
+          <div className="rso-tp-session-chips">
             {SESSIONS.map((s) => (
-              <button key={s} onClick={() => toggleSession(s)} style={{
-                padding: '0.4rem 0.75rem', borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
-                fontWeight: sessions.includes(s) ? 700 : 400, fontSize: '13px',
-                background: sessions.includes(s) ? 'var(--primary)' : 'var(--surface)',
-                color: sessions.includes(s) ? '#fff' : 'var(--text)',
-              }}>{sessions.includes(s) ? '✓ ' : ''}{s}</button>
+              <button key={s} type="button" className="rso-tp-toggle" aria-pressed={sessions.includes(s)}
+                onClick={() => toggleSession(s)}>{sessions.includes(s) ? '✓ ' : ''}{s}</button>
             ))}
           </div>
-          <label className="rso-field" style={{ maxWidth: 220 }}>
+          <label className="rso-field rso-tp-date">
             <span>Class Date</span>
             <input className="rso-input" type="date" value={classDate} onChange={(e) => setClassDate(e.target.value)} />
           </label>
           {selectedClass && (
-            <Button variant="ghost" size="sm" onClick={showHistory} style={{ marginTop: '0.5rem' }}>
-              {history ? 'Hide History' : 'View Session History'}
-            </Button>
+            <div className="rso-tp-caption-tight">
+              <Button variant="ghost" size="sm" onClick={showHistory}>
+                {history ? 'Hide History' : 'View Session History'}
+              </Button>
+            </div>
           )}
           {history && (
-            <div style={{ marginTop: '0.75rem' }}>
+            <div className="rso-tp-history">
               {history.map((h, i) => (
-                <div key={i} style={{ display: 'flex', gap: '1rem', fontSize: '13px', padding: '0.35rem 0', borderBottom: '1px solid var(--border)' }}>
+                <div key={i} className="rso-tp-history-row">
                   <span>{h.date} — {h.session}</span>
-                  <span style={{ color: 'var(--color-success)' }}>✓ {h.present}</span>
-                  <span style={{ color: 'var(--color-danger)' }}>✗ {h.absent}</span>
+                  <span className="rso-tp-ok">✓ {h.present}</span>
+                  <span className="rso-tp-bad">✗ {h.absent}</span>
                 </div>
               ))}
             </div>
           )}
           {alreadySubmitted && (
-            <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.75rem', background: 'var(--color-warning-bg)', borderRadius: 'var(--r-sm)', fontSize: '13px', color: 'var(--color-warning-fg)' }}>
+            <div className="rso-tp-warning">
               ⚠️ Attendance has already been submitted for this session.
             </div>
           )}
-          <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+          <div className="rso-tp-actions">
             <Button variant="ghost" onClick={() => setStep('action')}>Back</Button>
             <Button variant="primary" disabled={sessions.length === 0} onClick={loadRosterData}>Load Roster</Button>
           </div>
@@ -319,36 +360,39 @@ export default function TeacherAttendancePage() {
       {/* Step 5 — Attendance */}
       {step === 'attendance' && !loading && (
         <div>
-          <div style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '0.75rem' }}>
+          <div className="rso-tp-caption">
             {selectedTeacher?.fullName} · {selectedClass?.classOptionId} · {sessions.join(' + ')} · {classDate}
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div className="rso-tp-row rso-tp-tools">
             <Button variant="success" size="sm" onClick={() => { const a = {}; roster.forEach((r) => a[r.id] = true); setAttendance(a); }}>All Present</Button>
             <Button variant="danger" size="sm" onClick={() => setAttendance({})}>All Absent</Button>
-            <SearchInput value={rosterSearch} onChange={(e) => setRosterSearch(e.target.value)} placeholder="Search roster…" style={{ flex: 1, minWidth: 160 }} />
+            <div className="rso-tp-row-grow">
+              <SearchInput value={rosterSearch} onChange={(e) => setRosterSearch(e.target.value)} placeholder="Search roster…" />
+            </div>
             <Button variant="ghost" size="sm" onClick={() => setAddModalOpen(true)}>+ Add Person</Button>
           </div>
-          <div style={{ display: 'grid', gap: '0.35rem' }}>
+          <div className="rso-tp-stack-xs">
             {filteredRoster.map((r) => (
-              <div key={r.id} onClick={() => setAttendance((a) => ({ ...a, [r.id]: !a[r.id] }))}
-                className="rso-card" style={{ padding: '0.5rem 0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  borderLeft: `3px solid ${attendance[r.id] ? 'var(--color-success)' : 'var(--color-danger)'}` }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontWeight: 600 }}>{r.fullName}</span>
+              <button key={r.id} type="button" className="rso-card rso-tp-row-btn"
+                aria-pressed={!!attendance[r.id]}
+                data-present={!!attendance[r.id]}
+                onClick={() => setAttendance((a) => ({ ...a, [r.id]: !a[r.id] }))}>
+                <span className="rso-tp-name-row">
+                  <span className="rso-tp-name">{r.fullName}</span>
                   {r.isGuest
                     ? <Badge variant="neutral">Guest</Badge>
-                    : <span style={{ fontSize: '11px', color: 'var(--muted)' }}>{r.personType}</span>}
-                </div>
+                    : <span className="rso-tp-meta">{r.personType}</span>}
+                </span>
                 <Badge variant={attendance[r.id] ? 'success' : 'danger'}>{attendance[r.id] ? 'Present' : 'Absent'}</Badge>
-              </div>
+              </button>
             ))}
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.75rem', fontSize: '13px', fontWeight: 600 }}>
-            <span style={{ color: 'var(--color-success)' }}>Present: {present}</span>
-            <span style={{ color: 'var(--color-danger)' }}>Absent: {absent}</span>
-            <span style={{ color: 'var(--primary)' }}>Total: {roster.length}</span>
+          <div className="rso-tp-tally">
+            <span className="rso-tp-ok">Present: {present}</span>
+            <span className="rso-tp-bad">Absent: {absent}</span>
+            <span className="rso-tp-total">Total: {roster.length}</span>
           </div>
-          <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+          <div className="rso-tp-actions">
             <Button variant="ghost" onClick={() => setStep('session')}>Back</Button>
             <Button variant="primary" onClick={() => setStep('review')}>Review →</Button>
           </div>
@@ -358,36 +402,61 @@ export default function TeacherAttendancePage() {
       {/* Review */}
       {step === 'review' && !loading && (
         <div>
-          <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '0.75rem' }}>Review & Submit</h2>
-          <div className="rso-card" style={{ padding: '1rem', marginBottom: '1rem' }}>
+          <h2 className="rso-tp-heading">Review & Submit</h2>
+          <div className="rso-card rso-tp-review">
             <p><strong>Class:</strong> {selectedClass?.classOptionId}</p>
             <p><strong>Session:</strong> {sessions.join(' + ')}</p>
             <p><strong>Date:</strong> {classDate}</p>
-            <p style={{ marginTop: '0.5rem' }}>
-              <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>Present: {present}</span> ·{' '}
-              <span style={{ color: 'var(--color-danger)', fontWeight: 600 }}>Absent: {absent}</span> ·{' '}
-              <span style={{ fontWeight: 600 }}>Total: {roster.length}</span>
+            <p className="rso-tp-review-totals">
+              <span className="rso-tp-ok">Present: {present}</span> ·{' '}
+              <span className="rso-tp-bad">Absent: {absent}</span> ·{' '}
+              <span className="rso-tp-name">Total: {roster.length}</span>
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div className="rso-tp-actions">
             <Button variant="ghost" onClick={() => setStep('attendance')}>Back</Button>
-            <Button variant="primary" onClick={handleSubmit}>Submit</Button>
+            {!ATTENDANCE_SUBMIT_CERTIFIED && <p role="status" style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>{ATTENDANCE_SUBMIT_HOLD_MESSAGE}</p>}
+            <Button variant="primary" onClick={handleSubmit} disabled={loading || !ATTENDANCE_SUBMIT_CERTIFIED}>Submit</Button>
           </div>
+        </div>
+      )}
+
+      {/* Saved: the server confirmed the attendance. Outcome questions load from here. */}
+      {step === 'saved' && (
+        <div>
+          <h2 className="rso-tp-heading">Attendance saved</h2>
+          <p className="rso-tp-caption">
+            {selectedClass?.classOptionId} · {sessions.join(' + ')} · {classDate} — Present: {present}, Absent: {absent}
+          </p>
+          {outcomesLoading ? (
+            <Skeleton variant="rows" rows={2} />
+          ) : milestoneError ? (
+            <>
+              <div className="rso-tp-warning" role="status">
+                Attendance is saved. The outcome questions could not be loaded: {milestoneError}
+              </div>
+              <div className="rso-tp-actions">
+                <Button variant="ghost" onClick={resetToClassSelect}>Done</Button>
+                <Button variant="primary" onClick={loadOutcomes}>Retry loading outcomes</Button>
+              </div>
+            </>
+          ) : null}
         </div>
       )}
 
       {/* Outcomes */}
       {step === 'outcomes' && !loading && (
         <div>
-          <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '0.75rem' }}>Session Outcomes</h2>
-          <p style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '1rem' }}>Mark milestone outcomes for present students.</p>
+          <h2 className="rso-tp-heading">Session Outcomes</h2>
+          <p className="rso-tp-caption">Mark milestone outcomes for present students.</p>
           {roster.filter((r) => attendance[r.id]).map((person) => (
-            <div key={person.id} className="rso-card" style={{ padding: '0.75rem 1rem', marginBottom: '0.5rem' }}>
-              <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>{person.fullName}</div>
+            <div key={person.id} className="rso-card rso-tp-outcome-card">
+              <div className="rso-tp-outcome-name">{person.fullName}</div>
               {milestones.map((m) => (
-                <div key={m.milestoneId} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem', fontSize: '13px' }}>
-                  <span style={{ flex: 1 }}>{m.question}</span>
-                  <select className="rso-select" style={{ width: 120 }}
+                <div key={m.milestoneId} className="rso-tp-outcome-row">
+                  <span className="rso-tp-outcome-q">{m.question}</span>
+                  <select className="rso-select rso-tp-outcome-select"
+                    aria-label={`${person.fullName}: ${m.question}`}
                     value={outcomes[`${person.id}::${m.milestoneId}`] || ''}
                     onChange={(e) => setOutcomes((o) => ({ ...o, [`${person.id}::${m.milestoneId}`]: e.target.value }))}>
                     <option value="">Not marked</option>
@@ -398,9 +467,9 @@ export default function TeacherAttendancePage() {
               ))}
             </div>
           ))}
-          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-            <Button variant="ghost" onClick={() => handleOutcomes(false)}>Skip / Flag Follow-up</Button>
-            <Button variant="primary" onClick={() => handleOutcomes(true)}>Submit Outcomes</Button>
+          <div className="rso-tp-actions">
+            <Button variant="ghost" onClick={() => handleOutcomes(false)} disabled={!ATTENDANCE_SUBMIT_CERTIFIED}>Skip / Flag Follow-up</Button>
+            <Button variant="primary" onClick={() => handleOutcomes(true)} disabled={!ATTENDANCE_SUBMIT_CERTIFIED}>Submit Outcomes</Button>
           </div>
         </div>
       )}
@@ -442,36 +511,33 @@ function AddPersonModal({ classOptionId, teacherId, sessions, onClose, onAdd, ad
     finally { setSearching(false); }
   }
 
-  const tabStyle = (t) => ({
-    padding: '0.35rem 0.75rem', borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
-    fontWeight: tab === t ? 700 : 400, fontSize: '13px',
-    background: tab === t ? 'var(--primary)' : 'var(--surface)',
-    color: tab === t ? '#fff' : 'var(--text)',
-  });
-
   return (
     <Modal title="Add Person" open onClose={onClose}>
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-        <button style={tabStyle('search')} onClick={() => setTab('search')}>Search Roster</button>
-        <button style={tabStyle('guest')} onClick={() => setTab('guest')}>Guest (visiting)</button>
+      <div className="rso-tp-modal-tabs">
+        <button type="button" className="rso-tp-toggle rso-tp-toggle-sm" aria-pressed={tab === 'search'}
+          onClick={() => setTab('search')}>Search Roster</button>
+        <button type="button" className="rso-tp-toggle rso-tp-toggle-sm" aria-pressed={tab === 'guest'}
+          onClick={() => setTab('guest')}>Guest (visiting)</button>
       </div>
 
       {tab === 'search' && (
         <>
-          <div style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem' }}>
-            <input className="rso-input" style={{ flex: 1 }} placeholder="Search by name or email…" value={query}
+          <div className="rso-tp-row rso-tp-search-row">
+            <input className="rso-input rso-tp-row-grow" aria-label="Search roster" placeholder="Search by name or email…" value={query}
               onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doSearch()} />
             <Button variant="primary" size="sm" onClick={doSearch} disabled={searching}>Search</Button>
           </div>
-          {results.map((r) => (
-            <div key={r.id} className="rso-card" onClick={() => onAdd({ ...r, source: 'Search' })}
-              style={{ padding: '0.5rem 0.75rem', cursor: 'pointer', marginBottom: '0.25rem' }}>
-              <span style={{ fontWeight: 600 }}>{r.fullName}</span>
-              <span style={{ fontSize: '11px', color: 'var(--muted)', marginLeft: '0.5rem' }}>{r.email} · {r.personType}</span>
-            </div>
-          ))}
+          <div className="rso-tp-stack-tight">
+            {results.map((r) => (
+              <button key={r.id} type="button" className="rso-card rso-tp-row-btn rso-tp-row-btn-plain rso-tp-result"
+                onClick={() => onAdd({ ...r, source: 'Search' })}>
+                <span className="rso-tp-name">{r.fullName}</span>
+                <span className="rso-tp-meta-inline">{r.email} · {r.personType}</span>
+              </button>
+            ))}
+          </div>
           {results.length === 0 && query.length >= 2 && !searching && (
-            <p style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '0.5rem' }}>
+            <p className="rso-tp-no-match">
               No roster match. Use "Guest" tab to record a visiting student's attendance.
             </p>
           )}
@@ -479,13 +545,13 @@ function AddPersonModal({ classOptionId, teacherId, sessions, onClose, onAdd, ad
       )}
 
       {tab === 'guest' && (
-        <div style={{ display: 'grid', gap: '0.5rem' }}>
-          <p style={{ fontSize: '13px', color: 'var(--muted)' }}>
+        <div className="rso-tp-modal-stack">
+          <p className="rso-tp-caption">
             Record that a visiting student attended. Only their name is saved — no account details.
           </p>
-          <input className="rso-input" placeholder="Full Name *" value={guestName}
+          <input className="rso-input" aria-label="Guest full name" placeholder="Full Name *" value={guestName}
             onChange={(e) => setGuestName(e.target.value)} />
-          <input className="rso-input" placeholder="Phone (optional)" value={guestPhone}
+          <input className="rso-input" aria-label="Guest phone" placeholder="Phone (optional)" value={guestPhone}
             onChange={(e) => setGuestPhone(e.target.value)} />
           <Button variant="primary" size="sm" disabled={!guestName.trim()} onClick={() => onAdd({
             id: `GUEST-${Date.now()}`,
