@@ -71,6 +71,20 @@ Totals: 843 objects checked, 202 missing, 23 migrations with gaps. Excluding 000
 
 Each row needs a per-migration review before any production change. Some missing objects are intentionally superseded (for example, `trg_profiles_protect_self_role_update` from `202605071980` was replaced by `trg_profiles_enforce_role_assignment` from `202607131500`, which is present and matches the repo's current design).
 
+### 4a. Comparison with staging (same catalog check, 2026-10-22)
+
+The same 843-object catalog check was run against `rocksolid-staging` (Supabase project `hblahcaozlttknkzvkib`). Staging has **both `class_options` columns** and its `schema_migrations` history ends at `202610030004`, the same as production. So staging is a working reference for the repaired DDL. It is not a perfect reference: it is missing 11 objects that production has (for example, some `auth_rbac` policies).
+
+| Comparison | Objects |
+|---|---:|
+| Missing in production, present in staging (production-only drift) | 140 total, of which 47 are non-baseline (19 migrations) |
+| Missing in both | 62 total, of which 13 are non-baseline (5 migrations): shared gaps to review in both |
+| Missing in staging, present in production | 11 |
+
+Non-baseline production gaps are 47 + 13 = 60, matching section 4.
+
+The repair in this PR makes production match staging for the two registration columns.
+
 ## 5. Migration dependency assessment
 
 - **`202605190900`** (this repair): no other migration depends on it. Its two columns are read by `registration-form.html`, `class-editor.html` and `classEditor.js` (writes `is_online`), `attendance-reminder/index.ts` and `teacher-portal-api/_actions/*` (`confirmed_start_date`, with fallback when absent). Nothing in the repo drops them.
