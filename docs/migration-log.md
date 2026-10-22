@@ -2878,3 +2878,35 @@ Result labels: **PASS** = verified with evidence. **FAIL** = verified not to mee
 ### 7. CI on PR #6 (registration repair)
 
 - Head `0ab80dee`. Migration gate: PASS. Unit tests: PASS. Netlify deploy preview: PASS. Security regression: PASS (run `39716908550`, 2m7s). Head `0ab80dee`, PR #6 open and not merged.
+
+## 2026-10-22 — PR #12 limited frontend certification
+
+**Result: LIMITED FRONTEND CERTIFICATION: PASS** for PR #12 (`brief/spa-cutover-v2`) at SHA `524725e`.
+PR #12 remains draft and unmerged. No production deployment was made.
+
+Scope: limited frontend rollout with uncertified workflows disabled. Not a full operational release.
+
+### Evidence (staging preview, SHA `524725e`)
+
+- **CI PASS:** Unit tests, Migration gate and Security regression succeeded on `524725e`. Netlify deploy preview reported success.
+- **Fresh teacher authentication and attendance API PASS:** a fresh teacher sign-in (no saved session) reached `/app/teacher/attendance`. `teacher-portal-api` returned `200` with `ok: true`.
+- **Staff class_options and class_roster PASS:** a fresh staff sign-in reached `/app/staff/attendance`. `class_options` returned `200` with filters `active=eq.true` and `deleted_at=is.null`. `class_roster` returned `200` with filters `class_option_id=in.(…)` and `status=eq.Active`.
+- **Admin/teacher route separation PASS:** `/teacher/attendance` is guarded by `['teacher']` only (`foundation-spa/src/App.jsx`, `foundation-spa/src/routing/routeRoles.js`). Staff accounts were redirected from it.
+- **Release holds remain false:** `APPROVAL_CERTIFIED`, `MOODLE_RETRY_CERTIFIED` and `ATTENDANCE_SUBMIT_CERTIFIED` are `false` in `foundation-spa/src/releaseHolds.js` at `524725e`.
+- **Dashboard error versus zero:** code-level PASS. `dashboard.js` returns `null` on a failed query and `KpiCard` renders `-` for `null`, so failure and real zero are distinguished.
+
+### Uncertified for full operational release (disabled in the build)
+
+- Teacher attendance submission (`ATTENDANCE_SUBMIT_CERTIFIED=false`). The Submit control is compiled disabled. Not exercised: no test account had class options and a roster.
+- Availability approval (`APPROVAL_CERTIFIED=false`). No pending `teacher_availability` slots exist in staging, so approval rows were not exercised.
+- Moodle retry (`MOODLE_RETRY_CERTIFIED=false`). Dashboard retry controls are disabled.
+
+### Evidence limitations
+
+- **Hosted deployment identity is partial.** Netlify commit status ties `524725e` to `deploy-preview-12`. The Netlify deploy record was not read. The hosted asset hashes match the local build output, but that build's file timestamp predates the commit, so the hash match does not prove commit identity.
+- **Dashboard rendering not observed on the hosted build.** The error-versus-zero result rests on code reading. The hosted KPI card was not rendered in a probe.
+- **Intermittent teacher-landing failure did not reproduce.** One staging harness run failed on the first teacher landing test. A single rerun passed, and a fresh-login diagnostic passed. Root cause not confirmed.
+
+### Follow-up required before the next staging run
+
+- **The staging harness must refresh authentication after sign-out.** The sign-out test performs a global `supabase.auth.signOut()` (`foundation-spa/src/context/AuthContext.jsx`). That revokes the teacher session saved for later tests. A fresh-session probe then returned `200`, which is consistent with a stale saved session causing the earlier `401` from `teacher-portal-api`.

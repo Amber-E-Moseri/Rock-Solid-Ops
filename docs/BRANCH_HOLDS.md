@@ -52,6 +52,24 @@ are not the intended teacher-scoped set; the audit canonicalization trigger and 
 Production also has 9 migration versions from the unmerged C1 and C6 branches recorded as applied, which are
 not on `main`. No production schema change beyond the approved registration DDL is authorised.
 
+### PR #12 (`brief/spa-cutover-v2`) — uncertified workflows held for full operational release (2026-10-22)
+
+PR #12 is certified for **limited frontend rollout only**, at SHA `524725e`. Record: `docs/migration-log.md`,
+entry 2026-10-22 (PR #12 limited frontend certification). PR #12 stays draft and unmerged.
+
+The following workflows stay disabled and are NOT certified for full operational release:
+
+- Teacher attendance submission — `ATTENDANCE_SUBMIT_CERTIFIED = false` (`foundation-spa/src/releaseHolds.js`).
+- Availability approval — `APPROVAL_CERTIFIED = false`.
+- Moodle retry — `MOODLE_RETRY_CERTIFIED = false`.
+
+Release condition: each flag may be set to `true` only after its own backend certification is recorded.
+Do not set any flag as part of PR #12 or this documentation change.
+
+Known limitation: the staging harness must refresh authentication after sign-out, because the sign-out test
+revokes the teacher session that later tests reuse.
+
+
 ## Resolved (moot — already merged)
 
 ### `brief/moodle-credential-safety` — RESOLVED 2026-07-23
