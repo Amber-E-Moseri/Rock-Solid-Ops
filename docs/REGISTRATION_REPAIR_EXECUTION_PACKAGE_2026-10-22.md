@@ -1,33 +1,34 @@
 # Registration repair: final execution package (2026-10-22)
 
-**Status: NOT APPROVED. Do not execute. Stop at the database authorisation boundary.**
+**Status: FINAL PREPARATION COMPLETE. NOT APPROVED. Do not execute. Stop at the database authorisation boundary.**
 
 This package is for the owner's review. It records current state, read-only preflight results, the exact execution order, the history-recording method, and the recovery safeguards. It does not authorise a merge, a history change, a deploy or a production data change.
 
-## 1. Current state (checked 2026-10-22, about 05:06 UTC)
+## 1. Current state (final preparation, 2026-10-22)
 
-| Item | Value | Notes |
-|---|---|---|
-| `main` | `53a961c8dd17b26a16f007f314a0e954190be9a1` | PR #7 merge |
-| Live production deploy | `6ad98863c94537b0c8153536` (commit `53a961c8`) | Static site; no DB change |
-| PR #6 | open, **head `5a893ce0`** (was `0ab80dee` at the previous review) | Two new commits by the owner's account at 00:13 local: rollback, harness, runbook update. The forward migration file is unchanged from the reviewed version. |
-| PR #6 CI on head `5a893ce0` | Migration gate, Security regression, Unit tests, Deploy Preview: all PASS | |
-| PR #9 | open, head `bb39c06d` | Backup script and runbook. CI all PASS. |
-| Duplicate backup documents | PR #6 adds `docs/PRODUCTION_LOGICAL_BACKUP_PLAN_2026-10-22.md`; PR #9 adds `docs/PRODUCTION_BACKUP_AND_RECOVERY_2026-10-22.md` | **Two overlapping backup documents.** Consolidate before merge (see section 9). |
+| Item | Head | CI | Notes |
+|---|---|---|---|
+| `main` | `53a961c8` | — | |
+| PR #6 (repair, rollback, harness, runbook) | **`a3ebc4b`** (this review's head) | Re-run on `a3ebc4b` (docs-only change; migration unchanged) | Head `5a893ce0` passed all CI. Commit `a3ebc4b` corrects the history-method target and removes the duplicate backup plan. **Owner approval must name `a3ebc4b`.** |
+| PR #9 (backup script and the single authoritative backup runbook) | `bb39c06d` | All PASS | Must merge before or with PR #6. |
+| PR #11 (this package) | see the PR | — | Docs only. |
+
+Forward migration (`supabase/migrations/202610220100_repair_class_options_registration_columns.sql`): one statement, `ALTER TABLE public.class_options` with exactly two `ADD COLUMN IF NOT EXISTS` clauses (`is_online BOOLEAN NOT NULL DEFAULT false`, `confirmed_start_date DATE NULL`). No other object is created, altered or dropped.
 
 ## 2. Backup status
 
+**Authoritative procedure:** `docs/PRODUCTION_BACKUP_AND_RECOVERY_2026-10-22.md` with `scripts/backup/backup-prod-logical.sh` (PR #9). The duplicate backup plan has been removed from PR #6.
+
 | Item | Value |
 |---|---|
-| Logical backup (encrypted dump of `public`, with data) | snapshot **2026-10-22 04:33:51 UTC** |
-| Age at this review | about 32 minutes |
-| Checksum | PASS (`sha256sum -c`) |
-| Readable | PASS (`pg_restore --list`: 56 table-data entries) |
-| Encrypted history export | PASS (checksum; 159 rows; identical to production history at the snapshot) |
-| Restore rehearsal (PostgreSQL 17.6, isolated) | PASS with limits: 61 of 62 verification items identical (the one difference is 3 `audit_logs` rows written after the snapshot) |
-| Limits | Auth schema excluded (3 foreign keys to `auth.users` not restored). Storage, Vault, cron and roles not included. Free plan: no platform backup or PITR. |
+| Logical backup of `public` (with data), encrypted | snapshot **2026-10-22 04:33:51 UTC** |
+| Checksum | PASS |
+| Readable | PASS (56 table-data entries) |
+| Encrypted history export | PASS (159 rows; checksum identical to production at the snapshot) |
+| Restore rehearsal (PostgreSQL 17.6, isolated) | 61 of 62 items identical; the one difference is 3 `audit_logs` rows written after the snapshot |
+| Limits | `auth` excluded (3 foreign keys to `auth.users` not restored). Storage, Vault, cron and roles not included. Free plan: no platform backup or PITR. |
 
-**Before execution, take a fresh backup** (section 4, step S2). The current one is a valid fallback only for the state at 04:33 UTC.
+**A fresh encrypted backup is required immediately before execution** (step S2). The snapshot above is a fallback for the 04:33 state only.
 
 ## 3. Preflight (read-only, from a production-linked directory, 2026-10-22)
 
@@ -57,7 +58,7 @@ Each step has a stop condition. If any step fails, stop and report. Do not impro
 
 **S0. Approvals.** Written owner approval for (a) merging PR #6, (b) the exact forward migration `202610220100`, and (c) the history recording method in section 5. Approval for the rollback is separate and is not part of this order.
 
-**S1. Merge PR #6 (merge commit, repository policy).** Pin the merge to the head you approved, with `--match-head-commit`. Stop if the head is not the approved one.
+**S1. Merge PR #6 (merge commit, repository policy).** Merge only at head **`a3ebc4b`** (or the later head you approve), pinned with `--match-head-commit`. Stop if the head differs. PR #9 must be merged first or in the same change.
 Note: the merge changes `main`, which triggers a Netlify production build. The static output is unchanged, because the migration, ops and test files are not published.
 
 **S2. Fresh backup, immediately before execution.** Run `scripts/backup/backup-prod-logical.sh` (PR #9) with the production-linked CLI directory. Verify the checksum and `pg_restore --list`. Record the snapshot time. Stop if either check fails.
@@ -122,16 +123,15 @@ SELECT version, name FROM supabase_migrations.schema_migrations WHERE version IN
 
 **S8. Post-change backup.** Take a new encrypted backup. It is the recovery point for the repaired state.
 
-## 5. Migration-history recording procedure
+## 5. Migration-history recording
 
-**Correction to PR #6, section 15:** it says method A runs "from the repo against project `xelpsttqhrcqmttmjory`". The repository's CLI link is **staging** (`hblahcaozlttknkzvkib`). Running that command from the repository would change **staging**, not production. Method A must run **only** from a directory whose link was verified as `xelpsttqhrcqmttmjory`.
+Production history before: **159 rows**. Expected after execution: **160 rows**, with one new row: version `202610220100`, name `repair_class_options_registration_columns`. No other row may change.
 
-- **Method A (preferred):** `supabase migration repair --status applied 202610220100 --linked`, run from the production-linked directory, after S4 commits and S6 passes.
-  - Verify afterwards that only the new row was added (V5). Confirm the stored name and statements match the repo file.
-  - Stop if the CLI reports an error or a different version set.
-- **Method B (fallback only, needs its own approval):** insert the row inside the same transaction as S4, with the same name and statement text as the repo file. Do not use it if method A works.
-- **Never:** change, delete or re-order `202605190900` or `202605190930`. Never mark any version reverted as part of this repair.
-- **Expected result:** 160 rows (159 plus `202610220100`). The 9 remote-only C1 and C6 versions remain as recorded.
+- **Target rule (mandatory):** history commands run only from a directory whose `supabase/.temp/project-ref` is `xelpsttqhrcqmttmjory`. **Never** from the repository, which is linked to staging (`hblahcaozlttknkzvkib`).
+- **Method A (preferred):** `supabase migration repair --status applied 202610220100 --linked`, from the production-linked directory, after the DDL commits and V1–V4 pass. Stop if the reported version set or the command output differs.
+- **Method B (fallback only, needs its own approval):** insert the row in the same transaction as the DDL, with the same version and name, and statements equal to the file text.
+- **Never:** edit, delete or re-order `202605190900` or `202605190930`. Never mark anything reverted in this repair.
+- **Verify:** count is 160; the three versions `202605190900`, `202605190930` and `202610220100` are present; no other row changed.
 
 ## 6. Validation and rollback safeguards
 
@@ -174,18 +174,55 @@ SELECT version, name FROM supabase_migrations.schema_migrations WHERE version IN
 - If the repair fails: stop, roll back only with the guarded script after the export, and keep the history consistent.
 - If the data must come back: restore into a new database first, then decide.
 
-## 9. Documentation to reconcile before PR #6 merges
+## 9. Documentation reconciliation (resolved in this preparation)
 
-- PR #6 `docs/PRODUCTION_LOGICAL_BACKUP_PLAN_2026-10-22.md` and PR #9 `docs/PRODUCTION_BACKUP_AND_RECOVERY_2026-10-22.md` cover the same procedure. Keep one, or cross-link both.
-- PR #6 runbook section 15 method A: correct the target to the production-linked directory (section 5 above).
-- PR #6 backup plan cites "PostgreSQL 17.11" for its rehearsal. The harness was reproduced here on PostgreSQL 17.6 (30 of 30 PASS; backup tooling 12 of 12 PASS). Cite the version actually run.
-- The preflight checksum definitions differ between `docs/REGISTRATION_REPAIR_PRODUCTION_EXECUTION_2026-10-22.md` (PR #8) and the PR #6 harness. Use the harness definition in P6 (section 3 here).
+- **Backup guidance:** one authority, PR #9. The PR #6 duplicate (`PRODUCTION_LOGICAL_BACKUP_PLAN`) is removed.
+- **History method target:** corrected in PR #6 section 15 (commit `a3ebc4b`) and in section 5 above. The "run from the repo" instruction is withdrawn.
+- **Checksum definition:** P3 and V3 use the PR #6 harness column list. The earlier expression in PR #6 section 9 is replaced. Expected value on 2026-10-22: 13 rows, `e5037229c4c14e479fa2fd738fe66b48`.
+- **Rehearsal version:** PR #6 section 14 records the original 17.11 run and the reviewer's 17.6 reproduction (30/30; backup tooling 12/12).
+
+## 9a. Forward recovery preference
+
+Prefer **forward recovery** over the rollback:
+1. If V1–V4 fail, stop and investigate. Do not roll back for a single failed request.
+2. If the columns are correct but a value is wrong, correct it forward with a reviewed `UPDATE`.
+3. If the repair must be undone, use the guarded rollback in `supabase/ops/` only with owner authorisation, after the export in section 6.
+4. Restore from the encrypted backup into a **new** database only if production data is lost. Never restore over production without a separate decision.
+
+## 9b. Operator checklist and stop conditions
+
+Print this checklist and tick each item in the approval record.
+
+| # | Step | Stop condition |
+|---|---|---|
+| 0 | Written approval names PR #6 head `a3ebc4b` (or later approved head), and the DDL and history method | Approval missing, or head differs |
+| 1 | Verify the CLI link for every command: `cat <prod-dir>/supabase/.temp/project-ref` = `xelpsttqhrcqmttmjory` | Any other value. **Never** proceed from the repository. |
+| 2 | Merge PR #9 (if not merged), then PR #6 at the approved head with `--match-head-commit` | Head differs; CI not green |
+| 3 | Fresh encrypted backup (`backup-prod-logical.sh`); verify checksum and `pg_restore --list` | Any check fails |
+| 4 | Re-run preflight P1–P9 (section 3) from the production-linked directory | Any value differs from section 3 |
+| 5 | Re-run the P3 checksum (13 rows, `e5037229…`) | Checksum differs (a row was updated) |
+| 6 | Apply the DDL in one transaction with the validation block (S4) | Any error (transaction rolls back; stop) |
+| 7 | Record the history row, method A only (section 5) | Output differs; version set differs |
+| 8 | Run V1–V4 and the history verification | Any value differs |
+| 9 | REST registration check (anon): 200, 13 rows | Not 13 rows, or any error |
+| 10 | Registration form loads the class list (no submission) | Error banner or console error |
+| 11 | Admin class-editor save of one unchanged class | Save fails |
+| 12 | Monitor email and notification queues for 60 minutes | Queue stalls or failures rise |
+| 13 | Fresh encrypted backup of the repaired state (S8) | Any check fails |
+
+## 9c. Secrets and logging rules
+
+- Connection details, database passwords and encryption passphrases stay out of logs, chat, reports and Git. The CLI supplies them at run time. Scripts assign them to variables and never print them.
+- Never store a plaintext dump or export in a repository or a shared folder. Encrypted backups stay in the secure local folder, outside every repository.
+- Do not paste production rows, teacher or applicant data into any tool output or report. Report counts and checksums only.
+- Do not commit anything from the secure folder.
 
 ## 10. GO / NO-GO
 
-**NO-GO for executing production SQL now.** The package is consistent and the preflight matches, but execution requires:
-1. Written owner approval for S1 and S4, and for method A in S5.
-2. A fresh backup (S2) taken immediately before S4.
-3. Resolution of the documentation items in section 9 (at least the method A target correction).
+**Ready for owner authorisation: YES, subject to the conditions below.** Execution is **NOT** authorised by this document.
 
-**GO** only after those three conditions, with the S3 preflight matching section 3 at the time of execution.
+Conditions before execution:
+1. Written owner approval naming PR #6 head `a3ebc4b` (or a later reviewed head), the forward DDL, and the history method A.
+2. PR #9 merged (or merged in the same change), so the single backup authority is on `main`.
+3. Fresh encrypted backup (step 3 of the checklist) immediately before execution.
+4. Preflight P1–P9 and the P3 checksum match section 3 at the moment of execution.
