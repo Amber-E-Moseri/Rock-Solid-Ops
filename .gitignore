@@ -34,3 +34,6 @@ validation-screenshots/
 
 # Local config overrides
 foundation/js/config.local.js
+
+# Static publish output (hotfix)
+netlify-static-publish/

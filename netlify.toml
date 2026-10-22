@@ -1,6 +1,15 @@
+# Production publish is an allowlisted static directory, NOT the repository root.
+# scripts/build-static-publish.mjs copies only the static /foundation tree and
+# _headers into netlify-static-publish/, then fails the build if forbidden files
+# or configuration are present. The SPA is not built or published here.
+# Redirects below are unchanged from the previous root-publish configuration.
+#
+# Required Netlify environment variables: SUPABASE_URL, SUPABASE_ANON_KEY (anon
+# or publishable key only). BYPASS_ROLE must NOT be set; the build refuses.
+
 [build]
-  command = "node scripts/generate-netlify-config.mjs"
-  publish = "."
+  command = "node scripts/build-static-publish.mjs"
+  publish = "netlify-static-publish"
 
 [[redirects]]
   from = "/"
