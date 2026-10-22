@@ -15,7 +15,7 @@ export async function fetchTeachers() {
     const { data: avail } = await supabase.from('teacher_availability')
       .select('teacher_id, class_option_id')
       .in('teacher_id', ids)
-      .eq('status', 'Confirmed')
+      .eq('status', 'Available')
       .limit(500);
     for (const a of avail ?? []) {
       classMap.set(a.teacher_id, a.class_option_id);
@@ -53,16 +53,9 @@ export async function performAction(teacherId, action, reason, actorEmail, teach
   const patch = patches[action];
   if (!patch) throw new Error(`Unknown action: ${action}`);
 
-  // Suspend the pending availability first. If that write is refused, the teacher record must not change,
-  // and the refusal is surfaced rather than reported as success.
-  if (action === 'suspend') {
-    const { error: availabilityError } = await supabase.from('teacher_availability')
-      .update({ status: 'Suspended' }).eq('teacher_id', teacherId).eq('status', 'Tentative');
-    if (availabilityError) {
-      throw new Error(`Teacher not suspended. Availability could not be updated: ${availabilityError.message}`);
-    }
-  }
-
+  // Suspension is a teacher lifecycle change only (teachers.status = SUSPENDED, suspended_* columns, and the
+  // linked profile's is_active below, which blocks sign-in). Availability status is a separate field and is
+  // not written here: 'Suspended' is not a teacher_availability status.
   const { error } = await supabase.from('teachers').update(patch).eq('teacher_id', teacherId);
   if (error) throw error;
 

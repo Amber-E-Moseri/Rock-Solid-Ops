@@ -1,26 +1,28 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Download } from 'lucide-react';
-import { PageHeader, Card, Badge, Button, Skeleton } from '../../components/ui/index.js';
+import { PageHeader, Card, Badge, Button, Skeleton, ErrorBanner, EmptyState } from '../../components/ui/index.js';
 import { useToast } from '../../context/ToastContext.jsx';
-import { fetchClasses, demoClasses, counts, classStatus, computeKpis, initials } from './lib/attendance.js';
+import { fetchClasses, counts, classStatus, computeKpis, initials } from './lib/attendance.js';
 
 export default function AttendancePage() {
   const toast = useToast();
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [selId, setSelId] = useState(null);
 
+  // No demo fallback: invented classes must never appear as real staff data. A failed read is shown as an error.
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchClasses();
-      if (!data.length) throw new Error('no data');
       setClasses(data);
       setSelId(data[0]?.id ?? null);
-    } catch {
-      const demo = demoClasses();
-      setClasses(demo);
-      setSelId(demo[0]?.id ?? null);
+      setLoadError(null);
+    } catch (e) {
+      setClasses([]);
+      setSelId(null);
+      setLoadError(e?.message || 'Failed to load classes');
     } finally {
       setLoading(false);
     }
@@ -52,8 +54,8 @@ export default function AttendancePage() {
     if (!selected) return;
     const c = counts(selected);
     if (c.m === c.total) { toast('Mark at least one student first.', 'warning'); return; }
-    setClasses(prev => prev.map(cl => cl.id === selId ? { ...cl, submitted: true } : cl));
-    toast(`${selected.loc} attendance submitted (${c.p} present, ${c.a} absent).`, 'success');
+    // Recording is not connected to a backend in this build. Never report attendance as saved.
+    toast(`Attendance for ${selected.loc} was not saved: recording is not connected yet.`, 'warning');
   };
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
@@ -81,7 +83,11 @@ export default function AttendancePage() {
         ))}
       </div>
 
-      {loading ? <Skeleton style={{ height: 400 }} /> : (
+      {loading ? <Skeleton style={{ height: 400 }} /> : loadError ? (
+        <ErrorBanner message={`Could not load classes. ${loadError}`} onRetry={load} />
+      ) : classes.length === 0 ? (
+        <EmptyState icon="📭" title="No classes found" message="No class sessions are available to record attendance for." />
+      ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '380px minmax(0, 1fr)', gap: 18, alignItems: 'start' }}>
           {/* Class list */}
           <div>

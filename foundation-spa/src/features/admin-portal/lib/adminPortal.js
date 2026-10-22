@@ -5,7 +5,8 @@ export async function fetchPortalStats() {
     supabase.from('applicants').select('id', { count: 'exact', head: true }).not('status', 'in', '(Withdrawn,Rejected)'),
     supabase.from('batches').select('batch_id', { count: 'exact', head: true }).in('status', ['Active', 'Open']),
     supabase.from('applicants').select('id', { count: 'exact', head: true }).eq('status', 'Pending'),
-    supabase.from('teachers').select('teacher_id', { count: 'exact', head: true }).eq('status', 'Active'),
+    // teachers.status is the lifecycle column: PENDING | ACTIVE | SUSPENDED | INACTIVE (202605071600).
+    supabase.from('teachers').select('teacher_id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
   ]);
   const firstError = enrolled.error || batches.error || pending.error || teachers.error;
   if (firstError) throw firstError;

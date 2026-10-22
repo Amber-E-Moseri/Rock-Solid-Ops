@@ -6,8 +6,8 @@ const { calls, failures } = vi.hoisted(() => ({ calls: [], failures: {} }));
 vi.mock('../supabase.js', () => ({
   supabase: {
     from: (table) => {
-      const state = { table, ops: [], payload: null };
-      const result = () => (failures[table] && state.payload && state.ops.includes('update')
+      const state = { ops: [], payload: null };
+      const result = () => (failures[table] && state.ops.includes('update')
         ? { data: null, error: failures[table] }
         : { data: [], error: null });
       const builder = {
@@ -34,33 +34,38 @@ beforeEach(() => {
 
 const writesTo = (table) => calls.filter((c) => c.table === table && c.op === 'update');
 
-describe('performAction suspend', () => {
-  it('does not change the teacher when the availability write is refused, and surfaces the database message', async () => {
-    failures.teacher_availability = { message: 'new row violates check constraint "teacher_availability_status_check"' };
+describe('performAction suspend uses the teacher lifecycle only', () => {
+  it('writes the teacher lifecycle status and suspension fields', async () => {
+    await performAction('T-1', 'suspend', 'reason', 'admin@test.com', null);
+
+    expect(writesTo('teachers')).toHaveLength(1);
+    expect(writesTo('teachers')[0].payload).toMatchObject({ status: 'SUSPENDED', active: false, suspended_reason: 'reason' });
+  });
+
+  it('never writes Suspended to teacher_availability', async () => {
+    await performAction('T-1', 'suspend', 'reason', 'admin@test.com', 'user-1');
+
+    expect(writesTo('teacher_availability')).toHaveLength(0);
+    expect(calls.some((c) => c.payload && JSON.stringify(c.payload).includes('"Suspended"'))).toBe(false);
+  });
+
+  it('blocks sign-in through the linked profile, as the existing contract does', async () => {
+    await performAction('T-1', 'suspend', 'reason', 'admin@test.com', 'user-1');
+
+    expect(writesTo('profiles')[0].payload).toEqual({ is_active: false });
+  });
+
+  it('surfaces a refused teacher write, and no success follows', async () => {
+    failures.teachers = { message: 'permission denied for table teachers' };
 
     await expect(performAction('T-1', 'suspend', 'reason', 'admin@test.com', null))
-      .rejects.toThrow('Teacher not suspended. Availability could not be updated: new row violates check constraint');
-
-    expect(writesTo('teachers')).toHaveLength(0);
+      .rejects.toMatchObject({ message: 'permission denied for table teachers' });
+    expect(writesTo('profiles')).toHaveLength(0);
     expect(calls.some((c) => c.table === 'email_queue')).toBe(false);
   });
 
-  it('suspends the availability first, then the teacher, when both writes succeed', async () => {
-    await performAction('T-1', 'suspend', 'reason', 'admin@test.com', null);
-
-    const availability = writesTo('teacher_availability');
-    expect(availability).toHaveLength(1);
-    expect(availability[0].payload).toEqual({ status: 'Suspended' });
-
-    const teacherIndex = calls.findIndex((c) => c.table === 'teachers' && c.op === 'update');
-    const availabilityIndex = calls.findIndex((c) => c.table === 'teacher_availability' && c.op === 'update');
-    expect(availabilityIndex).toBeLessThan(teacherIndex);
-    expect(writesTo('teachers')[0].payload).toMatchObject({ status: 'SUSPENDED', active: false });
-  });
-
-  it('does not touch availability for other actions', async () => {
+  it('leaves availability alone for other actions', async () => {
     await performAction('T-1', 'activate', '', 'admin@test.com', null);
     expect(writesTo('teacher_availability')).toHaveLength(0);
-    expect(writesTo('teachers')).toHaveLength(1);
   });
 });

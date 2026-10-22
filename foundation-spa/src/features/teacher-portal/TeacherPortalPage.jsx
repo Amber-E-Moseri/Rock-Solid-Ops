@@ -145,7 +145,7 @@ function AvailabilityTab({ teacherId, teacherEmail, addToast }) {
                   fontSize: 'var(--fs-xs)',
                   background: selected.has(s.id) ? 'var(--color-danger, #dc3545)' : 'var(--surface)',
                   color: selected.has(s.id) ? '#fff' : 'var(--text)',
-                }}>{s.time_slot} <Badge status={s.status?.toLowerCase() === 'approved' ? 'active' : 'draft'}>{s.status || 'Tentative'}</Badge></button>
+                }}>{s.time_slot} <Badge status={s.status === 'Available' ? 'active' : 'draft'}>{s.status || 'Tentative'}</Badge></button>
               ))}
             </div>
           </div>
