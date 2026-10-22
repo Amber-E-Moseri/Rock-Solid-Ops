@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import ProtectedRoute from './components/layout/ProtectedRoute.jsx';
+import { useAuth } from './context/AuthContext.jsx';
+import { landingPathForRole } from './routing/routeRoles.js';
 import Shell from './components/layout/Shell.jsx';
 import { PWAInstallPrompt } from './components/pwa/PWAInstallPrompt.jsx';
 import { OfflineIndicator } from './components/pwa/OfflineIndicator.jsx';
@@ -72,6 +74,17 @@ function StaffShell({ title, children }) {
   return <Shell pageTitle={title}>{children}</Shell>;
 }
 
+// Role-aware landing for "/" and unknown paths. Teachers go to /teacher/index,
+// operational roles to /staff/dashboards. Roles with no landing see the login
+// screen with an unauthorized notice, not a redirect loop.
+function HomeRedirect() {
+  const { user, profile, loading } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/auth/login" replace />;
+  const landing = landingPathForRole(String(profile?.role ?? '').trim().toLowerCase());
+  return <Navigate to={landing ?? '/auth/login?error=unauthorized'} replace />;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -86,15 +99,17 @@ export default function App() {
               <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
               <Route path="/auth/*" element={<Navigate to="/auth/login" replace />} />
 
-              {/* Design system showcase (dev only) */}
-              <Route
-                path="/dev/showcase"
-                element={
-                  <StaffShell title="Design Showcase">
-                    <ShowcasePage />
-                  </StaffShell>
-                }
-              />
+              {/* Design system showcase: development builds only, never in the production bundle */}
+              {import.meta.env.DEV && (
+                <Route
+                  path="/dev/showcase"
+                  element={
+                    <StaffShell title="Design Showcase">
+                      <ShowcasePage />
+                    </StaffShell>
+                  }
+                />
+              )}
 
               {/* Staff — audit log (Phase 2 pilot) */}
               <Route
@@ -553,8 +568,8 @@ export default function App() {
               />
 
               {/* Root redirect */}
-              <Route path="/" element={<Navigate to="/staff/dashboards" replace />} />
-              <Route path="*" element={<Navigate to="/staff/dashboards" replace />} />
+              <Route path="/" element={<HomeRedirect />} />
+              <Route path="*" element={<HomeRedirect />} />
             </Routes>
           </Suspense>
         </ToastProvider>

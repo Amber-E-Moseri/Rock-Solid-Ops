@@ -1,64 +1,18 @@
-# Production publish is an allowlisted static directory, NOT the repository root.
-# scripts/build-static-publish.mjs copies only the static /foundation tree and
-# _headers into netlify-static-publish/, then fails the build if forbidden files
-# or configuration are present. The SPA is not built or published here.
-# Redirects below are unchanged from the previous root-publish configuration.
+# Netlify build for the SPA cutover.
 #
-# Required Netlify environment variables: SUPABASE_URL, SUPABASE_ANON_KEY (anon
-# or publishable key only). BYPASS_ROLE must NOT be set; the build refuses.
+# Publish is the allowlisted directory built by scripts/build-spa-publish.mjs.
+# It is never the repository root. The security baseline is
+# scripts/build-static-publish.mjs (origin/main), whose guards the build keeps.
+# Redirects live only in foundation-spa/public/_redirects (copied to the publish
+# root by Vite). Headers live only in the repository root _headers file (copied by the build).
+#
+# Required Netlify environment variables: SUPABASE_URL and SUPABASE_ANON_KEY (anon
+# or publishable key only). BYPASS_ROLE and VITE_BYPASS_ROLE must NOT be set in
+# any context; the build refuses.
 
 [build]
-  command = "node scripts/build-static-publish.mjs"
+  command = "npm --prefix foundation-spa ci && node scripts/build-spa-publish.mjs"
   publish = "netlify-static-publish"
 
-[[redirects]]
-  from = "/"
-  to = "/foundation/auth/login.html"
-  status = 302
-  force = true
-
-[[redirects]]
-  from = "/staff"
-  to = "/foundation/staff/admin-portal.html"
-  status = 302
-  force = true
-
-[[redirects]]
-  from = "/auth"
-  to = "/foundation/auth/login.html"
-  status = 302
-  force = true
-
-[[redirects]]
-  from = "/staff/*"
-  to = "/foundation/staff/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/auth/*"
-  to = "/foundation/auth/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/supabase/*"
-  to = "/foundation/auth/login.html"
-  status = 302
-  force = true
-
-[[redirects]]
-  from = "/ai/*"
-  to = "/foundation/auth/login.html"
-  status = 302
-  force = true
-
-[[redirects]]
-  from = "/archive/*"
-  to = "/foundation/auth/login.html"
-  status = 302
-  force = true
-
-[[redirects]]
-  from = "/foundation/docs/*"
-  to = "/foundation/auth/login.html"
-  status = 302
-  force = true
+[build.environment]
+  NODE_VERSION = "22"

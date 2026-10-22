@@ -1,12 +1,29 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../supabase.js';
+import { postLoginPath } from './postLoginPath.js';
 
 const ERROR_MESSAGES = {
   inactive:     'Your account is inactive. Please contact your administrator.',
   pending:      'Your account is pending approval.',
   unauthorized: 'You do not have permission to access that page.',
 };
+
+// Reads the profile role for the landing decision. A lookup failure returns
+// null, and ProtectedRoute then reports the account state on the next screen.
+async function loadRole(userId) {
+  if (!userId) return null;
+  try {
+    const { data } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle();
+    return data?.role ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export default function LoginPage() {
   const [email, setEmail]       = useState('');
@@ -26,10 +43,11 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) { setError(authError.message); return; }
-      const next = params.get('next') || '/staff/dashboards';
-      navigate(decodeURIComponent(next), { replace: true });
+      const role = await loadRole(data?.user?.id);
+      // params.get() already decodes once. Do not decode again.
+      navigate(postLoginPath({ role, next: params.get('next') }), { replace: true });
     } catch (err) {
       setError(err.message || 'An unexpected error occurred.');
     } finally {

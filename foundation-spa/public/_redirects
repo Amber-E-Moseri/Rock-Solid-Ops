@@ -1,1 +1,135 @@
-/* /index.html 200
+# Netlify redirects for the SPA cutover. Single source for redirects: netlify.toml
+# has no [[redirects]] block, so there is one precedence order to reason about.
+# Vite copies this file into the publish root.
+#
+# Rules are matched in order. A trailing "!" forces the rule even when a file exists.
+# 302 (not 301) until production is verified, so rollback is not blocked by cached 301s.
+# Each redirected static page has a .html rule and a pretty-URL rule, because Netlify
+# serves /foundation/staff/x without the extension.
+
+# Entry points
+/                                                        /foundation/auth/login.html        302!
+/auth                                                    /auth/login                        302!
+/staff                                                   /staff/admin-portal                302!
+
+# Legacy static auth URLs: the SPA owns /auth/* (login and reset-password)
+/auth/login.html                                         /auth/login                        302!
+/auth/reset-password.html                                /auth/reset-password               302!
+/foundation/staff/login.html                             /foundation/auth/login.html        302!
+/foundation/staff/login                                  /foundation/auth/login.html        302!
+
+# Staff portal: static pages now served by the SPA (.html URL and pretty URL)
+/foundation/staff/admin-activity.html                    /staff/admin-activity              302!
+/foundation/staff/admin-activity                         /staff/admin-activity              302!
+/foundation/staff/admin-dashboard.html                   /staff/dashboards                  302!
+/foundation/staff/admin-dashboard                        /staff/dashboards                  302!
+/foundation/staff/admin-management.html                  /staff/admin-management            302!
+/foundation/staff/admin-management                       /staff/admin-management            302!
+/foundation/staff/admin-portal.html                      /staff/admin-portal                302!
+/foundation/staff/admin-portal                           /staff/admin-portal                302!
+/foundation/staff/admin-review.html                      /staff/admin-review                302!
+/foundation/staff/admin-review                           /staff/admin-review                302!
+/foundation/staff/applicant-directory.html               /staff/applicant-directory         302!
+/foundation/staff/applicant-directory                    /staff/applicant-directory         302!
+/foundation/staff/at-risk-students.html                  /staff/at-risk-students            302!
+/foundation/staff/at-risk-students                       /staff/at-risk-students            302!
+/foundation/staff/attendance.html                        /staff/attendance                  302!
+/foundation/staff/attendance                             /staff/attendance                  302!
+/foundation/staff/audit-log.html                         /staff/audit-log                   302!
+/foundation/staff/audit-log                              /staff/audit-log                   302!
+/foundation/staff/availability-approval.html             /staff/availability-approval       302!
+/foundation/staff/availability-approval                  /staff/availability-approval       302!
+/foundation/staff/baptism-report.html                    /staff/baptism-report              302!
+/foundation/staff/baptism-report                         /staff/baptism-report              302!
+/foundation/staff/batch-management.html                  /staff/batch-management            302!
+/foundation/staff/batch-management                       /staff/batch-management            302!
+/foundation/staff/class-editor.html                      /staff/class-editor                302!
+/foundation/staff/class-editor                           /staff/class-editor                302!
+/foundation/staff/clickup-management.html                /staff/nexus-management            302!
+/foundation/staff/clickup-management                     /staff/nexus-management            302!
+/foundation/staff/dashboards.html                        /staff/dashboards                  302!
+/foundation/staff/dashboards                             /staff/dashboards                  302!
+/foundation/staff/data-exports.html                      /staff/data-exports                302!
+/foundation/staff/data-exports                           /staff/data-exports                302!
+/foundation/staff/email-campaigns.html                   /staff/email-campaigns             302!
+/foundation/staff/email-campaigns                        /staff/email-campaigns             302!
+/foundation/staff/failed-sync-retry-center.html          /staff/failed-sync-retry-center    302!
+/foundation/staff/failed-sync-retry-center               /staff/failed-sync-retry-center    302!
+/foundation/staff/fellowship-management.html             /staff/fellowship-management       302!
+/foundation/staff/fellowship-management                  /staff/fellowship-management       302!
+/foundation/staff/graduation-status.html                 /staff/graduation-status           302!
+/foundation/staff/graduation-status                      /staff/graduation-status           302!
+/foundation/staff/help-guide.html                        /staff/help-guide                  302!
+/foundation/staff/help-guide                             /staff/help-guide                  302!
+/foundation/staff/makeup-management.html                 /staff/makeup-management           302!
+/foundation/staff/makeup-management                      /staff/makeup-management           302!
+/foundation/staff/messages.html                          /staff/messages                    302!
+/foundation/staff/messages                               /staff/messages                    302!
+/foundation/staff/milestones-admin.html                  /staff/milestones                  302!
+/foundation/staff/milestones-admin                       /staff/milestones                  302!
+/foundation/staff/moodle-settings.html                   /staff/moodle-settings             302!
+/foundation/staff/moodle-settings                        /staff/moodle-settings             302!
+/foundation/staff/needs-attention.html                   /staff/needs-attention             302!
+/foundation/staff/needs-attention                        /staff/needs-attention             302!
+/foundation/staff/notification-center.html               /staff/notification-center         302!
+/foundation/staff/notification-center                    /staff/notification-center         302!
+/foundation/staff/operational-trace.html                 /staff/operational-trace           302!
+/foundation/staff/operational-trace                      /staff/operational-trace           302!
+/foundation/staff/reports.html                           /staff/reports                     302!
+/foundation/staff/reports                                /staff/reports                     302!
+/foundation/staff/rocksolid-management.html              /staff/nexus-management            302!
+/foundation/staff/rocksolid-management                   /staff/nexus-management            302!
+/foundation/staff/role-audit.html                        /staff/role-audit                  302!
+/foundation/staff/role-audit                             /staff/role-audit                  302!
+/foundation/staff/StudentProgressView.html               /staff/student-progress            302!
+/foundation/staff/StudentProgressView                    /staff/student-progress            302!
+/foundation/staff/studentprogressview                    /staff/student-progress            302!
+/foundation/staff/system-health.html                     /staff/system-health               302!
+/foundation/staff/system-health                          /staff/system-health               302!
+/foundation/staff/teacher-management.html                /staff/teacher-management          302!
+/foundation/staff/teacher-management                     /staff/teacher-management          302!
+/foundation/staff/teacher-schedule.html                  /staff/teacher-schedule            302!
+/foundation/staff/teacher-schedule                       /staff/teacher-schedule            302!
+/foundation/staff/waitlist.html                          /staff/waitlist                    302!
+/foundation/staff/waitlist                               /staff/waitlist                    302!
+
+# Legacy dead-end and retired routes -> login
+/supabase/*                                              /foundation/auth/login.html        302!
+/ai/*                                                    /foundation/auth/login.html        302!
+/archive/*                                               /foundation/auth/login.html        302!
+/foundation/docs/*                                       /foundation/auth/login.html        302!
+
+# Repository files and folders are never published. Answer 404, not the SPA shell.
+/README.md                                               /404.html                          404!
+/CLAUDE.md                                               /404.html                          404!
+/ARCHITECTURE.md                                         /404.html                          404!
+/NEXT_STEPS.md                                           /404.html                          404!
+/TESTING.md                                              /404.html                          404!
+/package.json                                            /404.html                          404!
+/package-lock.json                                       /404.html                          404!
+/vercel.json                                             /404.html                          404!
+/netlify.toml                                            /404.html                          404!
+/.env                                                    /404.html                          404!
+/.env.local                                              /404.html                          404!
+/.env.example                                            /404.html                          404!
+/_headers                                                /404.html                          404!
+/_redirects                                              /404.html                          404!
+/scripts/*                                               /404.html                          404!
+/docs/*                                                  /404.html                          404!
+/site/*                                                  /404.html                          404!
+/netlify-static-publish/*                                /404.html                          404!
+/node_modules/*                                          /404.html                          404!
+/.git/*                                                  /404.html                          404!
+/foundation-spa/*                                        /404.html                          404!
+/foundation/sql/*                                        /404.html                          404!
+/foundation/archive/*                                    /404.html                          404!
+/foundation/edge-functions/*                             /404.html                          404!
+/tmp_teacher_ref/*                                       /404.html                          404!
+/validation-screenshots/*                                /404.html                          404!
+
+# Any other /foundation/ path without a published file is retired: 404, not the SPA shell.
+# Applies only when no file matches, so published static pages are unaffected.
+/foundation/*                                            /404.html                          404
+
+# SPA fallback: every other path is a client route (includes /auth/*, /staff/*, /teacher/*)
+/*                                                       /index.html                        200
