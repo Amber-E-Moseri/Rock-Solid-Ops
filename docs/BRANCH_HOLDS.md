@@ -23,6 +23,35 @@ canonical body supersedes it (main session flagged the conflict to the operator)
 update is isolated in section 2 of `202607141000_waitlist_consolidate_dedup.sql`,
 strippable on its own if the operator reverses.
 
+### `fix/registration-class-options-drift` — HOLD on production execution (2026-10-22)
+
+Status: repair migration `202610220100` written, reviewed and tested on an isolated model (17 of 17 PASS).
+PR #6 open; CI migration gate passed. Runbook: `docs/REGISTRATION_CLASS_OPTIONS_REPAIR_2026-10-22.md`.
+
+Hold conditions before the production SQL runs:
+1. Owner approval for this exact DDL only (`is_online`, `confirmed_start_date` on `public.class_options`).
+2. Preflight queries P1–P4 match the expected values in the runbook.
+3. The production schema-history row is recorded by an approved mechanism. `supabase db push` is not
+   suitable while production has 9 remote-only versions (`202609231000`…`202610030004`).
+4. Operational readiness: public registrations re-open when the class list works.
+
+Do not execute the other 60 non-baseline drifted objects, or the remote-only C1/C6 versions, in the same change.
+
+### `rocksolid-staging` (site `268dac64…`) — HOLD on any deployment or retirement (2026-10-22)
+
+Status: no repository files are published (every probed repository path returns the SPA shell, identical
+bytes). Manual deploys only. Last deploy 2026-09-19. Staging database shows no applicant or audit activity
+since 2026-09-19. Owner decision needed: restrict access (for example, password protection if the plan allows)
+or retire. No change has been made.
+
+### Production schema drift and unapplied-but-recorded migrations — HOLD (2026-10-22)
+
+Production has 60 non-baseline schema objects that repo migrations create but production lacks (see the
+migration log entry of the same date). Several affect security (RLS policies on `attendance_records`
+are not the intended teacher-scoped set; the audit canonicalization trigger and columns are absent).
+Production also has 9 migration versions from the unmerged C1 and C6 branches recorded as applied, which are
+not on `main`. No production schema change beyond the approved registration DDL is authorised.
+
 ## Resolved (moot — already merged)
 
 ### `brief/moodle-credential-safety` — RESOLVED 2026-07-23
