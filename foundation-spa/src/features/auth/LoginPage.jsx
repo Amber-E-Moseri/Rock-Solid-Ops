@@ -1,29 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../supabase.js';
 import { postLoginPath } from './postLoginPath.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 const ERROR_MESSAGES = {
   inactive:     'Your account is inactive. Please contact your administrator.',
   pending:      'Your account is pending approval.',
   unauthorized: 'You do not have permission to access that page.',
+  session:      'We could not load your account. Please sign in again.',
 };
-
-// Reads the profile role for the landing decision. A lookup failure returns
-// null, and ProtectedRoute then reports the account state on the next screen.
-async function loadRole(userId) {
-  if (!userId) return null;
-  try {
-    const { data } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('user_id', userId)
-      .maybeSingle();
-    return data?.role ?? null;
-  } catch {
-    return null;
-  }
-}
 
 export default function LoginPage() {
   const [email, setEmail]       = useState('');
@@ -32,22 +18,36 @@ export default function LoginPage() {
   const [error, setError]       = useState('');
   const [resetMsg, setResetMsg] = useState('');
   const [resetPending, setResetPending] = useState(false);
+  // Set once Supabase accepts the password. Navigation waits until the auth
+  // context has the profile, so the route guard never sees a half-finished sign-in.
+  const [pendingNext, setPendingNext] = useState(null);
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const { user, profile, loading: sessionLoading, error: sessionError } = useAuth();
 
   const errorCode = params.get('error');
   const serverMsg = errorCode ? ERROR_MESSAGES[errorCode] : '';
+  const busy = loading || Boolean(pendingNext);
+
+  useEffect(() => {
+    if (!pendingNext || sessionLoading) return;
+    if (user && profile) {
+      setPendingNext(null);
+      navigate(postLoginPath({ role: profile.role, next: pendingNext.next }), { replace: true });
+      return;
+    }
+    setPendingNext(null);
+    setError(sessionError ? ERROR_MESSAGES.session : 'Sign-in did not complete. Please try again.');
+  }, [pendingNext, sessionLoading, user, profile, sessionError, navigate]);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) { setError(authError.message); return; }
-      const role = await loadRole(data?.user?.id);
-      // params.get() already decodes once. Do not decode again.
-      navigate(postLoginPath({ role, next: params.get('next') }), { replace: true });
+      setPendingNext({ next: params.get('next') });
     } catch (err) {
       setError(err.message || 'An unexpected error occurred.');
     } finally {
@@ -147,21 +147,21 @@ export default function LoginPage() {
           </label>
           <button
             type="submit"
-            disabled={loading}
+            disabled={busy}
             style={{
               marginTop: 8,
               padding: '11px 0',
               borderRadius: 'var(--radius-md)',
-              background: loading ? 'var(--soft-purple)' : 'var(--primary)',
+              background: busy ? 'var(--soft-purple)' : 'var(--primary)',
               color: '#fff',
               border: 'none',
               fontSize: 14,
               fontWeight: 700,
-              cursor: loading ? 'not-allowed' : 'pointer',
+              cursor: busy ? 'not-allowed' : 'pointer',
               transition: 'background 0.15s',
             }}
           >
-            {loading ? 'Signing in…' : 'Sign in'}
+            {busy ? 'Signing in…' : 'Sign in'}
           </button>
           <button
             type="button"

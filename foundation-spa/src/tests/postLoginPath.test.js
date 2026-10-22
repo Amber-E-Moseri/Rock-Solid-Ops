@@ -46,10 +46,14 @@ describe('safeNextPath', () => {
 });
 
 describe('postLoginPath', () => {
-  it('sends teachers to /teacher/index, even when next points at staff', () => {
-    expect(postLoginPath({ role: 'teacher', next: '/staff/dashboards' })).toBe(TEACHER_LANDING);
-    expect(postLoginPath({ role: 'Teacher ', next: null })).toBe(TEACHER_LANDING);
+  it('sends teachers with no usable next to /teacher/index', () => {
+    expect(postLoginPath({ role: 'teacher', next: null })).toBe(TEACHER_LANDING);
+    expect(postLoginPath({ role: 'Teacher ', next: '//evil.example' })).toBe(TEACHER_LANDING);
     expect(TEACHER_LANDING).toBe('/teacher/index');
+  });
+
+  it('follows a valid next for a teacher; the route guard refuses staff routes', () => {
+    expect(postLoginPath({ role: 'teacher', next: '/staff/dashboards' })).toBe('/staff/dashboards');
   });
 
   it('follows a validated next for staff roles', () => {

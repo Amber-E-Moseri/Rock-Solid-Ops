@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '../supabase.js';
 
 // ── Role constants (mirrors auth-client.js) ──────────────────────────────────
@@ -136,10 +136,21 @@ const PROJECTIONS = [
   'user_id,role',
 ];
 
+// Thrown when the profiles query itself fails. It is not an authorization
+// decision: the user is not treated as unauthorized and no metadata role is used.
+class ProfileLoadError extends Error {
+  constructor(message, cause) {
+    super(message);
+    this.name = 'ProfileLoadError';
+    this.cause = cause;
+  }
+}
+
 async function resolveProfile(user) {
   const cached = readCachedProfile(user.id);
   if (cached) return cached;
 
+  let queryFailed = null;
   for (const projection of PROJECTIONS) {
     const { data, error } = await supabase
       .from('profiles')
@@ -158,9 +169,14 @@ async function resolveProfile(user) {
     if (error) {
       if (isAuthError(error)) throw error;
       if (!isMissingTableError(error)) {
+        queryFailed = queryFailed || error;
         console.warn('[AuthContext] profiles projection failed', { projection, error });
       }
     }
+  }
+
+  if (queryFailed) {
+    throw new ProfileLoadError('The profiles query failed.', queryFailed);
   }
 
   const metadataProfile = normalizeProfileRecord('auth', {}, user, {
@@ -228,24 +244,61 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
 
-  const loadProfile = useCallback(async (sessionUser) => {
+  // Id of the latest session application. A profile result that finishes after a
+  // newer session change (for example a sign-out) is dropped instead of applied.
+  const sessionRequestRef = useRef(0);
+  // The profile load in progress, shared by concurrent callers for the same user.
+  const inflightRef = useRef({ userId: null, promise: null });
+
+  const fetchProfileOnce = useCallback((sessionUser) => {
+    const current = inflightRef.current;
+    if (current.promise && current.userId === sessionUser.id) return current.promise;
+    const promise = resolveProfile(sessionUser).finally(() => {
+      if (inflightRef.current.promise === promise) {
+        inflightRef.current = { userId: null, promise: null };
+      }
+    });
+    inflightRef.current = { userId: sessionUser.id, promise };
+    return promise;
+  }, []);
+
+  // Applies a session to state. When `blocking`, `loading` stays true until the
+  // profile has resolved, so the route guard waits instead of treating the user
+  // as signed out. A failed profile load is recorded in `error`; it is never
+  // reported as an authorization decision.
+  const applySession = useCallback((sessionUser, { blocking = true } = {}) => {
+    const requestId = ++sessionRequestRef.current;
+
     if (!sessionUser) {
+      inflightRef.current = { userId: null, promise: null };
       setUser(null);
       setProfile(null);
+      setError(null);
       setLoading(false);
       return;
     }
-    try {
-      const resolved = await resolveProfile(sessionUser);
-      setUser(sessionUser);
-      setProfile(resolved);
-    } catch (err) {
-      console.error('[AuthContext] profile load error', err);
-      setError(err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+
+    if (blocking) setLoading(true);
+    fetchProfileOnce(sessionUser).then(
+      (resolved) => {
+        if (requestId !== sessionRequestRef.current) return;
+        setUser(sessionUser);
+        setProfile(resolved);
+        setError(null);
+        setLoading(false);
+      },
+      (err) => {
+        if (requestId !== sessionRequestRef.current) return;
+        console.error('[AuthContext] profile load error', err);
+        if (blocking) {
+          setUser(null);
+          setProfile(null);
+        }
+        setError(err);
+        setLoading(false);
+      }
+    );
+  }, [fetchProfileOnce]);
 
   useEffect(() => {
     if (BYPASS_ROLE) {
@@ -256,23 +309,29 @@ export function AuthProvider({ children }) {
       return;
     }
 
+    // The initial snapshot is older than any auth event that arrived while it was
+    // loading (for example a sign-in), so it is dropped in that case.
+    const initialRequest = sessionRequestRef.current;
     supabase.auth.getSession().then(({ data }) => {
-      loadProfile(data.session?.user ?? null);
+      if (sessionRequestRef.current !== initialRequest) return;
+      applySession(data.session?.user ?? null);
     });
 
+    // The listener does not await the profile load. The auth client awaits its
+    // subscribers, and the profile query runs through that same client.
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESH_FAILED') {
         clearCachedProfile();
-        setUser(null);
-        setProfile(null);
-        setLoading(false);
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        loadProfile(session?.user ?? null);
+        applySession(null);
+      } else if (event === 'SIGNED_IN') {
+        applySession(session?.user ?? null, { blocking: true });
+      } else if (event === 'TOKEN_REFRESHED') {
+        applySession(session?.user ?? null, { blocking: false });
       }
     });
 
     return () => listener.subscription.unsubscribe();
-  }, [loadProfile]);
+  }, [applySession]);
 
   const signOut = useCallback(async () => {
     clearCachedProfile();

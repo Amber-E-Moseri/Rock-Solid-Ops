@@ -31,14 +31,16 @@ export function safeNextPath(raw) {
   return raw;
 }
 
-// Where a user lands after a successful sign-in. Teachers always get their own
-// portal, matching the static login. Everyone else gets a validated `next`, then
-// their role landing. Roles with no landing fall back to the staff dashboard so
-// ProtectedRoute can show the pending, inactive or unauthorized notice.
+// Where a user lands after a successful sign-in. A valid `next` is followed for any
+// role, and ProtectedRoute decides whether that role may open it, so a teacher
+// who targets a staff route gets the unauthorized notice. With no usable `next`,
+// teachers land on their portal and everyone else on their role landing. Roles
+// with no landing fall back to the staff dashboard, where ProtectedRoute shows the
+// pending, inactive or unauthorized notice.
 export function postLoginPath({ role, next }) {
   const canonical = String(role ?? '').trim().toLowerCase();
-  if (canonical === 'teacher') return TEACHER_LANDING;
   const safe = safeNextPath(next);
   if (safe) return safe;
+  if (canonical === 'teacher') return TEACHER_LANDING;
   return landingPathForRole(canonical) ?? STAFF_LANDING;
 }
