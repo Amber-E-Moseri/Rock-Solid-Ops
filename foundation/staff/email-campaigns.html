@@ -22,14 +22,14 @@ main{max-width:1180px;margin:0 auto;padding:28px 24px 60px}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
 button,.btn{border:0;border-radius:9px;padding:10px 15px;font-weight:700;cursor:pointer;background:var(--navy);color:white;text-decoration:none;display:inline-block}
 button.secondary{background:white;color:var(--text);border:1px solid var(--border)}
-input,select,textarea{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font:inherit;background:white}
+input,select,textarea{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font:inherit;background:var(--color-surface)}
 textarea{resize:vertical;min-height:90px}
 label{font-size:12px;font-weight:700;color:var(--muted);display:block;margin-bottom:6px}
 .table-wrap{overflow:auto}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;background:#f8f6ff;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding:10px 12px;white-space:nowrap}
+th{text-align:left;background:var(--surface-2);color:var(--color-text-muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding:10px 12px;white-space:nowrap}
 td{border-top:1px solid var(--border);padding:10px 12px;vertical-align:top}
-tr:hover td{background:#faf9ff}
+tr:hover td{background:color-mix(in srgb,var(--primary) 5%,var(--color-surface))}
 .badge{display:inline-block;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:700}
 .ok{background:var(--success-bg);color:var(--success)}
 .bad{background:var(--danger-bg);color:var(--danger)}
@@ -46,7 +46,7 @@ tr:hover td{background:#faf9ff}
   z-index:4000;align-items:center;justify-content:center;padding:16px;
 }
 .cmp-modal{
-  background:white;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.25);
+  background:var(--color-surface);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.25);
   width:100%;max-width:680px;max-height:90vh;overflow-y:auto;padding:28px;
   position:relative;
 }
@@ -58,14 +58,14 @@ tr:hover td{background:#faf9ff}
 .cmp-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .cmp-tags-box{
   border:1px solid var(--border);border-radius:10px;padding:10px;
-  max-height:160px;overflow-y:auto;background:white;
+  max-height:160px;overflow-y:auto;background:var(--surface-2);
 }
 .cmp-modal-footer{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
 .cmp-modal-footer .err{color:var(--danger);font-size:12px;flex:1}
 .cmp-recipient-count{font-size:12px;color:var(--muted);margin-top:6px}
 /* Preview modal */
 .cmp-preview-frame{width:100%;height:500px;border:1px solid var(--border);border-radius:10px;margin-top:12px}
-.cmp-preview-text{white-space:pre-wrap;font-size:13px;background:#f8f6ff;border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:12px;max-height:500px;overflow-y:auto}
+.cmp-preview-text{white-space:pre-wrap;font-size:13px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:12px;max-height:500px;overflow-y:auto}
 .cmp-meta{font-size:13px;color:var(--muted);margin-bottom:4px}
 </style>
   <link rel="stylesheet" href="../ui/tokens.css" />

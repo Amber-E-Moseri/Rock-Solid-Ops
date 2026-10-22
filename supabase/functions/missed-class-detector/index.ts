@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { validateCronAuth } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -73,15 +74,16 @@ function classNumberForDate(batchStartDate: string, classDate: Date) {
 
 async function invokeClickupSync(
   supabaseUrl: string,
-  serviceKey: string,
   body: Record<string, unknown>,
 ) {
+  const internalSecret = Deno.env.get("INTERNAL_INVOKE_SECRET") || "";
+  if (!internalSecret) throw new Error("Missing INTERNAL_INVOKE_SECRET");
+
   const res = await fetch(`${supabaseUrl}/functions/v1/clickup-sync`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${serviceKey}`,
-      apikey: serviceKey,
       "Content-Type": "application/json",
+      "x-internal-secret": internalSecret,
     },
     body: JSON.stringify(body),
   });
@@ -109,6 +111,9 @@ Deno.serve(async (req) => {
   applyAllowedOrigin(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
+
+  const authFailure = validateCronAuth(req);
+  if (authFailure) return authFailure;
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -218,7 +223,7 @@ Deno.serve(async (req) => {
 
       summary.missed_count += 1;
 
-      const clickupRes = await invokeClickupSync(SUPABASE_URL, SERVICE_KEY, {
+      const clickupRes = await invokeClickupSync(SUPABASE_URL, {
         type: "missed_class",
         payload: {
           student_id: studentId,
@@ -334,7 +339,7 @@ Deno.serve(async (req) => {
     for (const a of candidates) {
       const subgroupId = fellowshipMap.get(normalizeText(a.fellowship_code)) || "";
       const fullName = `${normalizeText(a.first_name)} ${normalizeText(a.last_name)}`.trim();
-      const clickupRes = await invokeClickupSync(SUPABASE_URL, SERVICE_KEY, {
+      const clickupRes = await invokeClickupSync(SUPABASE_URL, {
         type: "escalation",
         payload: {
           source: "applicants",

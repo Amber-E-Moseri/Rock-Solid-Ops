@@ -49,9 +49,11 @@
   }
 
   // ── Status chip ────────────────────────────────────────────────────────────
+  const TEACHER_STATUS_VARIANT = { active: "success", pending: "warning", suspended: "warning", inactive: "neutral" };
   function statusChip(status) {
     const n = FSAdminApi.normalizeTeacherStatus(status, false).toLowerCase();
-    return `<span class="chip ${n}">${n.toUpperCase()}</span>`;
+    const v = TEACHER_STATUS_VARIANT[n] || "neutral";
+    return `<span class="fs-badge fs-badge-${v}">${n.toUpperCase()}</span>`;
   }
 
   // ── State helpers ──────────────────────────────────────────────────────────
@@ -136,18 +138,18 @@
     const linked = Boolean(row.teacher_user_id);
     const allowAuthLinking = isAdmin();
     const linkBtn  = allowAuthLinking
-      ? `<button class="btn" data-action="linkauth" data-id="${id}" data-email="${emailEsc}" title="Link auth account">${linked ? "Relink Auth" : "Link Auth"}</button>`
+      ? `<button class="fs-btn fs-btn-secondary fs-btn-sm" data-action="linkauth" data-id="${id}" data-email="${emailEsc}" title="Link auth account">${linked ? "Relink Auth" : "Link Auth"}</button>`
       : "";
     const unlinkBtn = allowAuthLinking && linked
-      ? `<button class="btn danger" data-action="unlinkauth" data-id="${id}" title="Unlink auth account">Unlink Auth</button>`
+      ? `<button class="fs-btn fs-btn-danger fs-btn-sm" data-action="unlinkauth" data-id="${id}" title="Unlink auth account">Unlink Auth</button>`
       : "";
-    const emailBtn = `<button class="btn" data-action="email" data-id="${id}">Email</button>`;
+    const emailBtn = `<button class="fs-btn fs-btn-secondary fs-btn-sm" data-action="email" data-id="${id}">Email</button>`;
 
     if (normalized === "PENDING") {
       if (!isAdmin()) return `<div class="actions">${emailBtn}${linkBtn}${unlinkBtn}</div>`;
       return `<div class="actions">
-        <button class="btn success" data-action="activate"   data-id="${id}">Approve</button>
-        <button class="btn danger"  data-action="reject"     data-id="${id}">Reject</button>
+        <button class="fs-btn fs-btn-primary fs-btn-sm" data-action="activate"   data-id="${id}">Approve</button>
+        <button class="fs-btn fs-btn-danger fs-btn-sm"  data-action="reject"     data-id="${id}">Reject</button>
         ${emailBtn}
         ${linkBtn}
         ${unlinkBtn}
@@ -156,30 +158,30 @@
 
     if (normalized === "ACTIVE") {
       const suspendBtn = isAdmin()
-        ? `<button class="btn" data-action="suspend" data-id="${id}">Suspend</button>`
+        ? `<button class="fs-btn fs-btn-secondary fs-btn-sm" data-action="suspend" data-id="${id}">Suspend</button>`
         : "";
       const inactivateBtn = isAdmin()
-        ? `<button class="btn danger" data-action="inactivate" data-id="${id}">Inactivate</button>`
+        ? `<button class="fs-btn fs-btn-danger fs-btn-sm" data-action="inactivate" data-id="${id}">Inactivate</button>`
         : "";
       return `<div class="actions">${suspendBtn}${inactivateBtn}${emailBtn}${linkBtn}${unlinkBtn}</div>`;
     }
 
     if (normalized === "SUSPENDED") {
       const activateBtn = isAdmin()
-        ? `<button class="btn success" data-action="unsuspend" data-id="${id}">Activate</button>`
+        ? `<button class="fs-btn fs-btn-primary fs-btn-sm" data-action="unsuspend" data-id="${id}">Activate</button>`
         : "";
       const inactivateBtn = isAdmin()
-        ? `<button class="btn danger" data-action="inactivate" data-id="${id}">Inactivate</button>`
+        ? `<button class="fs-btn fs-btn-danger fs-btn-sm" data-action="inactivate" data-id="${id}">Inactivate</button>`
         : "";
       return `<div class="actions">${activateBtn}${inactivateBtn}${emailBtn}${linkBtn}${unlinkBtn}</div>`;
     }
 
     if (normalized === "INACTIVE") {
       const activateBtn = isAdmin()
-        ? `<button class="btn success" data-action="activate" data-id="${id}">Activate</button>`
+        ? `<button class="fs-btn fs-btn-primary fs-btn-sm" data-action="activate" data-id="${id}">Activate</button>`
         : "";
       const suspendBtn = isAdmin()
-        ? `<button class="btn" data-action="suspend" data-id="${id}">Suspend</button>`
+        ? `<button class="fs-btn fs-btn-secondary fs-btn-sm" data-action="suspend" data-id="${id}">Suspend</button>`
         : "";
       return `<div class="actions">${activateBtn}${suspendBtn}${emailBtn}${linkBtn}${unlinkBtn}</div>`;
     }

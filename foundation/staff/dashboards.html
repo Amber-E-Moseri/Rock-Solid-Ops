@@ -711,11 +711,12 @@
         const { data: sess } = await supabase.auth.getSession();
         const token = sess?.session?.access_token;
         const { data: failedRows } = await supabase.from("moodle_enrollment_sync").select("id").in("sync_status", ["FAILED", "RETRYING"]).limit(100);
+        const supabaseUrl = String(window.FS_CONFIG?.SUPABASE_URL || "").trim() || window.location.origin;
         for (const row of (failedRows || [])) {
-          await fetch(`${window.location.origin}/functions/v1/moodle-sync`, {
+          await fetch(`${supabaseUrl}/functions/v1/admin-api`, {
             method: "POST",
             headers: { "Content-Type":"application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-            body: JSON.stringify({ id: row.id, limit: 1 }),
+            body: JSON.stringify({ action: "invoke-moodle-sync", id: row.id, limit: 1 }),
           });
         }
         await loadMoodleSyncHealth();

@@ -44,30 +44,6 @@ Deno.serve(async (req) => {
       SUPABASE_URL,
       SUPABASE_SERVICE_ROLE_KEY
     );
-    const triggerMoodleSync = async (syncId: string) => {
-      if (!syncId) return;
-      try {
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/moodle-sync`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-            apikey: SUPABASE_SERVICE_ROLE_KEY,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ id: syncId, limit: 1 }),
-        });
-        if (!res.ok) {
-          const txt = await res.text();
-          console.error("REGISTRATION_PROCESSOR_MOODLE_SYNC_TRIGGER_FAILED", {
-            syncId,
-            status: res.status,
-            body: txt,
-          });
-        }
-      } catch (err) {
-        console.error("REGISTRATION_PROCESSOR_MOODLE_SYNC_TRIGGER_ERROR", { syncId, err });
-      }
-    };
     const body = await req.json().catch(() => ({}));
     
     // Input validation
@@ -773,9 +749,6 @@ Deno.serve(async (req) => {
       } catch (moodleQueueErr) {
         console.error("REGISTRATION_PROCESSOR_MOODLE_QUEUE_ERROR", moodleQueueErr);
       }
-      if (moodleSyncRowId) {
-        await triggerMoodleSync(moodleSyncRowId);
-      }
     }
 
     const writeAudit = async (
@@ -827,18 +800,23 @@ Deno.serve(async (req) => {
       await writeAudit("REGISTRATION_INACTIVE", "SUCCESS", commonAuditDetails);
       // Fire-and-forget: decrement slot and check waitlist for next eligible student
       if (class_option_id && batch_id) {
-        void fetch(`${SUPABASE_URL}/functions/v1/waitlist-processor`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            applicant_id:    String(insertedApplicant?.id || ""),
-            class_option_id,
-            batch_id,
-          }),
-        }).catch(() => {});
+        const internalSecret = Deno.env.get("INTERNAL_INVOKE_SECRET") || "";
+        if (!internalSecret) {
+          console.error("REGISTRATION_PROCESSOR_WAITLIST_TRIGGER_CONFIG_ERROR");
+        } else {
+          void fetch(`${SUPABASE_URL}/functions/v1/waitlist-processor`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-internal-secret": internalSecret,
+            },
+            body: JSON.stringify({
+              applicant_id:    String(insertedApplicant?.id || ""),
+              class_option_id,
+              batch_id,
+            }),
+          }).catch(() => {});
+        }
       }
     } else if (registrationStatusTyped === "DUPLICATE") {
       await writeAudit("REGISTRATION_DUPLICATE", "SUCCESS", commonAuditDetails);

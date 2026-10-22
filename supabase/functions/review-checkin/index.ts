@@ -5,6 +5,7 @@ import {
   jsonResponse,
   safeLogAudit,
 } from "../_shared/http.ts";
+import { validateCronAuth } from "../_shared/auth.ts";
 
 function json(body: unknown, status = 200) {
   return jsonResponse(
@@ -20,6 +21,9 @@ function json(body: unknown, status = 200) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
+
+  const authFailure = validateCronAuth(req);
+  if (authFailure) return authFailure;
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
   const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";

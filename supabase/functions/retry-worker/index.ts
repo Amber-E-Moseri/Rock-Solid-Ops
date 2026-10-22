@@ -9,6 +9,7 @@ import {
   isValidString,
   safeLogAudit,
 } from "../_shared/http.ts";
+import { validateCronAuth } from "../_shared/auth.ts";
 
 type RetryAction = "retry" | "resolve";
 type RetrySource = "email_queue" | "scheduled_notifications" | "moodle_sync" | "moodle_enrollment_sync" | "failed_syncs";
@@ -49,37 +50,18 @@ function json(body: unknown, status = 200) {
   );
 }
 
-async function triggerMoodleSync(
-  supabaseUrl: string,
-  serviceKey: string,
-  id: string,
-) {
-  const res = await fetch(`${supabaseUrl}/functions/v1/moodle-sync`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${serviceKey}`,
-      apikey: serviceKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ id, limit: 1 }),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`moodle-sync trigger failed (${res.status}): ${text}`);
-  }
-}
-
 async function triggerClickupEscalation(
   supabaseUrl: string,
-  serviceKey: string,
   payload: Record<string, unknown>,
 ) {
+  const internalSecret = Deno.env.get("INTERNAL_INVOKE_SECRET") || "";
+  if (!internalSecret) throw new Error("Missing INTERNAL_INVOKE_SECRET");
+
   const res = await fetch(`${supabaseUrl}/functions/v1/clickup-sync`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${serviceKey}`,
-      apikey: serviceKey,
       "Content-Type": "application/json",
+      "x-internal-secret": internalSecret,
     },
     body: JSON.stringify({
       type: "escalation",
@@ -136,6 +118,41 @@ async function isAdmin(serviceDb: ReturnType<typeof createClient>, userId: strin
   } catch (_) {
     return false;
   }
+}
+
+async function authorizeRequest(
+  req: Request,
+  serviceDb: any,
+): Promise<
+  | { ok: true; mode: "cron"; actorEmail: string }
+  | { ok: true; mode: "user"; actorEmail: string }
+  | { ok: false; response: Response }
+> {
+  if (req.headers.has("x-cron-secret")) {
+    const cronFailure = validateCronAuth(req);
+    if (cronFailure) return { ok: false, response: cronFailure };
+    return { ok: true, mode: "cron", actorEmail: "retry-worker@system" };
+  }
+
+  if (req.headers.has("x-internal-secret")) {
+    return { ok: false, response: json({ ok: false, error: "Unsupported caller credential" }, 401) };
+  }
+
+  const authHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return { ok: false, response: json({ ok: false, error: "Missing credentials" }, 401) };
+  }
+
+  const jwt = authHeader.slice("Bearer ".length).trim();
+  const { data: userData, error: userErr } = await serviceDb.auth.getUser(jwt);
+  if (userErr || !userData?.user) {
+    return { ok: false, response: json({ ok: false, error: "Invalid session" }, 401) };
+  }
+  const allowed = await isAdmin(serviceDb, userData.user.id, userData.user.email);
+  if (!allowed) {
+    return { ok: false, response: json({ ok: false, error: "Admin access required" }, 403) };
+  }
+  return { ok: true, mode: "user", actorEmail: userData.user.email || "retry-worker@user" };
 }
 
 async function logAudit(
@@ -205,7 +222,6 @@ async function sweepMoodleEnrollmentRetries(
 async function maybeEscalateMoodleFailure(
   db: ReturnType<typeof createClient>,
   supabaseUrl: string,
-  serviceKey: string,
   rowId: string,
 ) {
   const { data: row, error } = await db
@@ -247,7 +263,7 @@ async function maybeEscalateMoodleFailure(
     error_message: String(row.last_error || ""),
   };
 
-  const clickupRes = await triggerClickupEscalation(supabaseUrl, serviceKey, payload);
+  const clickupRes = await triggerClickupEscalation(supabaseUrl, payload);
   const taskId = String(clickupRes?.clickup_task_id || "").trim();
   if (taskId) {
     await db.from("moodle_enrollment_sync").update({ clickup_task_id: taskId }).eq("id", row.id);
@@ -327,6 +343,7 @@ async function applyRetry(
         error_message: null,
         error_code: null,
         retry_requested_at: now,
+        next_retry_at: null,
         updated_at: now,
       })
       .eq("id", id);
@@ -404,17 +421,10 @@ Deno.serve(async (req) => {
     if (!SUPABASE_URL || !SERVICE_KEY) return json({ ok: false, error: "Missing Supabase env" }, 500);
 
     const serviceDb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
-    const authHeader = req.headers.get("Authorization") || "";
-    const isCronCall = !authHeader.startsWith("Bearer ");
-    let actorEmail = "retry-worker@system";
-    if (!isCronCall) {
-      const jwt = authHeader.slice("Bearer ".length).trim();
-      const { data: userData, error: userErr } = await serviceDb.auth.getUser(jwt);
-      if (userErr || !userData?.user) return json({ ok: false, error: "Invalid session" }, 401);
-      const allowed = await isAdmin(serviceDb, userData.user.id, userData.user.email);
-      if (!allowed) return json({ ok: false, error: "Admin access required" }, 403);
-      actorEmail = userData.user.email || actorEmail;
-    }
+    const auth = await authorizeRequest(req, serviceDb);
+    if (!auth.ok) return auth.response;
+    const isCronCall = auth.mode === "cron";
+    const actorEmail = auth.actorEmail;
 
     const body = (await req.json().catch(() => ({}))) as RetryRequest;
     
@@ -447,7 +457,7 @@ Deno.serve(async (req) => {
       let escalated = 0;
       for (const row of sweep.candidates || []) {
         try {
-          const outcome = await maybeEscalateMoodleFailure(serviceDb, SUPABASE_URL, SERVICE_KEY, String(row.id || ""));
+          const outcome = await maybeEscalateMoodleFailure(serviceDb, SUPABASE_URL, String(row.id || ""));
           if (outcome.escalated) escalated += 1;
         } catch (err) {
           console.error("RETRY_SWEEP_ESCALATION_ERROR", err);
@@ -462,22 +472,8 @@ Deno.serve(async (req) => {
         "SUCCESS",
         { source: "moodle_enrollment_sync", selected: sweep.selected, attempted: sweep.attempted, escalated, limit },
       );
-      // Trigger Moodle sync once after sweep to process newly marked RETRYING rows.
-      if (sweep.attempted > 0) {
-        try {
-          await fetch(`${SUPABASE_URL}/functions/v1/moodle-sync`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${SERVICE_KEY}`,
-              apikey: SERVICE_KEY,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ limit: limit }),
-          });
-        } catch (triggerErr) {
-          console.error("RETRY_SWEEP_MOODLE_TRIGGER_ERROR", triggerErr);
-        }
-      }
+      // Moodle rows marked RETRYING are durable — the scheduled */5 moodle-sync cron
+      // discovers them on its next run. No function-to-function invocation required.
       return json({ ok: true, mode: "auto_sweep", source: "moodle_enrollment_sync", selected: sweep.selected, attempted: sweep.attempted, escalated, limit });
     }
 
@@ -499,15 +495,12 @@ Deno.serve(async (req) => {
 
       if (source === "moodle_enrollment_sync") {
         try {
-          await maybeEscalateMoodleFailure(serviceDb, SUPABASE_URL, SERVICE_KEY, id);
+          await maybeEscalateMoodleFailure(serviceDb, SUPABASE_URL, id);
         } catch (escalationErr) {
           console.error("RETRY_WORKER_CLICKUP_ESCALATION_ERROR", escalationErr);
         }
-        try {
-          await triggerMoodleSync(SUPABASE_URL, SERVICE_KEY, id);
-        } catch (triggerErr) {
-          console.error("RETRY_WORKER_MOODLE_TRIGGER_ERROR", triggerErr);
-        }
+        // Row is now RETRYING — the scheduled */5 moodle-sync cron picks it up.
+        // No function-to-function invocation needed; durable state drives processing.
       }
     }
     else await applyResolve(serviceDb, source, id);

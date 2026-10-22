@@ -1,4 +1,5 @@
 import { createServiceClient } from "../_shared/supabase.ts";
+import { validateCronAuth } from "../_shared/auth.ts";
 
 // ── Clients ──────────────────────────────────────────────────
 const supabase = createServiceClient()
@@ -37,7 +38,10 @@ interface RunResult {
 // Invoked on a cron schedule (see config.toml).
 // Also accepts manual POST for operational use.
 
-Deno.serve(async (): Promise<Response> => {
+Deno.serve(async (req): Promise<Response> => {
+  const authFailure = validateCronAuth(req);
+  if (authFailure) return authFailure;
+
   const result: RunResult = { sent: 0, failed: 0, rateLimited: 0, errors: [] }
 
   try {

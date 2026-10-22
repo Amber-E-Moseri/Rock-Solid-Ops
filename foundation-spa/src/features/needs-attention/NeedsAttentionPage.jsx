@@ -27,7 +27,7 @@ function relTime(ts) {
 export default function NeedsAttentionPage() {
   const { profile } = useAuth();
   const isRegSec = profile?.role === 'regional_secretary';
-  const { addToast } = useToast();
+  const addToast = useToast();
 
   const [batchId, setBatchId] = useState('');
   const [search, setSearch] = useState('');
