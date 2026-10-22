@@ -3,6 +3,7 @@ import { Download } from 'lucide-react';
 import { PageHeader, Card, Badge, Button, Skeleton, ErrorBanner, EmptyState } from '../../components/ui/index.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { fetchClasses, counts, classStatus, computeKpis, initials } from './lib/attendance.js';
+import { ATTENDANCE_SUBMIT_CERTIFIED, ATTENDANCE_SUBMIT_HOLD_MESSAGE } from '../../releaseHolds.js';
 
 export default function AttendancePage() {
   const toast = useToast();
@@ -212,7 +213,8 @@ export default function AttendancePage() {
                     {selected.submitted ? 'Submitted · you can update and re-submit.' : `${cc.m} of ${cc.total} still unmarked.`}
                   </span>
                   <Button variant="secondary" onClick={markAllPresent} style={{ marginLeft: 'auto' }}>Mark all present</Button>
-                  <Button onClick={submitAttendance}>{selected.submitted ? 'Update attendance' : 'Submit attendance'}</Button>
+                  {!ATTENDANCE_SUBMIT_CERTIFIED && <p role="status" style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>{ATTENDANCE_SUBMIT_HOLD_MESSAGE}</p>}
+                  <Button onClick={submitAttendance} disabled={!ATTENDANCE_SUBMIT_CERTIFIED}>{selected.submitted ? 'Update attendance' : 'Submit attendance'}</Button>
                 </div>
               </>
             )}

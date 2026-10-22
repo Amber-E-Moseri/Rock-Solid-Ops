@@ -44,21 +44,6 @@ export async function fetchClasses() {
   });
 }
 
-export function demoClasses() {
-  return [
-    { id: 1, time: 'Sun · 10:00 AM', loc: 'CE · Downtown', teacher: 'J. Musa', session: '4b', flagSessions: [], submitted: true,
-      roster: [{ name: 'Hannah Lawal', status: 'present' }, { name: 'Isaac Mensah', status: 'present' }, { name: 'John Musa', status: 'late' }, { name: 'Faith Udo', status: 'present' }, { name: 'Caleb Thomas', status: 'absent' }, { name: 'Joy Eke', status: 'present' }] },
-    { id: 2, time: 'Sun · 4:00 PM', loc: 'CE · Uptown', teacher: 'F. Udo', session: '4b', flagSessions: [], submitted: true,
-      roster: [{ name: 'Daniel Okoro', status: 'present' }, { name: 'Ruth Bello', status: 'present' }, { name: 'Esther Ade', status: 'present' }, { name: 'Samuel Eze', status: 'late' }, { name: 'Grace Adeyemi', status: 'present' }] },
-    { id: 3, time: 'Sun · 10:00 AM', loc: 'CSGA · Scarborough', teacher: 'E. Ade', session: '4b', flagSessions: [], submitted: false,
-      roster: [{ name: 'Peter Nwosu', status: null }, { name: 'Mary Johnson', status: null }, { name: 'Blessing Obi', status: null }, { name: 'David Eke', status: null }, { name: 'Sarah Ade', status: null }] },
-    { id: 4, time: 'Sun · 4:00 PM', loc: 'CSGB · Markham', teacher: 'S. Eze', session: '4b', flagSessions: ['4a', '4b'], submitted: true,
-      roster: [{ name: 'Naomi Bassey', status: 'present' }, { name: 'Paul Inyang', status: 'present' }, { name: 'Lydia Etim', status: 'absent' }] },
-    { id: 5, time: 'Sun · 10:00 AM', loc: 'WS · Brampton', teacher: 'K. Obi', session: '4b', flagSessions: [], submitted: false,
-      roster: [{ name: 'Joy Eke', status: null }, { name: 'Caleb Thomas', status: null }, { name: 'Ruth Bello', status: null }, { name: 'Mark Ojo', status: null }] },
-  ];
-}
-
 export function counts(c) {
   let p = 0, l = 0, a = 0, m = 0;
   (c.roster || []).forEach(s => {

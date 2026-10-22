@@ -61,15 +61,16 @@ describe('AttendancePage data states', () => {
 });
 
 describe('AttendancePage submit', () => {
-  it('never reports attendance as saved, since recording is not connected', async () => {
-    // One student marked, so the page reaches the save path rather than the "mark first" guard.
+  it('holds the submit control: disabled, and it never reports attendance as saved', async () => {
+    // One student marked, so the page would reach the save path if the hold were lifted.
     const marked = { ...CLASS, roster: [{ ...CLASS.roster[0], status: 'present' }, CLASS.roster[1]] };
     vi.mocked(fetchClasses).mockResolvedValue([marked]);
     render(<AttendancePage />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Submit attendance' }));
+    const submit = await screen.findByRole('button', { name: 'Submit attendance' });
+    expect(submit).toBeDisabled();
+    fireEvent.click(submit);
 
-    expect(mockToast).toHaveBeenCalledWith('Attendance for SG1 was not saved: recording is not connected yet.', 'warning');
     expect(mockToast.mock.calls.some(([msg, type]) => type === 'success' || /submitted/.test(msg))).toBe(false);
   });
 });
