@@ -65,8 +65,12 @@ function headerMatches(pattern, pathname) {
   return pattern === pathname;
 }
 
+// Netlify does not serve its control files as content (production returns 404 for /_headers).
+const HIDDEN = new Set(["_headers", "_redirects"]);
+
 export function resolveFile(root, urlPath) {
   const rel = decodeURIComponent(urlPath).replace(/^\/+/, "");
+  if (HIDDEN.has(rel)) return null;
   const abs = path.normalize(path.join(root, rel));
   if (!abs.startsWith(path.normalize(root))) return null;
   const candidates = [abs, `${abs}.html`, path.join(abs, "index.html")];

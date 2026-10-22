@@ -1,17 +1,18 @@
-# Netlify build for the SPA cutover.
+# Netlify build for the isolated SPA preview.
 #
-# Publish is the allowlisted directory built by scripts/build-spa-publish.mjs.
-# It is never the repository root. The security baseline is
-# scripts/build-static-publish.mjs (origin/main), whose guards the build keeps.
-# Redirects live only in foundation-spa/public/_redirects (copied to the publish
-# root by Vite). Headers live only in the repository root _headers file (copied by the build).
+# Publish is netlify-static-publish/, never the repository root.
+# Step 1 is the origin/main baseline, unchanged: it publishes the static /foundation
+# tree and _headers, and verifies them. Step 2 adds the SPA under /app/ and the
+# production-compatible root _redirects, then verifies the combined output.
+#
+# Redirects live only in the root _redirects file. This file has no redirect blocks.
 #
 # Required Netlify environment variables: SUPABASE_URL and SUPABASE_ANON_KEY (anon
 # or publishable key only). BYPASS_ROLE and VITE_BYPASS_ROLE must NOT be set in
 # any context; the build refuses.
 
 [build]
-  command = "npm --prefix foundation-spa ci && node scripts/build-spa-publish.mjs"
+  command = "npm --prefix foundation-spa ci && node scripts/build-static-publish.mjs && node scripts/build-spa-publish.mjs"
   publish = "netlify-static-publish"
 
 [build.environment]

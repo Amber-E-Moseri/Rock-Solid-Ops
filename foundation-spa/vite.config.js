@@ -2,7 +2,9 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// The SPA is published under /app/ so /foundation/ static routes keep their behaviour.
 export default defineConfig({
+  base: '/app/',
   plugins: [
     react(),
     VitePWA({
@@ -19,15 +21,15 @@ export default defineConfig({
         name: 'Rock Solid Ops',
         short_name: 'RSO',
         description: 'Foundation School internal staff operations platform.',
-        start_url: '/',
-        scope: '/',
+        start_url: '/app/',
+        scope: '/app/',
         display: 'standalone',
         orientation: 'portrait-primary',
         theme_color: '#4C2A92',
         background_color: '#f8f5ee',
         icons: [
-          { src: '/pwa-icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
-          { src: '/pwa-icon-maskable.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
+          { src: '/app/pwa-icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+          { src: '/app/pwa-icon-maskable.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
         ],
       },
       injectManifest: {

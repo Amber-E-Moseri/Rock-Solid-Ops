@@ -65,7 +65,7 @@ export default function LoginPage() {
     setResetPending(true);
     setResetMsg('Sending reset link...');
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
-      redirectTo: `${window.location.origin}/auth/reset-password`,
+      redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}auth/reset-password`,
     });
     setResetPending(false);
     if (resetError) {

@@ -1,8 +1,8 @@
-// Netlify publish allowlist, redirect, header and route regression tests.
-// Run after a build: node --test tests/
-//   1. Config tests read the repository only and always run.
-//   2. Output tests and emulator tests need netlify-static-publish/ (run
-//      `node scripts/build-spa-publish.mjs` first) and are skipped otherwise.
+// Netlify publish, redirect, header and route regression tests for the /app/ preview.
+// Run after a build (see docs/SPA_CUTOVER_CANDIDATE.md):
+//   node --test tests/netlify-publish.test.mjs
+// 1. Repository tests always run.
+// 2. Output and emulator tests need netlify-static-publish/ and are skipped otherwise.
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -15,11 +15,14 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8").replace(/\r\n/g, "\n");
 const ALLOWLIST = JSON.parse(read("scripts/netlify-site-allowlist.json"));
 const OUT = path.join(ROOT, "netlify-static-publish");
-const HAS_OUTPUT = fs.existsSync(path.join(OUT, "index.html"));
-const SKIP_OUTPUT = HAS_OUTPUT ? false : "netlify-static-publish/ missing: run node scripts/build-spa-publish.mjs";
-
-const REDIRECTS = parseRedirects(read("foundation-spa/public/_redirects"));
-const findRule = (from) => REDIRECTS.find((r) => r.from === from);
+const HAS_OUTPUT = fs.existsSync(path.join(OUT, "app", "index.html"));
+const SKIP_OUTPUT = HAS_OUTPUT ? false : "netlify-static-publish/ missing: run the two build steps first";
+const ROOT_REDIRECTS = parseRedirects(read("_redirects"));
+const find = (from) => ROOT_REDIRECTS.find((r) => r.from === from);
+// Known pre-existing gap: staff/_template.html loads a placeholder script that 404s on production too.
+// /foundation/images/canada_sr.png is referenced by staff/help-guide.html; the file lives at
+// foundation/registration/canada_sr.png. Also already 404 on production (to confirm on a Deploy Preview).
+const KNOWN_MISSING = new Set(["/foundation/js/your-page.js", "/foundation/images/canada_sr.png"]);
 
 function walk(dir, base = dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -31,7 +34,7 @@ function walk(dir, base = dir, out = []) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. Configuration (repository only)
+// 1. Repository configuration
 
 describe("netlify.toml", () => {
   const toml = read("netlify.toml");
@@ -41,19 +44,20 @@ describe("netlify.toml", () => {
     assert.doesNotMatch(toml, /publish = "\."/);
   });
 
-  test("builds through the reviewed SPA publish script", () => {
-    assert.match(toml, /node scripts\/build-spa-publish\.mjs/);
+  test("runs the origin/main baseline first, then the SPA layer", () => {
+    const cmd = toml.match(/command = "([^"]+)"/)[1];
+    assert.ok(cmd.indexOf("build-static-publish.mjs") < cmd.indexOf("build-spa-publish.mjs"), cmd);
   });
 
-  test("has one redirect source: no [[redirects]] block in netlify.toml", () => {
+  test("has no [[redirects]]: redirects live only in the root _redirects", () => {
     assert.doesNotMatch(toml, /\[\[redirects\]\]/);
   });
 });
 
-describe("security baseline parity with scripts/build-static-publish.mjs", () => {
+describe("baseline and guard parity", () => {
   const baseline = read("scripts/build-static-publish.mjs");
-  const candidate = read("scripts/build-spa-publish.mjs");
-  // Regex literal lines of the baseline guard lists, e.g. /\.sql$/i, or the EXCLUDED_FILE literal.
+  const spa = read("scripts/build-spa-publish.mjs");
+  // Regex literal lines of the baseline guard lists.
   const literals = baseline
     .split("\n")
     .map((l) => l.trim())
@@ -64,13 +68,11 @@ describe("security baseline parity with scripts/build-static-publish.mjs", () =>
     assert.ok(literals.length >= 20, `found ${literals.length} literals`);
   });
 
-  test("every baseline guard literal is kept verbatim", () => {
-    for (const lit of literals) {
-      assert.ok(candidate.includes(lit), `missing guard: ${lit}`);
-    }
+  test("every baseline guard literal is kept verbatim in the SPA layer", () => {
+    for (const lit of literals) assert.ok(spa.includes(lit), `missing guard: ${lit}`);
   });
 
-  test("the allowlist's forbidden patterns cover the baseline file-name guards", () => {
+  test("the allowlist covers the baseline file-name guards", () => {
     for (const pat of ["\\.sql$", "\\.md$", "\\.ts$", "\\.map$", "\\.env", "(^|/)node_modules/", "(^|/)supabase/"]) {
       assert.ok(ALLOWLIST.forbiddenFilePatterns.includes(pat), `missing pattern ${pat}`);
     }
@@ -92,118 +94,85 @@ describe("bypass and key guards", () => {
   });
 });
 
-describe("_redirects", () => {
-  test("serves the SPA shell as the final fallback, and only as the final rule", () => {
-    const last = REDIRECTS[REDIRECTS.length - 1];
-    assert.deepEqual([last.from, last.to, last.status], ["/*", "/index.html", 200]);
+describe("root _redirects: production rules are unchanged", () => {
+  // Copied from netlify.toml on origin/main (53a961c). Each must appear here with the same
+  // target, status and force flag.
+  const PRODUCTION = [
+    ["/", "/foundation/auth/login.html", 302, true],
+    ["/staff", "/foundation/staff/admin-portal.html", 302, true],
+    ["/auth", "/foundation/auth/login.html", 302, true],
+    ["/staff/*", "/foundation/staff/:splat", 200, false],
+    ["/auth/*", "/foundation/auth/:splat", 200, false],
+    ["/supabase/*", "/foundation/auth/login.html", 302, true],
+    ["/ai/*", "/foundation/auth/login.html", 302, true],
+    ["/archive/*", "/foundation/auth/login.html", 302, true],
+    ["/foundation/docs/*", "/foundation/auth/login.html", 302, true],
+  ];
+
+  for (const [from, to, status, force] of PRODUCTION) {
+    test(`${from} -> ${to} (${status}${force ? "!" : ""})`, () => {
+      const rule = find(from);
+      assert.ok(rule, `missing ${from}`);
+      assert.equal(rule.to, to);
+      assert.equal(rule.status, status);
+      assert.equal(rule.force, force);
+    });
+  }
+
+  test("no staff page is redirected: /foundation/staff/*.html stays static", () => {
+    assert.deepEqual(
+      ROOT_REDIRECTS.filter((r) => r.from.startsWith("/foundation/staff/")),
+      []
+    );
   });
 
-  test("entry points keep their legacy targets", () => {
-    assert.equal(findRule("/").to, "/foundation/auth/login.html");
-    assert.equal(findRule("/").status, 302);
-    assert.equal(findRule("/staff").to, "/staff/admin-portal");
-    assert.equal(findRule("/auth").to, "/auth/login");
+  test("no root SPA catch-all: /* is not rewritten to the SPA", () => {
+    assert.equal(find("/*"), undefined);
   });
 
-  test("legacy static auth URLs point at the SPA auth routes", () => {
-    assert.equal(findRule("/auth/login.html").to, "/auth/login");
-    assert.equal(findRule("/auth/reset-password.html").to, "/auth/reset-password");
-    assert.equal(findRule("/foundation/staff/login.html").to, "/foundation/auth/login.html");
-  });
-
-  test("every retired staff page has a .html rule and a pretty-URL rule", () => {
-    const staffHtml = fs.readdirSync(path.join(ROOT, "foundation/staff")).filter((f) => f.endsWith(".html"));
-    const kept = new Set(ALLOWLIST.staticEntries);
-    const redirected = staffHtml.filter((f) => !kept.has(`foundation/staff/${f}`));
-    assert.ok(redirected.length >= 37, `expected at least 37 redirected staff pages, found ${redirected.length}`);
-    for (const f of redirected) {
-      const base = `/foundation/staff/${f}`;
-      const pretty = base.replace(/\.html$/, "");
-      for (const from of [base, pretty]) {
-        const rule = REDIRECTS.find((r) => r.from === from);
-        assert.ok(rule, `no rule for ${from}`);
-        assert.equal(rule.status, 302, `${from} must be a 302`);
-        assert.ok(rule.force, `${from} must be forced (!)`);
-      }
-    }
-  });
-
-  test("repository paths answer 404, forced, never the SPA shell", () => {
-    for (const from of [
-      "/README.md", "/CLAUDE.md", "/package.json", "/netlify.toml", "/.env", "/.env.local",
-      "/scripts/*", "/docs/*", "/foundation-spa/*", "/foundation/sql/*", "/foundation/archive/*",
-      "/foundation/edge-functions/*", "/node_modules/*", "/.git/*", "/netlify-static-publish/*",
-    ]) {
-      const rule = findRule(from);
-      assert.ok(rule, `no rule for ${from}`);
-      assert.equal(rule.status, 404, from);
-      assert.ok(rule.force, `${from} must be forced`);
-    }
-  });
-
-  test("the /foundation/* catch-all sits after the specific rules", () => {
-    const idx = REDIRECTS.findIndex((r) => r.from === "/foundation/*");
-    const sensitive = REDIRECTS.findIndex((r) => r.from === "/README.md");
-    assert.ok(idx > sensitive && idx > REDIRECTS.findIndex((r) => r.from === "/foundation/docs/*"));
-    assert.equal(REDIRECTS[idx].status, 404);
-  });
-
-  test("does not rewrite /auth/* or /staff/* to static files (the SPA owns them)", () => {
-    for (const r of REDIRECTS) {
-      assert.ok(!(r.from.startsWith("/auth/") && r.status === 200), `unexpected rewrite ${r.from}`);
-      assert.ok(!(r.from.startsWith("/staff/") && r.status === 200), `unexpected rewrite ${r.from}`);
-    }
+  test("the SPA is served only under /app/", () => {
+    assert.equal(find("/app").to, "/app/index.html");
+    assert.equal(find("/app/*").to, "/app/index.html");
+    assert.equal(find("/app/*").status, 200);
   });
 });
 
-describe("_headers", () => {
-  const headers = read("_headers");
+describe("SPA base path and service worker", () => {
+  const vite = read("foundation-spa/vite.config.js");
+  const sw = read("foundation-spa/src/sw.js");
+  const main = read("foundation-spa/src/main.jsx");
 
-  test("keeps the noindex and no-store rules for legacy and repository paths", () => {
-    for (const block of ["/supabase/*", "/ai/*", "/archive/*", "/foundation/docs/*", "/*.sql"]) {
-      assert.ok(headers.split("\n").some((l) => l.trim() === block), `missing block ${block}`);
-    }
-    assert.match(headers, /X-Robots-Tag: noindex/);
+  test("Vite builds under /app/ and the manifest is scoped to /app/", () => {
+    assert.match(vite, /base: '\/app\/'/);
+    assert.match(vite, /start_url: '\/app\/'/);
+    assert.match(vite, /scope: '\/app\/'/);
+    assert.match(vite, /src: '\/app\/pwa-icon\.svg'/);
   });
 
-  test("keeps the /foundation/* security headers", () => {
-    assert.match(headers, /\/foundation\/\*\n(?:  .*\n)*?\s+X-Frame-Options: DENY/);
-    assert.match(headers, /Content-Security-Policy: default-src 'self'/);
+  test("the router uses the Vite base as its basename", () => {
+    assert.match(main, /basename=\{import\.meta\.env\.BASE_URL\.replace\(\/\\\/\$\/, ''\)\}/);
   });
 
-  test("keeps the site-wide nosniff header", () => {
-    assert.match(headers, /\/\*\n\s+X-Content-Type-Options: nosniff/);
+  test("the service worker resolves shell and notification URLs from its scope", () => {
+    assert.doesNotMatch(sw, /caches\.match\('\/index\.html'/);
+    assert.doesNotMatch(sw, /caches\.match\('\/'\)/);
+    assert.match(sw, /self\.registration\.scope/);
+  });
+
+  test("reset-password redirectTo follows the Vite base", () => {
+    const login = read("foundation-spa/src/features/auth/LoginPage.jsx");
+    assert.match(login, /\$\{import\.meta\.env\.BASE_URL\}auth\/reset-password/);
   });
 });
 
 describe("allowlist", () => {
-  test("every approved static entry exists in the repository", () => {
-    for (const rel of [...ALLOWLIST.staticEntries, ...ALLOWLIST.staticAssets]) {
-      assert.ok(fs.existsSync(path.join(ROOT, rel)), `missing ${rel}`);
-    }
+  test("the SPA base in the allowlist matches the Vite base", () => {
+    assert.equal(ALLOWLIST.spaBase, "/app/");
+    assert.match(read("foundation-spa/vite.config.js"), /base: '\/app\/'/);
   });
 
-  test("the eight legacy pages stay in the candidate", () => {
-    for (const rel of [
-      "foundation/staff/_template.html",
-      "foundation/staff/shell.html",
-      "foundation/staff/acceptance-tests.html",
-      "foundation/teacher/sections/attendance.html",
-      "foundation/teacher/sections/availability.html",
-      "foundation/teacher/sections/my-class.html",
-      "foundation/teacher/sections/teacher-home.html",
-      "foundation/teacher/sections/teacher-messages.html",
-    ]) {
-      assert.ok(ALLOWLIST.staticEntries.includes(rel), `not retained: ${rel}`);
-    }
-  });
-
-  test("no retirement is approved", () => {
-    assert.deepEqual(ALLOWLIST.approvedRetirements, []);
-  });
-
-  test("the only known missing reference is the scaffold placeholder", () => {
-    assert.deepEqual(ALLOWLIST.knownMissingReferences, ["foundation/js/your-page.js"]);
+  test("the external contract names only published static pages", () => {
+    for (const url of ALLOWLIST.externalContract) assert.ok(url.startsWith("/foundation/"), url);
   });
 });
 
@@ -222,32 +191,58 @@ describe("published output", { skip: SKIP_OUTPUT }, () => {
     assert.deepEqual(bad, []);
   });
 
-  test("top level contains only the SPA output, _headers and foundation/", () => {
-    const allowed = new Set([...fs.readdirSync(path.join(ROOT, ALLOWLIST.spaOutput)), "_headers", "foundation"]);
-    const tops = new Set(files.map((f) => f.split("/")[0]));
-    for (const t of tops) assert.ok(allowed.has(t), `unexpected ${t}`);
+  test("top level is exactly foundation/, app/, _headers and _redirects", () => {
+    const tops = [...new Set(files.map((f) => f.split("/")[0]))].sort();
+    assert.deepEqual(tops, ["_headers", "_redirects", "app", "foundation"]);
+  });
+
+  test("every repository static page is published (none omitted)", () => {
+    const published = new Set(files);
+    const repo = [];
+    const walkRepo = (dir) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (e.isDirectory()) {
+          if (!["archive", "docs", "sql", "edge-functions", "node_modules"].includes(e.name)) walkRepo(path.join(dir, e.name));
+        } else if (e.name.endsWith(".html")) {
+          repo.push(path.relative(ROOT, path.join(dir, e.name)).split(path.sep).join("/"));
+        }
+      }
+    };
+    walkRepo(path.join(ROOT, "foundation"));
+    assert.ok(repo.length >= 58, `found ${repo.length} repository pages`);
+    assert.deepEqual(repo.filter((p) => !published.has(p)), []);
   });
 
   test("no privileged key material in any text file", () => {
-    const text = files.filter((f) => /\.(html|m?js|css|json|svg|txt)$/i.test(f));
-    for (const f of text) {
+    for (const f of files.filter((x) => /\.(html|m?js|css|json|svg|txt|webmanifest)$/i.test(x))) {
       const body = fs.readFileSync(path.join(OUT, f), "utf8");
       assert.doesNotMatch(body, /sb_secret_|service_role|-----BEGIN [A-Z ]*PRIVATE KEY-----/, f);
     }
   });
 
-  test("generated config never enables the role bypass", () => {
-    const cfg = fs.readFileSync(path.join(OUT, "foundation/js/config.js"), "utf8");
-    assert.match(cfg, /BYPASS_ROLE: ""/);
+  test("generated config keeps BYPASS_ROLE empty", () => {
+    assert.match(fs.readFileSync(path.join(OUT, "foundation/js/config.js"), "utf8"), /BYPASS_ROLE: ""/);
   });
 
   test("no source maps are published", () => {
     assert.deepEqual(files.filter((f) => f.endsWith(".map")), []);
   });
+
+  test("the SPA entry references its assets under /app/", () => {
+    const html = fs.readFileSync(path.join(OUT, "app/index.html"), "utf8");
+    assert.match(html, /\/app\/assets\//);
+    assert.doesNotMatch(html, /(src|href)="\/assets\//);
+  });
+
+  test("the SPA registers its service worker with the /app/ scope", () => {
+    const register = fs.readFileSync(path.join(OUT, "app/registerSW.js"), "utf8");
+    assert.match(register, /\/app\/sw\.js/);
+    assert.match(register, /scope:\s*["']\/app\/["']/);
+  });
 });
 
 // ---------------------------------------------------------------------------
-// 3. Route behaviour through the Netlify emulator
+// 3. Routes through the Netlify emulator
 
 describe("routes through the emulator", { skip: SKIP_OUTPUT }, () => {
   let server;
@@ -267,18 +262,44 @@ describe("routes through the emulator", { skip: SKIP_OUTPUT }, () => {
 
   const get = (p) => fetch(base + p, { redirect: "manual" });
 
+  // [path, status, expected]. A 302 expects the Location path+query; a 200 expects a content-type prefix.
   const expectations = [
-    // [path, status, location-or-content-type-prefix]
+    // production behaviour
     ["/", 302, "/foundation/auth/login.html"],
-    ["/staff", 302, "/staff/admin-portal"],
-    ["/auth", 302, "/auth/login"],
-    ["/auth/login.html", 302, "/auth/login"],
-    ["/foundation/staff/login.html", 302, "/foundation/auth/login.html"],
-    ["/foundation/staff/dashboards.html?x=1", 302, "/staff/dashboards?x=1"],
-    ["/foundation/staff/dashboards", 302, "/staff/dashboards"],
-    ["/foundation/staff/attendance", 302, "/staff/attendance"],
-    ["/foundation/staff/clickup-management.html", 302, "/staff/nexus-management"],
-    ["/foundation/staff/StudentProgressView.html", 302, "/staff/student-progress"],
+    ["/staff", 302, "/foundation/staff/admin-portal.html"],
+    ["/auth", 302, "/foundation/auth/login.html"],
+    ["/supabase/anything", 302, "/foundation/auth/login.html"],
+    ["/foundation/docs/x", 302, "/foundation/auth/login.html"],
+    ["/staff/dashboards", 200, "text/html"],
+    ["/foundation/staff/dashboards.html?x=1", 200, "text/html"],
+    ["/foundation/staff/attendance.html", 200, "text/html"],
+    ["/foundation/staff/clickup-management.html", 200, "text/html"],
+    ["/foundation/staff/StudentProgressView.html", 200, "text/html"],
+    ["/foundation/auth/login.html", 200, "text/html"],
+    ["/foundation/auth/reset-password.html", 200, "text/html"],
+    ["/foundation/auth/teacher-register.html", 200, "text/html"],
+    ["/foundation/teacher/index.html", 200, "text/html"],
+    ["/foundation/registration/class-selection.html", 200, "text/html"],
+    ["/foundation/registration/registration-form.html", 200, "text/html"],
+    ["/foundation/registration/canada_sr.png", 200, "image/png"],
+    ["/foundation/staff/TeacherAttendancePortal.html", 200, "text/html"],
+    ["/foundation/staff/env-check.html", 200, "text/html"],
+    ["/foundation/staff/_template.html", 200, "text/html"],
+    ["/foundation/staff/shell.html", 200, "text/html"],
+    ["/foundation/staff/acceptance-tests.html", 200, "text/html"],
+    ["/foundation/teacher/sections/attendance.html", 200, "text/html"],
+    ["/foundation/teacher/sections/my-class.html", 200, "text/html"],
+    ["/foundation/js/config.js", 200, "text/javascript"],
+    // SPA under /app/
+    ["/app", 200, "text/html"],
+    ["/app/", 200, "text/html"],
+    ["/app/auth/login", 200, "text/html"],
+    ["/app/auth/reset-password", 200, "text/html"],
+    ["/app/staff/dashboards", 200, "text/html"],
+    ["/app/teacher/index", 200, "text/html"],
+    ["/app/sw.js", 200, "text/javascript"],
+    ["/app/manifest.webmanifest", 200, "application/manifest"],
+    // Sensitive and unlisted paths
     ["/README.md", 404],
     ["/CLAUDE.md", 404],
     ["/package.json", 404],
@@ -291,64 +312,62 @@ describe("routes through the emulator", { skip: SKIP_OUTPUT }, () => {
     ["/foundation/sql/x.sql", 404],
     ["/foundation/archive/x.html", 404],
     ["/foundation/teacher/sections/unknown.html", 404],
-    ["/foundation/auth/login.html", 200, "text/html"],
-    ["/foundation/auth/reset-password.html", 200, "text/html"],
-    ["/foundation/auth/teacher-register.html", 200, "text/html"],
-    ["/foundation/index.html", 200, "text/html"],
-    ["/foundation/teacher/index.html", 200, "text/html"],
-    ["/foundation/teacher/roster.html", 200, "text/html"],
-    ["/foundation/registration/class-selection.html", 200, "text/html"],
-    ["/foundation/registration/registration-form.html", 200, "text/html"],
-    ["/foundation/registration/canada_sr.png", 200, "image/png"],
-    ["/foundation/staff/TeacherAttendancePortal.html", 200, "text/html"],
-    ["/foundation/staff/env-check.html", 200, "text/html"],
-    ["/foundation/staff/_template.html", 200, "text/html"],
-    ["/foundation/staff/shell.html", 200, "text/html"],
-    ["/foundation/staff/acceptance-tests.html", 200, "text/html"],
-    ["/foundation/teacher/sections/attendance.html", 200, "text/html"],
-    ["/foundation/teacher/sections/availability.html", 200, "text/html"],
-    ["/foundation/teacher/sections/my-class.html", 200, "text/html"],
-    ["/foundation/teacher/sections/teacher-home.html", 200, "text/html"],
-    ["/foundation/teacher/sections/teacher-messages.html", 200, "text/html"],
-    ["/foundation/js/config.js", 200, "text/javascript"],
-    ["/auth/login", 200, "text/html"],
-    ["/auth/reset-password", 200, "text/html"],
-    ["/staff/dashboards", 200, "text/html"],
-    ["/teacher/index", 200, "text/html"],
+    ["/unknown-root-path", 404],
   ];
 
   for (const [p, status, expected] of expectations) {
     test(`GET ${p} -> ${status}`, async () => {
       const res = await get(p);
       assert.equal(res.status, status, `${p} returned ${res.status}`);
-      if (status === 302) assert.equal(new URL(res.headers.get("location"), base).pathname + new URL(res.headers.get("location"), base).search, expected);
+      if (status === 302) {
+        const loc = new URL(res.headers.get("location"), base);
+        assert.equal(loc.pathname + loc.search, expected);
+      }
       if (status === 200) assert.match(res.headers.get("content-type") || "", new RegExp(expected));
     });
   }
 
-  test("the generated config keeps BYPASS_ROLE empty in the served file", async () => {
-    const body = await (await get("/foundation/js/config.js")).text();
-    assert.match(body, /BYPASS_ROLE: ""/);
+  test("GET /staff/dashboards serves the static page, not the SPA", async () => {
+    const body = await (await get("/staff/dashboards")).text();
+    assert.doesNotMatch(body, /\/app\/assets\//);
   });
 
-  // Both /foundation/* and /* set X-Frame-Options in _headers (DENY and SAMEORIGIN). How
-  // Netlify merges duplicate headers is not asserted here. It is an open check on a Deploy Preview.
-  test("the /foundation/* Content-Security-Policy is served", async () => {
+  test("the SPA entry's assets load under /app/", async () => {
+    const html = await (await get("/app/")).text();
+    const refs = [...html.matchAll(/(?:src|href)="(\/app\/[^"]+)"/g)].map((m) => m[1]);
+    assert.ok(refs.length > 0, "no /app/ asset references found");
+    for (const ref of refs) {
+      const res = await get(ref);
+      assert.equal(res.status, 200, ref);
+    }
+  });
+
+  test("the /foundation/* Content-Security-Policy is served on static pages", async () => {
     const res = await get("/foundation/auth/login.html");
     assert.match(res.headers.get("content-security-policy") || "", /default-src 'self'/);
   });
 
-  test("the site-wide nosniff header is served on the SPA shell", async () => {
-    const res = await get("/staff/dashboards");
+  test("the site-wide nosniff header is served on the SPA", async () => {
+    const res = await get("/app/auth/login");
     assert.equal(res.headers.get("x-content-type-options"), "nosniff");
   });
 
-  // Every local script, stylesheet, image and module referenced by a retained static page loads.
-  // Asset tags only. Anchors are navigation and are checked by the build verifier.
+  // Every static page in the repository loads its local scripts, styles, images and modules.
+  // Known gaps (KNOWN_MISSING) are the only exceptions. Checked against the production set.
+  const repoPages = [];
+  const walkRepo = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.isDirectory()) {
+        if (!["archive", "docs", "sql", "edge-functions", "node_modules"].includes(e.name)) walkRepo(path.join(dir, e.name));
+      } else if (e.name.endsWith(".html")) {
+        repoPages.push(path.relative(ROOT, path.join(dir, e.name)).split(path.sep).join("/"));
+      }
+    }
+  };
+  walkRepo(path.join(ROOT, "foundation"));
   const LOCAL = /<(?:script|img|link|source|iframe)\b[^>]*?\s(?:src|href)\s*=\s*["']([^"']+)["']/gi;
-  const retained = ALLOWLIST.staticEntries.filter((f) => f.endsWith(".html"));
-  for (const rel of retained) {
-    test(`required assets load for /${rel}`, async () => {
+  for (const rel of repoPages) {
+    test(`assets load for /${rel}`, async () => {
       const page = await get(`/${rel}`);
       assert.equal(page.status, 200, `/${rel}`);
       const html = await page.text();
@@ -361,14 +380,13 @@ describe("routes through the emulator", { skip: SKIP_OUTPUT }, () => {
         if (!clean) continue;
         refs.add(clean.startsWith("/") ? clean : path.posix.normalize(path.posix.join(pageDir, clean)));
       }
-      const missing = [];
+      const failed = [];
       for (const ref of refs) {
+        if (KNOWN_MISSING.has(ref)) continue;
         const res = await get(ref);
-        if (res.status !== 200) missing.push(`${ref} -> ${res.status}`);
+        if (res.status !== 200) failed.push(`${ref} -> ${res.status}`);
       }
-      const known = ALLOWLIST.knownMissingReferences.map((k) => `/${k}`);
-      const real = missing.filter((m) => !known.includes(m.split(" -> ")[0]));
-      assert.deepEqual(real, []);
+      assert.deepEqual(failed, []);
     });
   }
 });

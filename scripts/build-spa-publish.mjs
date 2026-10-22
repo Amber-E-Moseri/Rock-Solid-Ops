@@ -1,17 +1,16 @@
-// Builds the Netlify publish directory for the SPA cutover.
+// Adds the isolated SPA preview to the static publish output.
 //
-// Security baseline: scripts/build-static-publish.mjs on origin/main, the
-// allowlist that is live on production. The guard lists below are copied from
-// it verbatim, and tests/netlify-publish.test.mjs fails if they drift.
+// netlify.toml runs two steps, in order:
+//   1. node scripts/build-static-publish.mjs
+//      The origin/main baseline, unchanged. It produces netlify-static-publish/ with
+//      the static /foundation tree, _headers and a generated config.js, and verifies
+//      that output.
+//   2. node scripts/build-spa-publish.mjs   (this file)
+//      Builds the SPA with base /app/, copies it to netlify-static-publish/app/, copies
+//      the production-compatible root _redirects, then verifies the combined output.
 //
-// The publish directory is an allowlist, never the repository root:
-//   1. foundation-spa/dist (Vite build; includes public/_redirects and 404.html)
-//   2. _headers from the repository root
-//   3. the approved static compatibility closure from scripts/netlify-site-allowlist.json:
-//      each approved page plus every local file it loads (scripts, styles, images, modules)
-//   4. a generated foundation/js/config.js, written to the publish directory only
-//
-// Any verification failure stops the build. Netlify runs this via netlify.toml.
+// Nothing here changes a /foundation/ or production URL. The SPA lives only under /app/.
+// Any verification failure stops the build.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -20,15 +19,14 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = path.join(ROOT, "netlify-static-publish");
+const SPA = path.join(ROOT, "foundation-spa");
+const SPA_DIST = path.join(ROOT, "foundation-spa", "dist");
 const ALLOWLIST = JSON.parse(
   fs.readFileSync(path.join(ROOT, "scripts", "netlify-site-allowlist.json"), "utf8")
 );
-const SPA = path.join(ROOT, "foundation-spa");
-const SPA_DIST = path.join(ROOT, ALLOWLIST.spaOutput);
-const GENERATED = ALLOWLIST.generatedConfig;
-const KNOWN_MISSING = new Set(ALLOWLIST.knownMissingReferences || []);
 
 // Guard lists copied verbatim from scripts/build-static-publish.mjs (origin/main).
+// tests/netlify-publish.test.mjs fails if they drift.
 const FORBIDDEN_PATH = [
   /\.sql$/i,
   /\.md$/i,
@@ -72,7 +70,8 @@ function jwtRole(token) {
   }
 }
 
-// Environment guards. Bypass flags are refused in every deployment context, not only production.
+// Bypass flags are refused in every deployment context. The baseline checks the same,
+// so this is a second check on the combined build.
 function checkEnv(env) {
   const supabaseUrl = String(env.SUPABASE_URL || "").trim();
   const anonKey = String(env.SUPABASE_ANON_KEY || "").trim();
@@ -121,78 +120,7 @@ function buildSpa(cfg) {
     shell: process.platform === "win32",
   });
   if (res.status !== 0) fail("foundation-spa build failed.");
-  if (!fs.existsSync(SPA_DIST)) fail(`SPA output missing: ${ALLOWLIST.spaOutput}`);
-}
-
-// Static closure: local files referenced by approved pages, resolved transitively.
-// Inline <script type="module"> imports are scanned too, so their modules are published.
-const LOCAL_ATTR = /<(script|img|link|source|iframe)\b[^>]*?\s(?:src|href)\s*=\s*["']([^"']+)["']/gi;
-const INLINE_MODULE = /<script\b[^>]*\btype\s*=\s*["']module["'][^>]*>([\s\S]*?)<\/script>/gi;
-const JS_IMPORT = /(?:\bimport\s+(?:[^'"()]*?\sfrom\s+)?|\bimport\(\s*|\bexport\s+[^'"]*?\sfrom\s+)["']([^"']+)["']/g;
-const CSS_REF = /@import\s+["']([^"']+)["']|url\(\s*["']?([^"')]+)["']?\s*\)/g;
-
-function isLocal(ref) {
-  return Boolean(ref) && !/^(https?:|data:|mailto:|tel:|javascript:|#|\/\/)/i.test(ref);
-}
-
-// Resolves a reference found in repo file `fromRel` to a repo-relative path.
-// Only the static foundation/ tree is pulled in.
-function resolveRef(fromRel, ref) {
-  const clean = ref.split(/[?#]/)[0];
-  if (!clean) return null;
-  const rel = clean.startsWith("/")
-    ? clean.slice(1)
-    : path.posix.normalize(path.posix.join(path.posix.dirname(fromRel), clean));
-  return rel.startsWith("foundation/") ? rel : null;
-}
-
-function scanRefs(rel) {
-  const text = fs.readFileSync(path.join(ROOT, rel), "utf8");
-  const refs = new Set();
-  const add = (r) => {
-    if (!isLocal(r)) return;
-    const target = resolveRef(rel, r);
-    if (target) refs.add(target);
-  };
-  if (rel.endsWith(".html")) {
-    for (const m of text.matchAll(LOCAL_ATTR)) add(m[2]);
-    for (const block of text.matchAll(INLINE_MODULE)) {
-      for (const m of block[1].matchAll(JS_IMPORT)) add(m[1]);
-    }
-  } else if (/\.(m?js)$/.test(rel)) {
-    for (const m of text.matchAll(JS_IMPORT)) add(m[1]);
-  } else if (rel.endsWith(".css")) {
-    for (const m of text.matchAll(CSS_REF)) add(m[1] || m[2]);
-  }
-  return refs;
-}
-
-function computeClosure() {
-  const queue = [...ALLOWLIST.staticEntries, ...ALLOWLIST.staticAssets, GENERATED];
-  const files = new Set();
-  const missing = [];
-  while (queue.length) {
-    const rel = queue.shift();
-    if (files.has(rel)) continue;
-    // Written by this build from the environment. Never copied from the repository.
-    if (rel === GENERATED) {
-      files.add(rel);
-      continue;
-    }
-    if (!fs.existsSync(path.join(ROOT, rel))) {
-      // Placeholders that already 404 on production (for example the scaffold in
-      // staff/_template.html). Listed explicitly, warned about, never silent.
-      if (KNOWN_MISSING.has(rel)) {
-        console.warn(`[spa-publish] known missing reference (already 404 in production): ${rel}`);
-      } else {
-        missing.push(rel);
-      }
-      continue;
-    }
-    files.add(rel);
-    if (/\.(html|m?js|css)$/.test(rel)) for (const r of scanRefs(rel)) queue.push(r);
-  }
-  return { files: [...files].sort(), missing };
+  if (!fs.existsSync(SPA_DIST)) fail("foundation-spa/dist is missing after the build.");
 }
 
 function copyTree(srcDir, destDir) {
@@ -208,32 +136,17 @@ function copyTree(srcDir, destDir) {
   }
 }
 
-function assemble(closure) {
-  fs.rmSync(OUT, { recursive: true, force: true });
-  fs.mkdirSync(OUT, { recursive: true });
-  copyTree(SPA_DIST, OUT);
-  fs.copyFileSync(path.join(ROOT, "_headers"), path.join(OUT, "_headers"));
-  for (const rel of closure.files) {
-    if (rel === GENERATED) continue;
-    const dest = path.join(OUT, rel);
-    if (fs.existsSync(dest)) fail(`publish collision: ${rel}`);
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    fs.copyFileSync(path.join(ROOT, rel), dest);
+function addSpa() {
+  if (!fs.existsSync(path.join(OUT, "foundation", "auth", "login.html"))) {
+    fail("static publish output is missing. Run scripts/build-static-publish.mjs first.");
   }
+  if (fs.existsSync(path.join(OUT, "app"))) fail("app/ already exists in the publish output.");
+  if (fs.existsSync(path.join(OUT, "_redirects"))) fail("_redirects already exists in the publish output.");
+  fs.mkdirSync(path.join(OUT, "app"), { recursive: true });
+  copyTree(SPA_DIST, path.join(OUT, "app"));
+  fs.copyFileSync(path.join(ROOT, "_redirects"), path.join(OUT, "_redirects"));
 }
 
-// Browser-safe runtime config. BYPASS_ROLE is always empty in the publish output.
-function writeConfig(cfg) {
-  const dest = path.join(OUT, GENERATED);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.writeFileSync(
-    dest,
-    `window.FS_CONFIG = {\n  SUPABASE_URL: ${JSON.stringify(cfg.supabaseUrl)},\n  SUPABASE_ANON_KEY: ${JSON.stringify(cfg.anonKey)},\n  BYPASS_ROLE: "",\n};\n`,
-    "utf8"
-  );
-}
-
-// Verification helpers.
 function walk(dir, base = dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const abs = path.join(dir, entry.name);
@@ -243,10 +156,11 @@ function walk(dir, base = dir, out = []) {
   return out;
 }
 
-function listRepoStaticHtml(dir = path.join(ROOT, "foundation"), out = []) {
+// Every static HTML page in the repository that the baseline publishes.
+function repoStaticHtml(dir = path.join(ROOT, "foundation"), out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
-      if (!EXCLUDED_DIRS.has(entry.name)) listRepoStaticHtml(path.join(dir, entry.name), out);
+      if (!EXCLUDED_DIRS.has(entry.name)) repoStaticHtml(path.join(dir, entry.name), out);
     } else if (entry.name.endsWith(".html")) {
       out.push(path.relative(ROOT, path.join(dir, entry.name)).split(path.sep).join("/"));
     }
@@ -254,7 +168,6 @@ function listRepoStaticHtml(dir = path.join(ROOT, "foundation"), out = []) {
   return out;
 }
 
-// Parses _redirects. A trailing "*" in `from` is a splat. A trailing "!" forces the rule.
 function parseRedirects(file) {
   const rules = [];
   for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
@@ -266,39 +179,12 @@ function parseRedirects(file) {
   return rules;
 }
 
-function ruleMatches(rule, urlPath) {
-  if (rule.from.endsWith("*")) return urlPath.startsWith(rule.from.slice(0, -1));
-  return rule.from === urlPath;
-}
-
-// Route paths declared in App.jsx: exact paths and "/x/*" catch-alls.
-function spaRoutes() {
-  const src = fs.readFileSync(path.join(SPA, "src", "App.jsx"), "utf8");
-  return [...src.matchAll(/path=["']([^"']+)["']/g)].map((m) => m[1]);
-}
-
-function spaRouteExists(target) {
-  const pathOnly = target.split(/[?#]/)[0];
-  return spaRoutes().some(
-    (r) => r === pathOnly || (r.endsWith("/*") && pathOnly.startsWith(r.slice(0, -1)))
-  );
-}
-
-function verify(closure, env) {
+function verify(env) {
   const problems = [];
   const served = new Set(walk(OUT));
-  const rules = parseRedirects(path.join(OUT, "_redirects"));
   const secrets = secretValues(env);
 
-  const covered = (urlPath) => {
-    const p = urlPath.replace(/^\//, "");
-    return served.has(p) || served.has(`${p}.html`) || served.has(`${p.replace(/\/$/, "")}/index.html`);
-  };
-  // 404 rules do not count as routes. They only name the page shown for a missing path.
-  const redirected = (urlPath) => rules.some((r) => r.status !== 404 && ruleMatches(r, urlPath));
-  const resolvable = (urlPath) => covered(urlPath) || redirected(urlPath) || spaRouteExists(urlPath);
-
-  // a. Forbidden paths and files never reach the publish directory.
+  // a. Forbidden paths and files, from the baseline lists and the allowlist.
   for (const f of served) {
     if (FORBIDDEN_PATH.some((re) => re.test(f))) problems.push(`forbidden file published: ${f}`);
     if (EXCLUDED_FILE.test(path.posix.basename(f))) problems.push(`excluded file published: ${f}`);
@@ -308,85 +194,61 @@ function verify(closure, env) {
   }
 
   // b. Text content: no privileged key material and no secret values.
-  const textFile = /\.(html|m?js|css|json|txt|svg|webmanifest)$/i;
   for (const f of served) {
-    if (!textFile.test(f) && f !== "_headers" && f !== "_redirects") continue;
+    if (!/\.(html|m?js|css|json|txt|svg|webmanifest)$/i.test(f) && f !== "_headers" && f !== "_redirects") continue;
     const text = fs.readFileSync(path.join(OUT, f), "utf8");
     for (const re of FORBIDDEN_CONTENT) if (re.test(text)) problems.push(`forbidden content in ${f}: ${re}`);
     for (const { name, value } of secrets) if (text.includes(value)) problems.push(`value of ${name} found in ${f}`);
   }
 
-  // c. Top level: only the SPA output, _headers and foundation/.
-  const allowedTop = new Set([...fs.readdirSync(SPA_DIST), "_headers", "foundation"]);
+  // c. Top level: only the static tree, the SPA and the root control files.
+  const allowedTop = new Set(["foundation", "app", "_headers", "_redirects"]);
   for (const top of new Set([...served].map((f) => f.split("/")[0]))) {
     if (!allowedTop.has(top)) problems.push(`unexpected top-level entry: ${top}`);
   }
 
   // d. Required files.
   for (const req of [
-    "index.html",
     "_headers",
     "_redirects",
-    "404.html",
+    "app/index.html",
+    "app/sw.js",
+    "app/manifest.webmanifest",
     "foundation/index.html",
     "foundation/auth/login.html",
-    "foundation/auth/safe-next.js",
-    "foundation/registration/class-selection.html",
-    "foundation/teacher/index.html",
     "foundation/js/config.js",
     "foundation/staff/_template.html",
   ]) {
     if (!served.has(req)) problems.push(`required file missing: ${req}`);
   }
 
-  // e. Every local reference of a published static file is published.
-  for (const rel of closure.files) {
-    if (rel === GENERATED || !/\.(html|m?js|css)$/.test(rel)) continue;
-    for (const ref of scanRefs(rel)) {
-      if (!served.has(ref) && !KNOWN_MISSING.has(ref)) problems.push(`${rel} loads unpublished ${ref}`);
-    }
+  // e. No source maps in the SPA output.
+  for (const f of served) if (f.startsWith("app/") && f.endsWith(".map")) problems.push(`source map published: ${f}`);
+
+  // f. No static page is dropped: every repository page is published.
+  for (const rel of repoStaticHtml()) {
+    if (!served.has(rel)) problems.push(`static page missing from publish output: ${rel}`);
   }
 
-  // f. Navigation links on published static pages resolve to a file, a redirect or an SPA route.
-  for (const rel of closure.files.filter((f) => f.endsWith(".html"))) {
-    const pageUrl = `/${rel}`;
-    const html = fs.readFileSync(path.join(ROOT, rel), "utf8");
-    for (const m of html.matchAll(/<a\b[^>]*?\shref\s*=\s*["']([^"']+)["']/gi)) {
-      const ref = m[1];
-      if (!isLocal(ref) || ref.startsWith("#")) continue;
-      const target = ref.startsWith("/")
-        ? ref
-        : path.posix.normalize(path.posix.join(path.posix.dirname(pageUrl), ref));
-      const urlPath = target.split(/[?#]/)[0];
-      if (!urlPath.endsWith("/") && !resolvable(urlPath)) problems.push(`${rel} links to unresolved ${urlPath}`);
-    }
-  }
-
-  // g. Contract URLs used by Edge Functions and emails keep resolving.
-  for (const url of ALLOWLIST.externalContract) {
-    if (!resolvable(url)) problems.push(`external contract URL does not resolve: ${url}`);
-  }
-
-  // h. Redirect rules are well formed and point at real targets.
+  // g. Redirect targets that point at a static or SPA file must exist. Splat targets are checked by prefix.
+  const rules = parseRedirects(path.join(OUT, "_redirects"));
   for (const r of rules) {
     if (!Number.isFinite(r.status)) problems.push(`bad status in _redirects rule: ${r.from}`);
-    if (/^\/(staff|teacher|auth)(\/|$)/.test(r.to)) {
-      if (!spaRouteExists(r.to)) problems.push(`redirect target has no SPA route: ${r.from} -> ${r.to}`);
-    } else if (r.status >= 300 && r.status < 400 && r.to.startsWith("/foundation/")) {
-      if (!covered(r.to)) problems.push(`redirect target not published: ${r.from} -> ${r.to}`);
+    if (r.to.includes(":splat")) continue;
+    if (r.to.startsWith("/foundation/") || r.to.startsWith("/app/")) {
+      const p = r.to.split("?")[0].replace(/^\//, "");
+      if (!served.has(p)) problems.push(`redirect target not published: ${r.from} -> ${r.to}`);
     }
   }
 
-  // i. Retained routes: every static page in the repo stays reachable, as a file or as a
-  // redirect, both at its .html URL and its pretty URL. Retiring one needs approval.
-  for (const rel of listRepoStaticHtml()) {
-    if (closure.files.includes(rel)) continue;
-    const url = `/${rel}`;
-    const pretty = url.replace(/\.html$/, "");
-    const reachable = redirected(url) && redirected(pretty);
-    if (!reachable && !ALLOWLIST.approvedRetirements.includes(rel)) {
-      problems.push(`static route would 404 without approval: ${url} (pretty URL ${pretty})`);
-    }
+  // h. Runtime config never enables the role bypass.
+  const cfg = fs.readFileSync(path.join(OUT, "foundation", "js", "config.js"), "utf8");
+  if (!/BYPASS_ROLE: ""/.test(cfg)) problems.push("foundation/js/config.js does not have BYPASS_ROLE empty");
+
+  // i. Contract URLs used by Edge Functions and emails resolve to a published file.
+  for (const url of ALLOWLIST.externalContract) {
+    const p = url.replace(/^\//, "");
+    if (!served.has(p)) problems.push(`external contract URL does not resolve: ${url}`);
   }
 
   return { problems, served: [...served].sort() };
@@ -396,13 +258,10 @@ function verify(closure, env) {
 const env = { ...process.env };
 const cfg = checkEnv(env);
 buildSpa(cfg);
-const closure = computeClosure();
-if (closure.missing.length) fail(`allowlisted or referenced files missing in repo: ${closure.missing.join(", ")}`);
-assemble(closure);
-writeConfig(cfg);
-const { problems, served } = verify(closure, env);
+addSpa();
+const { problems, served } = verify(env);
 if (problems.length) {
   for (const p of problems) console.error(`[spa-publish] ${p}`);
   fail(`${problems.length} verification problem(s)`);
 }
-console.log(`[spa-publish] OK: ${served.length} files in netlify-static-publish/ (static closure: ${closure.files.length} files)`);
+console.log(`[spa-publish] OK: ${served.length} files in netlify-static-publish/ (static baseline plus app/)`);

@@ -1,37 +1,7 @@
 {
-  "description": "Static compatibility allowlist for the Netlify publish directory (netlify-static-publish/). Only these inputs and the files they load are copied. Everything else in the repository, including docs, SQL, source, config, archives and node_modules, is never published. Static staff pages that the SPA replaces are not copied; their URLs are answered by 302 rules in foundation-spa/public/_redirects. See docs/SPA_CUTOVER_CANDIDATE.md.",
+  "description": "Publish guards for the SPA preview build (scripts/build-spa-publish.mjs). The static tree is published by the origin/main baseline (scripts/build-static-publish.mjs), which copies every /foundation page except archive, docs, sql and edge-functions. The SPA is published under /app/. See docs/SPA_CUTOVER_CANDIDATE.md.",
   "spaOutput": "foundation-spa/dist",
-  "staticEntries": [
-    "foundation/index.html",
-    "foundation/auth/login.html",
-    "foundation/auth/reset-password.html",
-    "foundation/auth/teacher-register.html",
-    "foundation/teacher/index.html",
-    "foundation/teacher/roster.html",
-    "foundation/teacher/teacher-attendance.html",
-    "foundation/teacher/teacher-availability.html",
-    "foundation/teacher/teacher-progress.html",
-    "foundation/teacher/sections/attendance.html",
-    "foundation/teacher/sections/availability.html",
-    "foundation/teacher/sections/my-class.html",
-    "foundation/teacher/sections/teacher-home.html",
-    "foundation/teacher/sections/teacher-messages.html",
-    "foundation/registration/class-selection.html",
-    "foundation/registration/registration-form.html",
-    "foundation/staff/TeacherAttendancePortal.html",
-    "foundation/staff/env-check.html",
-    "foundation/staff/_template.html",
-    "foundation/staff/shell.html",
-    "foundation/staff/acceptance-tests.html"
-  ],
-  "staticAssets": [
-    "foundation/registration/canada_sr.png"
-  ],
-  "generatedConfig": "foundation/js/config.js",
-  "approvedRetirements": [],
-  "knownMissingReferences": [
-    "foundation/js/your-page.js"
-  ],
+  "spaBase": "/app/",
   "externalContract": [
     "/foundation/registration/class-selection.html",
     "/foundation/registration/canada_sr.png",
