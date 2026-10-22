@@ -251,7 +251,7 @@ export default function App() {
               <Route
                 path="/teacher/attendance"
                 element={
-                  <ProtectedRoute roles={[...OPERATIONAL_ROLES, 'teacher']}>
+                  <ProtectedRoute roles={['teacher']}>
                     <StaffShell title="Teacher Attendance">
                       <TeacherAttendancePage />
                     </StaffShell>
