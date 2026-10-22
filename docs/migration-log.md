@@ -2954,3 +2954,19 @@ Scope: limited frontend rollout with uncertified workflows disabled. Not a full 
 Migration and function deployment authorized by the C1 Production Gate brief. No new cron
 created, no function invoked with valid auth. Function deployed but dormant — activation
 requires a separate cron-wiring step under independent operator authorization.
+
+## 2026-10-21 — Toast `addToast` fix merged (`brief/toast-addtoast-fix`)
+
+**Merge.** Fast-forward of `main` from `82540b2` to `72531a3` (the branch's single commit). No merge commit.
+
+**Change.** `useToast()` returns the toast function, but 11 pages destructured `{ addToast }` from it, so every `addToast` call threw at runtime. Each page now uses `const addToast = useToast();`. Call sites are unchanged. `TeacherAttendancePage` now advances its step before the success toast, so a toast failure cannot leave the user on Review after a saved submit. Regression test: `src/tests/toastContract.test.jsx` (hook contract plus a source check on the 11 pages).
+
+**Evidence.**
+- `npx vitest run` in `foundation-spa`: 23 files, 160 tests, all passing.
+- `npx vite build`: passes.
+- Diff against `main` is limited to the 11 pages, `TeacherAttendancePage` ordering, and the new test (12 files, +53/-13).
+- No hold in `docs/BRANCH_HOLDS.md` names any touched file.
+
+**Not covered.** A page-level test for the attendance write sequence is not yet written. See the attendance duplicate-submission entry before merging any further attendance changes.
+
+**Teacher branch.** `brief/teacher-portal-ux` carries an identical cherry-pick of this change (`83d3ada`). It is still gated and not merged.
