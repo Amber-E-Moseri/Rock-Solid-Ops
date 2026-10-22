@@ -2845,7 +2845,7 @@ Result labels: **PASS** = verified with evidence. **FAIL** = verified not to mee
 - **Wider drift (FAIL, not fixed):** 843 schema objects checked against the repo migrations. 202 are missing in production, including 142 from `000_baseline_squash` (many replaced by later migrations). Non-baseline: 60 objects across 22 migrations. Production has no `attendance-reminder-daily` cron job, although the migration defines it. Waitlist notify triggers, `audit_logs.actor_id` and its redirect trigger, and the multicampus validation triggers are also absent.
 - **Remote-only history (FAIL, not fixed):** 9 migration versions recorded as applied in production (`202609231000`…`202610030004`) come from the unmerged C1 and C6 branches, not from `main`.
 - **Staging comparison (PASS):** `rocksolid-staging` has both `class_options` columns, so staging is a working reference for the repair DDL. Production-only drift relative to staging: 140 objects (47 non-baseline). Shared gaps: 62 (13 non-baseline).
-- **Remediation (PASS, not executed):** branch `fix/registration-class-options-drift`, migration `202610220100_repair_class_options_registration_columns.sql` (idempotent, the same DDL as `202605190900`). Isolated PGlite test: 17 of 17 PASS. CI migration gate on PR #6: PASS. Security regression on PR #6: PENDING at time of writing; the result is recorded in section 7.
+- **Remediation (PASS, not executed):** branch `fix/registration-class-options-drift`, migration `202610220100_repair_class_options_registration_columns.sql` (idempotent, the same DDL as `202605190900`). Isolated PGlite test: 17 of 17 PASS. CI migration gate on PR #6: PASS. Security regression on PR #6: PASS (run 39716908550, section 7).
 - **Production execution (UNVERIFIED, awaiting approval):** no production SQL has been run. The runbook is `docs/REGISTRATION_CLASS_OPTIONS_REPAIR_2026-10-22.md`.
 
 ### 3. Rocksolid-staging exposure
@@ -2877,4 +2877,4 @@ Result labels: **PASS** = verified with evidence. **FAIL** = verified not to mee
 
 ### 7. CI on PR #6 (registration repair)
 
-- Head `0ab80dee`. Migration gate: PASS. Unit tests: PASS. Netlify deploy preview: PASS. Security regression: PENDING at time of writing (run `39716908550`). This section will be updated with the final result.
+- Head `0ab80dee`. Migration gate: PASS. Unit tests: PASS. Netlify deploy preview: PASS. Security regression: PASS (run `39716908550`, 2m7s). Head `0ab80dee`, PR #6 open and not merged.
