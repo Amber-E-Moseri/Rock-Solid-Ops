@@ -121,7 +121,7 @@ export default function DashboardsPage() {
               active={batchId === b.batch_id}
               onClick={() => setBatchId(b.batch_id)}
               label={b.displayName}
-              meta={`${fmtDate(b.start_date)} — ${b.active ? 'Active' : 'Inactive'} — ${b.studentCount} students`}
+              meta={`${fmtDate(b.start_date)} — ${b.active ? 'Active' : 'Inactive'} — ${b.studentCount ?? '—'} students`}
             />
           ))}
         </div>

@@ -32,22 +32,27 @@ export async function fetchBatches() {
     .order('created_at', { ascending: false })
     .limit(30);
 
+  // A failed count read is unknown (null), not zero students.
   let countsByBatch = {};
+  let countsFailed = false;
   try {
-    const { data: counts } = await supabase
+    const { data: counts, error: countsError } = await supabase
       .from('students')
       .select('batch_id')
       .eq('status', 'Active');
+    if (countsError) countsFailed = true;
     (counts || []).forEach((r) => {
       const k = r.batch_id || '';
       countsByBatch[k] = (countsByBatch[k] || 0) + 1;
     });
-  } catch {}
+  } catch {
+    countsFailed = true;
+  }
 
   return (data || []).map((b) => ({
     ...b,
     displayName: b.name || b.batch_name || b.batch_id,
-    studentCount: countsByBatch[b.batch_id] || 0,
+    studentCount: countsFailed ? null : (countsByBatch[b.batch_id] || 0),
   }));
 }
 
