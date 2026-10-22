@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import {
   fetchAvailabilitySlots, approveSlot, groupSlots, computeKpis, filterSlots,
-  statusInfo, canApprove, formatTime,
+  statusInfo, canApprove, formatTime, APPROVAL_CERTIFIED, APPROVAL_HOLD_MESSAGE,
 } from './lib/availabilityApproval.js';
 
 const STATUS_FILTERS = [
@@ -132,6 +132,7 @@ export default function AvailabilityApprovalPage() {
 
       <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--muted)', margin: 0 }}>
         Rejecting slots and approving several at once are not available: the backend provides no verified action for either.
+        {!APPROVAL_CERTIFIED && ' Approval is on hold pending contract review.'}
       </p>
 
       <Modal
@@ -229,16 +230,19 @@ function SlotClassCell({ slot }) {
   return slot.class_option_id ? <span className="rso-cell-meta">{slot.class_option_id}</span> : <span className="rso-cell-meta">—</span>;
 }
 
+// Rendered disabled while approval is on hold. The lib also refuses the call, so this is not the only guard.
 function ApproveButton({ slot, group, onApprove, disabled }) {
+  const held = !APPROVAL_CERTIFIED;
   return (
     <Button
       size="sm"
       variant="primary"
       onClick={() => onApprove({ ...slot, teacher_name: group.teacher_name, teacher_email: group.teacher_email })}
-      disabled={disabled}
-      aria-label={`Approve ${slotLabel(slot)} for ${teacherLabel(group)}`}
+      disabled={disabled || held}
+      title={held ? APPROVAL_HOLD_MESSAGE : undefined}
+      aria-label={`${held ? 'Approval on hold for' : 'Approve'} ${slotLabel(slot)} for ${teacherLabel(group)}`}
     >
-      Approve
+      {held ? 'On hold' : 'Approve'}
     </Button>
   );
 }

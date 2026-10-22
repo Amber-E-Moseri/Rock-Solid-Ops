@@ -114,13 +114,28 @@ export function filterSlots(slots, { search = '', status = '' }) {
   });
 }
 
+// Approval is ON HOLD. The RPC creates class options and class slots, and its contract is under review
+// (see migration-log 2026-10-22, "Approval contract audit"). Keep this false until that review signs off.
+// While false, the page shows Approve disabled and approveSlot refuses to call the RPC.
+export const APPROVAL_CERTIFIED = false;
+export const APPROVAL_HOLD_MESSAGE = 'Approval is on hold pending contract review.';
+
 export function canApprove(slot, role) {
   return APPROVER_ROLES.includes(role) && statusInfo(slot.status).key === 'awaiting';
 }
 
-// The only approval path: the existing atomic RPC, called once per slot. It creates the class option
-// and class slot and sets status to Available. No client-side writes to teacher_availability here.
+export function approvalAvailable(slot, role) {
+  return APPROVAL_CERTIFIED && canApprove(slot, role);
+}
+
 export async function approveSlot({ id, actorEmail, actorId }) {
+  if (!APPROVAL_CERTIFIED) throw new Error(APPROVAL_HOLD_MESSAGE);
+  return callApprovalRpc({ id, actorEmail, actorId });
+}
+
+// Direct wrapper for the existing atomic RPC, called once per slot. It creates the class option and class
+// slot and sets status to Available. Exported for the contract tests only; the page must call approveSlot.
+export async function callApprovalRpc({ id, actorEmail, actorId }) {
   const { data, error } = await supabase.rpc('approve_teacher_availability_atomic', {
     p_availability_id: id,
     p_actor_email: actorEmail || null,

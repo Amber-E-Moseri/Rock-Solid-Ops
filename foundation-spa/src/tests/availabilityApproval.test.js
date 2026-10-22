@@ -23,6 +23,7 @@ vi.mock('../supabase.js', () => ({
 
 import {
   fetchAvailabilitySlots, groupSlots, computeKpis, filterSlots, statusInfo, canApprove, approveSlot,
+  callApprovalRpc, approvalAvailable, APPROVAL_CERTIFIED, APPROVAL_HOLD_MESSAGE,
   SLOT_COLUMNS, APPROVER_ROLES,
 } from '../features/availability-approval/lib/availabilityApproval.js';
 
@@ -126,10 +127,20 @@ describe('approval contract', () => {
     expect(APPROVER_ROLES).toEqual(['superadmin', 'admin', 'subgroup_admin', 'pastor', 'principal']);
   });
 
-  it('calls the existing RPC with its exact arguments and returns the created ids', async () => {
+  it('keeps approval on hold: approveSlot refuses and never calls the RPC', async () => {
+    expect(APPROVAL_CERTIFIED).toBe(false);
+    await expect(approveSlot({ id: 's-1', actorEmail: 'admin@test.com', actorId: 'u-1' })).rejects.toThrow(APPROVAL_HOLD_MESSAGE);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('does not offer approval while on hold, even to an approver on an awaiting slot', () => {
+    expect(approvalAvailable(slot(), 'admin')).toBe(false);
+  });
+
+  it('calls the RPC wrapper with the exact arguments and returns the created ids', async () => {
     rpc.mockResolvedValue({ data: [{ ok: true, class_option_id: 'CO-X', class_slot_id: 'CS-X', error: null }], error: null });
 
-    const result = await approveSlot({ id: 's-1', actorEmail: 'admin@test.com', actorId: 'u-1' });
+    const result = await callApprovalRpc({ id: 's-1', actorEmail: 'admin@test.com', actorId: 'u-1' });
 
     expect(rpc).toHaveBeenCalledWith('approve_teacher_availability_atomic', {
       p_availability_id: 's-1', p_actor_email: 'admin@test.com', p_actor_id: 'u-1',
@@ -139,11 +150,11 @@ describe('approval contract', () => {
 
   it('reports the RPC error text when the approval is refused', async () => {
     rpc.mockResolvedValue({ data: [{ ok: false, class_option_id: null, class_slot_id: null, error: 'No campuses selected for availability. Cannot approve.' }], error: null });
-    await expect(approveSlot({ id: 's-1' })).rejects.toThrow('No campuses selected for availability. Cannot approve.');
+    await expect(callApprovalRpc({ id: 's-1' })).rejects.toThrow('No campuses selected for availability. Cannot approve.');
   });
 
   it('reports a transport or permission error from the RPC', async () => {
     rpc.mockResolvedValue({ data: null, error: { message: 'permission denied for function approve_teacher_availability_atomic' } });
-    await expect(approveSlot({ id: 's-1' })).rejects.toMatchObject({ message: 'permission denied for function approve_teacher_availability_atomic' });
+    await expect(callApprovalRpc({ id: 's-1' })).rejects.toMatchObject({ message: 'permission denied for function approve_teacher_availability_atomic' });
   });
 });

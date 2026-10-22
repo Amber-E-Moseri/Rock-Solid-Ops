@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AvailabilityApprovalPage from '../features/availability-approval/AvailabilityApprovalPage.jsx';
-import { fetchAvailabilitySlots, approveSlot } from '../features/availability-approval/lib/availabilityApproval.js';
+import { fetchAvailabilitySlots, approveSlot, APPROVAL_CERTIFIED } from '../features/availability-approval/lib/availabilityApproval.js';
 
 vi.mock('../features/availability-approval/lib/availabilityApproval.js', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -28,6 +28,8 @@ const SLOTS = [
   { id: 's-2', teacher_id: 'T-1', teacher_full_name: 'Jane Teacher', teacher_email: 'jane@test.com', batch_id: '2026A', day: 'Wed', time_slot: '14:00:00', status: 'Available', class_option_id: 'CO-JANE', class_option_sync_status: 'SUCCESS' },
   { id: 's-3', teacher_id: 'T-2', teacher_full_name: null, teacher_email: null, batch_id: null, day: 'Fri', time_slot: '10:00:00', status: 'Tentative', class_option_id: null, class_option_sync_status: 'FAILED', class_option_sync_error: 'no campus' },
 ];
+
+const HELD_BUTTON = /^Approval on hold for /;
 
 function renderPage() {
   return render(<AvailabilityApprovalPage />);
@@ -78,7 +80,6 @@ describe('AvailabilityApprovalPage slot display', () => {
     renderPage();
     await screen.findByText('Batch 2026A');
 
-    // Each group renders its name once in the card header, and once in each slot row/card where shown.
     expect(screen.getAllByText('Jane Teacher').length).toBeGreaterThan(0);
     expect(screen.getByText('No name on teacher record')).toBeInTheDocument();
     expect(screen.getByText('No batch')).toBeInTheDocument();
@@ -93,21 +94,18 @@ describe('AvailabilityApprovalPage slot display', () => {
     expect(screen.getAllByText('Sync failed: no campus').length).toBeGreaterThan(0);
   });
 
-  it('offers Approve only on awaiting slots, and never a reject or revoke control', async () => {
+  it('never offers a reject or revoke control', async () => {
     renderPage();
     await screen.findByText('Batch 2026A');
-
-    const approve = screen.getAllByRole('button', { name: /^Approve / });
-    // s-1 and s-3 are awaiting; each appears in a table row and a card, so two buttons per slot.
-    expect(approve).toHaveLength(4);
     expect(screen.queryByRole('button', { name: /reject|revoke|decline/i })).toBeNull();
     expect(screen.getByText(/Rejecting slots and approving several at once are not available/)).toBeInTheDocument();
   });
 
-  it('hides approval from roles the RPC would refuse', async () => {
+  it('hides approval controls from roles the RPC would refuse', async () => {
     auth.profile = { role: 'regional_secretary', email: 'rs@example.com' };
     renderPage();
     await screen.findByText('Batch 2026A');
+    expect(screen.queryByRole('button', { name: HELD_BUTTON })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Approve / })).toBeNull();
   });
 
@@ -119,39 +117,34 @@ describe('AvailabilityApprovalPage slot display', () => {
   });
 });
 
-describe('AvailabilityApprovalPage approval flow', () => {
+describe('AvailabilityApprovalPage approval is on hold', () => {
   beforeEach(() => {
     vi.mocked(fetchAvailabilitySlots).mockResolvedValue(SLOTS);
   });
 
-  it('asks for confirmation, then calls the RPC wrapper once for that slot and reloads', async () => {
-    vi.mocked(approveSlot).mockResolvedValue({ classOptionId: 'CO-NEW', classSlotId: 'CS-NEW' });
-    renderPage();
-    await screen.findByText('Batch 2026A');
-
-    fireEvent.click(screen.getAllByRole('button', { name: 'Approve Mon 09:00 for Jane Teacher' })[0]);
-    const dialog = await screen.findByRole('dialog').catch(() => null);
-    const scope = dialog ? within(dialog) : screen;
-    expect(scope.getByText(/This creates the class option/)).toBeInTheDocument();
-    expect(approveSlot).not.toHaveBeenCalled();
-
-    fireEvent.click(scope.getByRole('button', { name: 'Approve' }));
-
-    await waitFor(() => expect(approveSlot).toHaveBeenCalledTimes(1));
-    expect(approveSlot).toHaveBeenCalledWith({ id: 's-1', actorEmail: 'admin@example.com', actorId: 'u-admin' });
-    await waitFor(() => expect(fetchAvailabilitySlots).toHaveBeenCalledTimes(2));
-    expect(mockToast).toHaveBeenCalledWith(expect.stringContaining('CO-NEW'), 'success');
+  it('is held in this build', () => {
+    expect(APPROVAL_CERTIFIED).toBe(false);
   });
 
-  it('keeps the confirmation open and shows the RPC error when approval is refused', async () => {
-    vi.mocked(approveSlot).mockRejectedValue(new Error('No campuses selected for availability. Cannot approve.'));
+  it('shows Approve disabled as "On hold" on awaiting slots for approvers, in table and card views', async () => {
     renderPage();
     await screen.findByText('Batch 2026A');
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Approve Mon 09:00 for Jane Teacher' })[0]);
-    fireEvent.click(await screen.findByRole('button', { name: 'Approve' }));
+    // s-1 and s-3 are awaiting; each appears in a table row and a card, so two controls per slot.
+    const held = screen.getAllByRole('button', { name: HELD_BUTTON });
+    expect(held).toHaveLength(4);
+    for (const button of held) expect(button).toBeDisabled();
+    expect(screen.getAllByText('On hold')).toHaveLength(4);
+    expect(screen.getByText(/Approval is on hold pending contract review/)).toBeInTheDocument();
+  });
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('No campuses selected for availability. Cannot approve.');
-    expect(fetchAvailabilitySlots).toHaveBeenCalledTimes(1);
+  it('does not open a confirmation or call the RPC wrapper when a held button is clicked', async () => {
+    renderPage();
+    await screen.findByText('Batch 2026A');
+
+    fireEvent.click(screen.getAllByRole('button', { name: HELD_BUTTON })[0]);
+
+    expect(screen.queryByText(/This creates the class option/)).toBeNull();
+    expect(approveSlot).not.toHaveBeenCalled();
   });
 });
