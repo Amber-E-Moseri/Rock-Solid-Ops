@@ -3,7 +3,13 @@
  * Set in .env:
  *   VITE_SUPABASE_URL
  *   VITE_SUPABASE_ANON_KEY
+ *
+ * Every request runs as the signed-in user. The anon key is sent only in the apikey header;
+ * the Authorization header carries the user's session access token. If there is no valid
+ * session, requests are not sent and SignInRequiredError is thrown. There is no anon fallback.
  */
+
+import { getSessionOrNull } from '../auth/auth-client.js';
 
 const ENV = (import.meta && import.meta.env) ? import.meta.env : {};
 const SUPABASE_URL      = ENV.VITE_SUPABASE_URL || window.FS_CONFIG?.SUPABASE_URL || '';
@@ -16,26 +22,80 @@ const FALLBACK_CAMPUSES = [
   { code: 'UALBERTA', name: 'University of Alberta',             group: 'WS', subgroup: 'WSGA',  timezone: 'America/Edmonton' },
 ];
 
+// - Errors -
+
+export class SignInRequiredError extends Error {
+  constructor(message = 'Your session has expired. Sign in again to continue.') {
+    super(message);
+    this.name = 'SignInRequiredError';
+    this.code = 'SIGN_IN_REQUIRED';
+  }
+}
+
+export class AccessDeniedError extends Error {
+  constructor(message = 'This account is not permitted to perform that request.') {
+    super(message);
+    this.name = 'AccessDeniedError';
+    this.code = 'ACCESS_DENIED';
+  }
+}
+
+// Auth failures must reach the caller. The read helpers below otherwise return empty or fallback data.
+export function isAuthError(err) {
+  return err instanceof SignInRequiredError || err instanceof AccessDeniedError;
+}
+
 // - Helpers -
 
-function sbHeaders(extra = {}) {
+// Returns the signed-in user's access token. getSession() refreshes a near-expiry token.
+// Throws SignInRequiredError when there is no session, the session is expired, or the lookup fails.
+async function requireAccessToken() {
+  let session = null;
+  try {
+    session = await getSessionOrNull();
+  } catch (_) {
+    session = null;
+  }
+  const token = session?.access_token || '';
+  const expiresAtMs = Number(session?.expires_at || 0) * 1000;
+  if (!token || (expiresAtMs && expiresAtMs <= Date.now())) {
+    throw new SignInRequiredError();
+  }
+  return token;
+}
+
+async function sbHeaders(extra = {}) {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new Error('Supabase configuration is missing.');
+  }
+  const token = await requireAccessToken();
   return {
     'apikey':        SUPABASE_ANON_KEY,
-    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    'Authorization': `Bearer ${token}`,
     'Content-Type':  'application/json',
     ...extra,
   };
 }
 
+// Maps PostgREST auth failures to typed errors. Other failures keep the caller's message format.
+async function throwIfNotOk(res, failureLabel) {
+  if (res.ok) return;
+  if (res.status === 401) throw new SignInRequiredError();
+  if (res.status === 403) {
+    throw new AccessDeniedError(
+      'Your account is not allowed to make this request. Check that it is linked to your teacher record.'
+    );
+  }
+  const txt = await res.text();
+  throw new Error(`${failureLabel} failed (${res.status}): ${txt}`);
+}
+
 async function sbGet(table, params = '') {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/${table}${params ? '?' + params : ''}`,
-    { headers: sbHeaders() }
+    { headers: await sbHeaders() }
   );
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`GET ${table} failed (${res.status}): ${txt}`);
-  }
+  await throwIfNotOk(res, `GET ${table}`);
   return res.json();
 }
 
@@ -80,6 +140,7 @@ export async function getCampuses() {
     console.log('[TA] getCampuses:', normalized.length, 'rows');
     return normalized.length ? normalized : FALLBACK_CAMPUSES;
   } catch (e) {
+    if (isAuthError(e)) throw e;
     console.error('[TA] getCampuses failed - using fallback:', e.message);
     return FALLBACK_CAMPUSES;
   }
@@ -98,6 +159,7 @@ export async function getTeachers() {
       teacherTimezone: 'America/Toronto',
     }));
   } catch (e) {
+    if (isAuthError(e)) throw e;
     console.error('[TA] getTeachers failed:', e.message);
     return [];
   }
@@ -123,6 +185,7 @@ export async function getScheduledClassConflicts(campusCodes) {
     });
     return conflicts;
   } catch (e) {
+    if (isAuthError(e)) throw e;
     console.error('[TA] getScheduledClassConflicts failed:', e.message);
     return [];
   }
@@ -147,6 +210,7 @@ export async function loadAvailability({ teacherEmail }) {
       notes:       r.notes,
     }));
   } catch (e) {
+    if (isAuthError(e)) throw e;
     console.error('[TA] loadAvailability failed:', e.message);
     return [];
   }
@@ -168,6 +232,7 @@ export async function submitAvailability(payload) {
         teacherMap[email] = rows[0].teacher_id;
       }
     } catch (e) {
+      if (isAuthError(e)) throw e;
       console.error('[TA] teacher lookup failed for', email, e.message);
     }
   }
@@ -179,7 +244,9 @@ export async function submitAvailability(payload) {
       'or=(active.eq.true,registration_open.eq.true)&archived=eq.false&order=start_date.desc&limit=1&select=batch_id'
     );
     if (batches.length) batchId = batches[0].batch_id;
-  } catch (_) {}
+  } catch (e) {
+    if (isAuthError(e)) throw e;
+  }
 
   if (!batchId) {
     return { ok: false, error: 'No active batch found. Please contact your administrator.' };
@@ -236,16 +303,13 @@ export async function submitAvailability(payload) {
 
   const res = await fetch(`${SUPABASE_URL}/rest/v1/teacher_availability`, {
     method: 'POST',
-    headers: sbHeaders({
+    headers: await sbHeaders({
       'Prefer': 'resolution=merge-duplicates,return=representation',
     }),
     body: JSON.stringify(rows),
   });
 
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`Submit failed: ${txt}`);
-  }
+  await throwIfNotOk(res, 'Submit');
 
   const result = await res.json();
   return { inserted: result.length, updated: rows.length - result.length, deactivated: 0 };

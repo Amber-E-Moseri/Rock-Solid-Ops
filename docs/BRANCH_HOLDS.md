@@ -52,6 +52,23 @@ are not the intended teacher-scoped set; the audit canonicalization trigger and 
 Production also has 9 migration versions from the unmerged C1 and C6 branches recorded as applied, which are
 not on `main`. No production schema change beyond the approved registration DDL is authorised.
 
+### `brief/anon-privilege-hardening` — HOLD: do not merge or apply (2026-10-22)
+
+Status: forward migration `20261022120000_anon_privilege_hardening.sql` (revokes anon table, sequence and
+function privileges; grants back column-level SELECT on four registration tables and INSERT on `teachers`).
+Opened as a draft security PR against `main`. Verified only by the local synthetic rehearsal
+(`supabase/tests/anon-privileges/run.sh`, 51 of 51) and the CI gates on the PR.
+
+Gates before merge:
+1. Migration gate and Security regression pass on the PR head.
+2. Owner approves a staging rehearsal (read-only inventory, anon traffic review, legacy-writer check,
+   end-to-end registration test on staging). The design document lists each item.
+3. Risk R1 (authenticated TRUNCATE) is a separate follow-up brief, not part of this PR.
+4. Production apply is a separate owner decision after the staging rehearsal is clean.
+5. **R12 (teacher availability helper):** reads and submit lookups moved to the session token on local branch `fix/r12-availability-session-token`. That branch is not pushed and not merged. Merge is blocked until the owner reviews it, it is merged into this PR, and CI passes on the new head. Live verification of the write path is still required.
+
+Design and risk register: `docs/ANON_PRIVILEGE_HARDENING_2026-10-22.md`.
+
 ## Resolved (moot — already merged)
 
 ### `brief/moodle-credential-safety` — RESOLVED 2026-07-23
