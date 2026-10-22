@@ -22,7 +22,7 @@ function tabsForRole(role) {
 
 export default function AdminManagementPage() {
   const { profile, user } = useAuth();
-  const { addToast } = useToast();
+  const addToast = useToast();
   const role = profile?.role;
   const tabs = tabsForRole(role);
   const canManageStaff = role === 'admin' || role === 'superadmin';

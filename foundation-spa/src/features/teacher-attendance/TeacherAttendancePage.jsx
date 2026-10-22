@@ -12,7 +12,7 @@ function stepIdx(step) { return { teacher: 0, class: 1, action: 2, session: 3, a
 
 export default function TeacherAttendancePage() {
   const { profile } = useAuth();
-  const { addToast } = useToast();
+  const addToast = useToast();
 
   const [step, setStep] = useState('teacher');
   const [loading, setLoading] = useState(false);
@@ -109,8 +109,8 @@ export default function TeacherAttendancePage() {
         classOptionId: selectedClass.classOptionId, classSession: sessions.join(','),
         classDate, records, guestRecords,
       });
-      addToast('Attendance submitted', 'success');
-
+      // Advance the UI before the toast: the attendance is already saved, so a
+      // toast failure must never leave the user on Review with a resubmit path.
       const ms = await getMilestones(sessions);
       if (ms.length > 0) {
         setMilestones(ms);
@@ -119,6 +119,7 @@ export default function TeacherAttendancePage() {
       } else {
         resetToClassSelect();
       }
+      addToast('Attendance submitted', 'success');
     } catch (e) { addToast(e.message, 'error'); }
     finally { setLoading(false); }
   }

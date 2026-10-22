@@ -7,7 +7,7 @@ import { PageHeader, Toolbar, Skeleton, EmptyState, Button, Modal, Card } from '
 
 export default function ReportsPage() {
   const { profile } = useAuth();
-  const { addToast } = useToast();
+  const addToast = useToast();
   const role = profile?.role;
   const isPastor = role === 'pastor';
   const isHighRole = role === 'superadmin' || role === 'admin';
