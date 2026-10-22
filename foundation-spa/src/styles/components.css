@@ -582,3 +582,35 @@
   .rso-page-actions { width: 100%; }
   .rso-page-actions .rso-select { flex: 1 1 auto; min-width: 0 !important; }
 }
+
+/* ── Shared: table card view, row actions, error banner ─────────────────── */
+.rso-table-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.rso-table-card-title {
+  font-weight: 700;
+}
+.rso-row-actions {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+.rso-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rso-cell-strong { font-weight: 600; }
+.rso-cell-meta { font-size: 11px; color: var(--color-text-muted); }

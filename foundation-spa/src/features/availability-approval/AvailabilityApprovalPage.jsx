@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, Fragment } from 'react';
-import { PageHeader, Card, Badge, Button, Skeleton, SearchInput, Select } from '../../components/ui/index.js';
+import { PageHeader, Card, Badge, Button, Skeleton, SearchInput, Select, ErrorBanner } from '../../components/ui/index.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import {
@@ -22,13 +22,16 @@ export default function AvailabilityApprovalPage() {
   const [drawerItem, setDrawerItem] = useState(null);
   const [reviewNote, setReviewNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchSubmissions();
       setSubmissions(data);
+      setLoadError(null);
     } catch (e) {
+      setLoadError(e.message || 'Failed to load submissions');
       toast(e.message || 'Failed to load submissions', 'error');
     } finally {
       setLoading(false);
@@ -135,9 +138,12 @@ export default function AvailabilityApprovalPage() {
           <Button size="sm" variant="secondary" onClick={clearFilters}>Clear</Button>
         </div>
 
-        {loading ? <Skeleton style={{ height: 300 }} /> : filtered.length === 0 ? (
+        {loading ? <Skeleton style={{ height: 300 }} /> : loadError ? (
+          <ErrorBanner message={`Could not load submissions. ${loadError}`} onRetry={load} />
+        ) : filtered.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 13, fontWeight: 600 }}>No submissions found.</div>
         ) : (
+          <>
           <div className="rso-table-wrap">
             <table className="rso-table" style={{ minWidth: 800 }}>
               <thead>
@@ -187,6 +193,38 @@ export default function AvailabilityApprovalPage() {
               </tbody>
             </table>
           </div>
+          <div className="rso-table-cards">
+            {filtered.map(s => {
+              const slotCount = (s.slots || []).length;
+              const campusStr = (s.campuses || []).slice(0, 2).join(', ') + (s.campuses?.length > 2 ? ` +${s.campuses.length - 2}` : '');
+              return (
+                <div className="rso-table-card" key={s.id}>
+                  <div className="rso-table-card-head">
+                    <label className="rso-table-card-title">
+                      <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSelect(s.id)} aria-label={`Select ${s.teacher_name || 'submission'}`} />{' '}
+                      {s.teacher_name || '—'}
+                    </label>
+                    <Badge variant={statusVariant(s.status)}>{s.status || 'pending'}</Badge>
+                  </div>
+                  <div className="rso-table-card-row"><span className="rso-table-card-label">Email</span><span>{s.teacher_email || '—'}</span></div>
+                  <div className="rso-table-card-row"><span className="rso-table-card-label">Submitted</span><span>{fmtDate(s.created_at)}</span></div>
+                  <div className="rso-table-card-row"><span className="rso-table-card-label">Month</span><span>{fmtMonth(s.month)}</span></div>
+                  <div className="rso-table-card-row"><span className="rso-table-card-label">Campus(es)</span><span>{campusStr || '—'}</span></div>
+                  <div className="rso-table-card-row"><span className="rso-table-card-label">Slots</span><span>{slotCount} slot{slotCount !== 1 ? 's' : ''}</span></div>
+                  <div className="rso-row-actions">
+                    <Button size="sm" variant="secondary" onClick={() => openDrawer(s)}>Review</Button>
+                    {s.status === 'pending' && (
+                      <>
+                        <Button size="sm" variant="primary" onClick={() => doSetStatus([s.id], 'approved')} disabled={saving}>✓</Button>
+                        <Button size="sm" variant="danger" onClick={() => doSetStatus([s.id], 'rejected')} disabled={saving}>✕</Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          </>
         )}
       </Card>
 
