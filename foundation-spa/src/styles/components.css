@@ -611,6 +611,11 @@
   font-size: 13px;
   font-weight: 600;
 }
+/* Long unbroken messages (e.g. a database column name) wrap instead of pushing Retry out of the banner. */
+.rso-error-banner > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 
 .rso-cell-strong { font-weight: 600; }
 .rso-cell-meta { font-size: 11px; color: var(--color-text-muted); }

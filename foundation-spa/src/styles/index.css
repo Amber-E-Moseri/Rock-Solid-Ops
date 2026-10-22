@@ -56,6 +56,8 @@ a:hover { text-decoration: underline; }
 .rso-content {
   margin-left: 220px;
   flex: 1;
+  /* Let wide tables scroll inside .rso-table-wrap instead of widening the whole shell. */
+  min-width: 0;
   display: flex;
   flex-direction: column;
   min-height: 100vh;

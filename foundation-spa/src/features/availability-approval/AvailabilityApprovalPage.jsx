@@ -83,7 +83,8 @@ export default function AvailabilityApprovalPage() {
   };
 
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
+    // minmax(0, 1fr): let the header and panels shrink to the viewport instead of forcing page overflow on phones.
+    <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'minmax(0, 1fr)' }}>
       <PageHeader
         title="Availability Approval"
         subtitle="Review and approve teacher availability submissions before scheduling classes."
