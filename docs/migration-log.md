@@ -2797,3 +2797,34 @@ now passing is the verification performed this session.
 Registration-processor touch reviewed and approved by the operator (see above) — this was the
 only gate; no RLS/auth-boundary change otherwise. Merged to `main` same session per the
 standing branch-per-brief workflow.
+
+## 2026-10-22 — Netlify static-publish security hotfix (PR #3) released to production
+
+**Result:** Production (`rocksolidsuite`) now publishes an allowlisted static directory instead of the repository root. The existing static application is unchanged, and the SPA is not deployed.
+
+| Item | Value |
+|---|---|
+| PR | #3, `hotfix/netlify-static-publish-security` → `main` |
+| Certified PR head | `d0b64726a8361f5723ff26b972b882deaa8f34b6` |
+| Merge commit on `main` | `8de0948b68c38928b13e76b7fafa067c066d0459` (merge commit, not squashed) |
+| Netlify production deploy | `6ad9778270515d1c2c7562d5`, context `production`, state `ready`, commit `8de0948b` |
+| Rollback target | `6aaf3ebb977cfc000898dadb`, commit `8b9e14ed` (pre-hotfix production) |
+| CI on merge commit (run `39712634437`) | Migration gate: pass. Unit tests: pass. Security regression: pass. |
+| CI on certified head (run `39709118604`) | Migration gate, Unit tests, Security regression: pass. Netlify deploy preview `6ad96ea3…`: pass. |
+
+**Verification on production**
+
+- Required routes: `/` → login (302); login, teacher index, admin portal, registration form, class-selection, `canada_sr.png`, teacher attendance, `/auth/login`, `config.js` and CSS all return 200 or the expected redirect. Teacher and attendance pages enforce their existing auth guards.
+- Sensitive paths (bodies inspected): `/README.md`, `/foundation-spa/src/App.jsx`, `/foundation/edge-functions/moodle-sync/index.ts`, `/foundation/sql/README.md`, `/package.json`, `/netlify.toml`, `/data_backup.sql`, `/.env.local`, `/vercel.json`, `/scripts/generate-netlify-config.mjs`, `/docs/deployment.md` return 404. `/supabase/config.toml` and `/archive/` redirect to login. `/foundation/archive/` is excluded.
+- File identity: all 103 published files match the pre-merge preview of the same tree after Netlify's injected markup is removed.
+- `config.js` contains only the public anon key and an empty `BYPASS_ROLE`.
+- `BYPASS_ROLE` is absent from the production environment.
+
+**Known issues (pre-existing, not caused by this release)**
+
+- `foundation/registration/registration-form.html` queries `class_options.is_online`, which production does not have (Postgres `42703`). The column is defined in migration `202605190900_class_options_online_multicampus.sql`. The migration does not appear to be applied to production, which is consistent with the prod drift recorded above. The page loads, but the class list request fails. This needs a separately approved schema reconciliation.
+- Authenticated workflows (teacher and admin sign-in, sign-out, attendance submission) were not tested. No safe test accounts were used. The static application is byte-identical to the pre-merge version, so this release does not change those flows.
+- Netlify's UI build settings still show the pre-hotfix command and publish directory. `netlify.toml` overrides them.
+- Deploy previews use the production Supabase project, because the environment variables are scoped to all contexts. Do not authenticate on previews until a non-production project is scoped to the deploy-preview context, or preview password protection is enabled.
+
+**Gate:** owner approval to merge and deploy PR #3 was given for this release. The SPA migration and the C6 rollout are not part of this release.
