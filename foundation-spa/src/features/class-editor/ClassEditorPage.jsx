@@ -146,9 +146,9 @@ export default function ClassEditorPage() {
       {!rows.length ? (
         <EmptyState icon="🏫" title="No classes" message="No class options found for the current filters." />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 340px) 1fr', gap: 14, alignItems: 'start' }}>
+        <div className="rso-class-split">
           {/* Class list */}
-          <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', background: 'var(--surface)', overflow: 'hidden', maxHeight: '75vh', overflowY: 'auto' }}>
+          <div className="rso-class-list">
             {rows.map((co) => {
               const enrolledCount = data.enrolled[co.class_option_id] || 0;
               const capacity = co.max_capacity ?? 25;
@@ -159,12 +159,7 @@ export default function ClassEditorPage() {
                 <div
                   key={co.class_option_id}
                   onClick={() => setOpenId(co.class_option_id)}
-                  style={{
-                    display: 'flex', gap: 10, alignItems: 'center', padding: '10px 12px', cursor: 'pointer',
-                    borderBottom: '1px solid var(--border)', opacity: inactive ? 0.55 : 1,
-                    background: active ? 'color-mix(in srgb, var(--primary) 8%, transparent)' : 'transparent',
-                    borderLeft: `3px solid ${active ? 'var(--primary)' : 'transparent'}`,
-                  }}
+                  className={`rso-class-row${active ? ' is-active' : ''}${inactive ? ' is-inactive' : ''}`}
                 >
                   {massOpen ? (
                     <input
@@ -187,7 +182,7 @@ export default function ClassEditorPage() {
                       {warn ? ' · Reg closed' : inactive ? ' · Inactive' : ''}
                     </div>
                   </div>
-                  <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--muted)' }}>{enrolledCount}/{capacity}</span>
+                  <span className="rso-capacity">{enrolledCount}/{capacity}</span>
                 </div>
               );
             })}

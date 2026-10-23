@@ -87,7 +87,24 @@ const TABLES = {
     { id: 1, status: 'unresolved', created_at: new Date(Date.UTC(2026, 9, 20)).toISOString(), batch_id: 1 },
     { id: 2, status: 'unresolved', created_at: new Date(Date.UTC(2026, 9, 18)).toISOString(), batch_id: 1 },
   ],
-  class_options: () => TEACHER_CLASSES.map((c) => ({ class_option_id: c.class_option_id, teacher_name: 'Synthetic Teacher 1' })),
+  // Richer rows for the Class Editor preview; the dashboard reads the same ids.
+  class_options: () => TEACHER_CLASSES.map((c) => ({
+    class_option_id: c.class_option_id,
+    class_name: c.class_name,
+    day: c.day,
+    class_time: c.class_time,
+    teacher_name: 'Synthetic Teacher 1',
+    teacher_id: 1,
+    max_capacity: 25,
+    active: c.active,
+    enrollment_open: true,
+    fellowship_codes: c.fellowship_codes,
+    group_id: 'SYNTHETIC-GROUP',
+    label_suffix: null,
+    is_online: false,
+    enrollment_closes_at: null,
+    deleted_at: null,
+  })),
   email_queue: () => synth(12, (i) => ({ id: i, status: 'Pending' })),
 };
 
