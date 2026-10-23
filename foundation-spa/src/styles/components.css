@@ -884,3 +884,46 @@
   .rso-class-split { grid-template-columns: minmax(0, 1fr); }
   .rso-class-list { max-height: 40vh; }
 }
+
+/* ── Class Editor detail form (After board 2.c1b) ── */
+.rso-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 16px;
+}
+.rso-toggle-group { display: flex; gap: 8px; flex-wrap: wrap; }
+.rso-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.rso-toggle input { accent-color: var(--primary); margin: 0; }
+.rso-toggle.is-on {
+  border-color: var(--success-bd, var(--border));
+  background: var(--success-bg);
+  color: var(--success);
+}
+.rso-capacity-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin: 6px 0;
+}
+.rso-capacity-bar > span { display: block; height: 100%; background: var(--primary); border-radius: 999px; }
+@media (max-width: 900px) {
+  .rso-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .rso-form-grid { grid-template-columns: minmax(0, 1fr); }
+}
