@@ -692,3 +692,65 @@
   .rso-quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rso-quick-card { padding: 12px; }
 }
+
+/* ── Tabs (underline style from the After boards) ── */
+.rso-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.rso-tab {
+  padding: 12px 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 44px;
+}
+.rso-tab:hover { color: var(--primary); }
+.rso-tab[aria-selected="true"] {
+  color: var(--primary);
+  font-weight: 700;
+  border-bottom-color: var(--primary);
+}
+.rso-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+/* ── Class cards (teacher home) ── */
+.rso-class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+.rso-class-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-xs);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.rso-class-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.rso-class-name { font-weight: 800; font-size: 14px; color: var(--text); overflow-wrap: anywhere; }
+.rso-class-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.rso-class-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rso-class-stat-value { font-size: 20px; font-weight: 800; color: var(--text); line-height: 1.1; }
+.rso-class-stat-label { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
+.rso-progress-track { width: 64px; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.rso-progress-fill { height: 100%; border-radius: 3px; background: var(--success); }
+.rso-progress-fill.is-low { background: var(--danger); }
+
+/* Text-valued class stats (campus codes) sit smaller than numeric stats. */
+.rso-class-stat-text { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.3; overflow-wrap: anywhere; }

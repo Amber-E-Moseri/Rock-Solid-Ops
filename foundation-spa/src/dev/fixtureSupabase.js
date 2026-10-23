@@ -26,6 +26,13 @@ function synth(count, make) {
   return Array.from({ length: count }, (_, i) => make(i + 1));
 }
 
+// Synthetic class options for the Teacher Home preview.
+const TEACHER_CLASSES = [
+  { class_option_id: 'syn-class-1', class_name: 'Synthetic Foundation Class A', day: 'Tuesday', class_time: '7:00 PM', fellowship_codes: ['UMANITOBA'], current_enrollment: 18, active: true },
+  { class_option_id: 'syn-class-2', class_name: 'Synthetic Foundation Class B', day: 'Thursday', class_time: '8:00 PM', fellowship_codes: ['UWATERLOO'], current_enrollment: 14, active: true },
+  { class_option_id: 'syn-class-3', class_name: 'Synthetic Maturity Class', day: 'Saturday', class_time: '10:00 AM', fellowship_codes: ['UCALGARY'], current_enrollment: 11, active: false },
+];
+
 // Table rows. Each page's queries read only the columns it needs; extend here per screen.
 const TABLES = {
   applicants: () => synth(142, (i) => ({
@@ -43,7 +50,8 @@ const TABLES = {
   teachers: () => synth(6, (i) => ({
     teacher_id: i,
     full_name: `Synthetic Teacher ${i}`,
-    email: `teacher${i}@example.invalid`,
+    // Teacher 1 is the synthetic identity used by the dev role bypass (dev@localhost).
+    email: i === 1 ? 'dev@localhost' : `teacher${i}@example.invalid`,
     status: i <= 4 ? 'Active' : 'Pending',
   })),
   audit_logs: () => [
@@ -150,7 +158,18 @@ export const supabase = {
     updateUser: async () => ({ data: null, error: WRITE_ERROR }),
     exchangeCodeForSession: async () => ({ data: null, error: WRITE_ERROR }),
   },
-  functions: { invoke: async () => ({ data: null, error: WRITE_ERROR }) },
+  functions: {
+    // Read-only fixtures for the edge functions previewed pages call. Anything else
+    // reports that no fixture exists rather than pretending to succeed.
+    invoke: async (functionName, { body } = {}) => {
+      if (functionName === 'teacher-portal-api' && body?.action === 'getTeacherActiveClassOptions') {
+        if (SCENARIO === 'empty') return { data: [], error: null };
+        if (SCENARIO === 'error') return { data: null, error: { message: 'Synthetic fixture: simulated function failure.' } };
+        return { data: TEACHER_CLASSES, error: null };
+      }
+      return { data: null, error: { message: 'Synthetic fixture: no preview fixture for ' + functionName + '.' } };
+    },
+  },
   storage: { from: () => ({ upload: async () => ({ data: null, error: WRITE_ERROR }), getPublicUrl: () => ({ data: { publicUrl: '' } }) }) },
   channel: () => ({ on() { return this; }, subscribe() { return this; } }),
   removeChannel: noopResult,
