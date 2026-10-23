@@ -83,6 +83,19 @@ const TABLES = {
     { actor_name: 'Synthetic Admin', action: 'suspend_teacher', entity_type: 'teacher', created_at: new Date(Date.UTC(2026, 9, 20, 17, 12)).toISOString() },
   ],
   moodle_sync: () => synth(3, (i) => ({ id: i, status: 'failed' })),
+  // Makeup rows: synthetic students; deadlines chosen so pending, overdue and done all show.
+  makeup_queue: () => {
+    const student = (i, name, sub) => ({ full_name: name, email: `student${i}@example.invalid`, fellowship_code: 'UMANITOBA', subgroup_id: sub });
+    const day = 86400000;
+    const now = Date.now();
+    return [
+      { id: 1, student_id: 301, batch_id: 1, class_missed: 'Synthetic Class A', makeup_type: 'Session', deadline: new Date(now + 9 * day).toISOString(), makeup_completed: false, completed_at: null, created_at: new Date(now - 3 * day).toISOString(), students: student(301, 'Synthetic Student 301', 'CESGA') },
+      { id: 2, student_id: 302, batch_id: 1, class_missed: 'Synthetic Class B', makeup_type: 'Video', deadline: new Date(now + 4 * day).toISOString(), makeup_completed: false, completed_at: null, created_at: new Date(now - 6 * day).toISOString(), students: student(302, 'Synthetic Student 302', 'CSGB') },
+      { id: 3, student_id: 303, batch_id: 1, class_missed: 'Synthetic Class A', makeup_type: 'Session', deadline: new Date(now - 2 * day).toISOString(), makeup_completed: false, completed_at: null, created_at: new Date(now - 14 * day).toISOString(), students: student(303, 'Synthetic Student 303', 'CESGA') },
+      { id: 4, student_id: 304, batch_id: 1, class_missed: 'Synthetic Class C', makeup_type: 'Session', deadline: new Date(now - 5 * day).toISOString(), makeup_completed: false, completed_at: null, created_at: new Date(now - 20 * day).toISOString(), students: student(304, 'Synthetic Student 304', 'WSGA') },
+      { id: 5, student_id: 305, batch_id: 1, class_missed: 'Synthetic Class B', makeup_type: 'Video', deadline: new Date(now + 7 * day).toISOString(), makeup_completed: true, completed_at: new Date(now - 1 * day).toISOString(), created_at: new Date(now - 10 * day).toISOString(), students: student(305, 'Synthetic Student 305', 'CSGB') },
+    ];
+  },
   attention_flags: () => [],
   moodle_enrollment_sync: () => [
     ...synth(18, () => ({ sync_status: 'SYNCED', synced_at: new Date(Date.UTC(2026, 9, 21, 12, 0)).toISOString(), updated_at: new Date(Date.UTC(2026, 9, 21, 12, 0)).toISOString() })),
