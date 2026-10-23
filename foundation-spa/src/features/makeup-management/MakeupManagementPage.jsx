@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { fetchBatchOptions, fetchMakeupQueue, computeStats, filterQueue, markComplete, extendDeadline } from './lib/makeupManagement.js';
-import { PageHeader, Toolbar, SearchInput, Skeleton, EmptyState, Badge, Button, Modal, KpiGrid, Kpi } from '../../components/ui/index.js';
+import { PageHeader, Toolbar, SearchInput, Skeleton, EmptyState, Badge, Button, Modal } from '../../components/ui/index.js';
 
 const ADMIN_ROLES = ['admin', 'superadmin', 'principal', 'subgroup_admin', 'pastor'];
 
@@ -53,12 +53,24 @@ export default function MakeupManagementPage() {
         </div>
       )}
 
-      <KpiGrid>
-        <Kpi label="Pending" value={stats.pending} />
-        <Kpi label="Overdue" value={stats.overdue} />
-        <Kpi label="Done This Week" value={stats.doneThisWeek} />
-        <Kpi label="Completion Rate" value={`${stats.completionRate}%`} />
-      </KpiGrid>
+      <div className="rso-kpi-grid">
+        <div className="rso-kpi-tile rso-kpi-tile-navy">
+          <div className="rso-kpi-tile-value">{stats.pending}</div>
+          <div className="rso-kpi-tile-label">Pending</div>
+        </div>
+        <div className="rso-kpi-tile rso-kpi-tile-coral">
+          <div className="rso-kpi-tile-value">{stats.overdue}</div>
+          <div className="rso-kpi-tile-label">Overdue</div>
+        </div>
+        <div className="rso-kpi-tile rso-kpi-tile-gold">
+          <div className="rso-kpi-tile-value">{stats.doneThisWeek}</div>
+          <div className="rso-kpi-tile-label">Done This Week</div>
+        </div>
+        <div className="rso-kpi-tile rso-kpi-tile-dark">
+          <div className="rso-kpi-tile-value">{`${stats.completionRate}%`}</div>
+          <div className="rso-kpi-tile-label">Completion Rate</div>
+        </div>
+      </div>
 
       <Toolbar>
         <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name or email…" />
@@ -77,8 +89,9 @@ export default function MakeupManagementPage() {
       </Toolbar>
 
       {isLoading ? <Skeleton variant="rows" rows={5} /> : filtered.length === 0 ? (
-        <EmptyState icon="📋" title="No makeups" subtitle="No makeup records match your filters" />
+        <EmptyState icon="📋" title="No makeups" message="No makeup records match your filters" />
       ) : (
+        <>
         <div className="rso-table-wrap">
           <table className="rso-table">
             <thead><tr><th>Student</th><th>Fellowship</th><th>Class Missed</th><th>Type</th><th>Deadline</th><th>Status</th>{isAdmin && <th>Actions</th>}</tr></thead>
@@ -110,6 +123,31 @@ export default function MakeupManagementPage() {
             </tbody>
           </table>
         </div>
+        <div className="rso-table-cards">
+            {filtered.map((m) => (
+              <div key={`card-${m.id}`} className="rso-table-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start', marginBottom: 8 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700 }}>{m.students?.full_name || '—'}</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)', overflowWrap: 'anywhere' }}>{m.students?.email || ''}</div>
+                  </div>
+                  {m.makeup_completed ? <Badge status="active">Complete</Badge>
+                    : isOverdue(m) ? <Badge status="archived">Overdue</Badge>
+                    : <Badge status="draft">Pending</Badge>}
+                </div>
+                <div className="rso-table-card-row"><span className="rso-table-card-label">Class missed</span><span>{m.class_missed || '—'}</span></div>
+                <div className="rso-table-card-row"><span className="rso-table-card-label">Type</span><span>{m.makeup_type || '—'}</span></div>
+                <div className="rso-table-card-row"><span className="rso-table-card-label">Deadline</span><span>{fmtDate(m.deadline)}</span></div>
+                {isAdmin && !m.makeup_completed && (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                    <Button variant="primary" size="sm" onClick={() => setCompleteModal(m)}>Complete</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setExtendModal(m)}>Extend</Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       <Modal open={!!completeModal} title="Mark Makeup Complete" onClose={() => setCompleteModal(null)} footer={
