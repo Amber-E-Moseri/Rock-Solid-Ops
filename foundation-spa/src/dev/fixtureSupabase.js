@@ -49,6 +49,13 @@ const TEACHER_CLASSES = [
   { class_option_id: 'syn-class-3', class_name: 'Synthetic Maturity Class', day: 'Saturday', class_time: '10:00 AM', fellowship_codes: ['UCALGARY'], current_enrollment: 11, active: false },
 ];
 
+// Time inputs need HH:MM; the teacher-portal labels above use 12-hour text.
+const to24h = (t) => {
+  const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(String(t));
+  if (!m) return t;
+  const h = (Number(m[1]) % 12) + (m[3].toUpperCase() === 'PM' ? 12 : 0);
+  return `${String(h).padStart(2, '0')}:${m[2]}`;
+};
 // Table rows. Each page's queries read only the columns it needs; extend here per screen.
 const TABLES = {
   applicants: () => synth(142, (i) => ({
@@ -92,7 +99,7 @@ const TABLES = {
     class_option_id: c.class_option_id,
     class_name: c.class_name,
     day: c.day,
-    class_time: c.class_time,
+    class_time: to24h(c.class_time),
     teacher_name: 'Synthetic Teacher 1',
     teacher_id: 1,
     max_capacity: 25,
