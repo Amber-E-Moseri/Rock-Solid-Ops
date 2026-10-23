@@ -16,12 +16,17 @@
 --   3. EXECUTE is removed from PUBLIC, anon, service_role and the helper for every
 --      role except authenticated on the three RPCs. Function signatures and return
 --      shapes are unchanged.
---   4. NOT fixed here: get_student_attention_flags has pre-existing body defects that
---      make its authorized calls fail with an error that the handler turns into zero rows:
---      42702 "column reference applicant_id is ambiguous" (RETURNS TABLE name vs. column) and
---      42P20 "window functions are not allowed in GROUP BY" (the consecutive-absence streak
---      in attendance_ordered uses row_number() inside a grouped expression). Both are body
---      logic changes and need their own brief. Both are reproduced on a local replay.
+--   4. get_student_attention_flags body repair (narrow, same signature and columns):
+--      - 42P20: the window function that computes the absence streak moved into its own CTE
+--        (absent_streaks), so the grouped query no longer groups by an expression that
+--        contains a window function.
+--      - 42702: every reference inside the streak logic is qualified. The bare applicant_id
+--        collided with the RETURNS TABLE column of the same name.
+--      - Unexpected errors are re-raised, not converted to zero rows. The audit insert was
+--        removed from this function because a raised error rolls it back anyway.
+--      - 42703: the milestone check referenced sms.completed and sms.value, which do not exist.
+--        The canonical completion state is status = 'completed'; those branches were dead.
+--      The teacher and system functions keep their handlers in this migration unchanged.
 --
 -- Not in this migration: subgroup or fellowship scoping, and any client-side route change.
 -- Rollback is not a migration. Restoring the previous definitions reopens the exposure
@@ -131,16 +136,26 @@ BEGIN
     FROM attendance_log al
     JOIN assigned s ON s.applicant_id = al.student_id::text
   ),
-  absent_runs AS (
+  absent_streaks AS (
+    -- Window functions live here, not in the grouped query below (42P20).
     SELECT
-      applicant_id,
-      MIN(class_date) AS first_absent_date,
-      MAX(class_date) AS last_absent_date,
+      ao.applicant_id,
+      ao.class_date,
+      ao.present,
+      (ao.seq - row_number() OVER (PARTITION BY ao.applicant_id, ao.present ORDER BY ao.seq)) AS grp
+    FROM attendance_ordered ao
+  ),
+  absent_runs AS (
+    -- Qualified columns only: the bare applicant_id is also a RETURNS TABLE name (42702).
+    SELECT
+      st.applicant_id,
+      MIN(st.class_date) AS first_absent_date,
+      MAX(st.class_date) AS last_absent_date,
       COUNT(*)::int AS missed_count,
-      (seq - row_number() OVER (PARTITION BY applicant_id, present ORDER BY seq)) AS grp
-    FROM attendance_ordered
-    WHERE present = false
-    GROUP BY applicant_id, grp
+      st.grp
+    FROM absent_streaks st
+    WHERE st.present = false
+    GROUP BY st.applicant_id, st.grp
   ),
   repeat_absence AS (
     SELECT DISTINCT ON (r.applicant_id)
@@ -198,11 +213,9 @@ BEGIN
         SELECT 1
         FROM student_milestone_status sms
         WHERE sms.applicant_id::text = s.applicant_id
-          AND (
-            sms.completed = true
-            OR lower(COALESCE(sms.status, '')) = 'completed'
-            OR lower(COALESCE(sms.value, '')) = 'yes'
-          )
+          -- Canonical completion state is status = 'completed' (202605071700). The former
+          -- sms.completed and sms.value branches reference columns that do not exist (42703).
+          AND lower(COALESCE(sms.status, '')) = 'completed'
       )
   ),
   waitlisted AS (
@@ -234,22 +247,8 @@ EXCEPTION
   WHEN insufficient_privilege THEN
     RAISE;
   WHEN OTHERS THEN
-  INSERT INTO public.audit_logs (actor_email, action, entity_type, entity_id, status, details, created_at)
-  VALUES (
-    'system@attention-flags',
-    'ATTENTION_FLAGS_ERROR',
-    'rpc',
-    'get_student_attention_flags',
-    'FAILED',
-    jsonb_build_object(
-      'function', 'get_student_attention_flags',
-      'sqlstate', SQLSTATE,
-      'error', SQLERRM,
-      'p_batch_id', p_batch_id
-    ),
-    now()
-  );
-  RETURN;
+    -- Unexpected errors surface to the caller. An empty result would look like "no flags".
+    RAISE;
 END;
 $$;
 
