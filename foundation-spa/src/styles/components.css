@@ -927,3 +927,26 @@
 @media (max-width: 640px) {
   .rso-form-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ── System Health (After board 3.s1b) ── */
+.rso-health-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.rso-health-tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  box-shadow: var(--sh-xs);
+  min-width: 0;
+}
+.rso-health-tile-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.rso-health-title { font-size: 14px; font-weight: 800; flex: 1; min-width: 0; color: var(--text); overflow-wrap: anywhere; }
+.rso-two-pane {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: start;
+}
+.rso-two-pane > * { min-width: 0; }
+@media (max-width: 900px) {
+  .rso-two-pane { grid-template-columns: minmax(0, 1fr); }
+}
