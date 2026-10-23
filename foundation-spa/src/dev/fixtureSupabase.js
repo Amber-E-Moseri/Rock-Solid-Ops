@@ -60,7 +60,74 @@ const TABLES = {
     { actor_name: 'Synthetic Admin', action: 'suspend_teacher', entity_type: 'teacher', created_at: new Date(Date.UTC(2026, 9, 20, 17, 12)).toISOString() },
   ],
   moodle_sync: () => synth(3, (i) => ({ id: i, status: 'failed' })),
+  moodle_enrollment_sync: () => [
+    ...synth(18, () => ({ sync_status: 'SYNCED', synced_at: new Date(Date.UTC(2026, 9, 21, 12, 0)).toISOString(), updated_at: new Date(Date.UTC(2026, 9, 21, 12, 0)).toISOString() })),
+    ...synth(3, () => ({ sync_status: 'PENDING', synced_at: null, updated_at: null })),
+    ...synth(2, () => ({ sync_status: 'FAILED', synced_at: null, updated_at: null })),
+    ...synth(1, () => ({ sync_status: 'PROCESSING', synced_at: null, updated_at: null })),
+  ],
+  duplicate_registration_groups: () => [
+    { id: 1, status: 'unresolved', created_at: new Date(Date.UTC(2026, 9, 20)).toISOString(), batch_id: 1 },
+    { id: 2, status: 'unresolved', created_at: new Date(Date.UTC(2026, 9, 18)).toISOString(), batch_id: 1 },
+  ],
+  class_options: () => TEACHER_CLASSES.map((c) => ({ class_option_id: c.class_option_id, teacher_name: 'Synthetic Teacher 1' })),
   email_queue: () => synth(12, (i) => ({ id: i, status: 'Pending' })),
+};
+
+// Synthetic RPC results for the Operational Dashboard preview. Shapes mirror the
+// fields read in features/dashboards/lib/dashboard.js. Every value is invented.
+const RPC_FIXTURES = {
+  get_registration_summary: () => [
+    { reg_status: 'ASSIGNED', cnt: 89 },
+    { reg_status: 'WAITLISTED', cnt: 23 },
+    { reg_status: 'REVIEW', cnt: 30 },
+    { reg_status: 'DUPLICATE', cnt: 4 },
+  ],
+  get_fellowship_breakdown: () => [
+    { fellowship: 'UMANITOBA', cnt: 41 },
+    { fellowship: 'UWATERLOO', cnt: 33 },
+    { fellowship: 'UCALGARY', cnt: 22 },
+    { fellowship: 'UBC', cnt: 15 },
+  ],
+  get_registrations_by_week: () => synth(12, (i) => ({
+    week_start: new Date(Date.UTC(2026, 7, 3 + (i - 1) * 7)).toISOString().slice(0, 10),
+    cnt: 6 + ((i * 7) % 11),
+  })),
+  get_capacity_summary: () => [
+    { class_option_id: 'syn-class-1', day: 'Tuesday', class_time: '7:00 PM', fellowship: 'UMANITOBA', enrolled_count: 18, max_capacity: 20 },
+    { class_option_id: 'syn-class-2', day: 'Thursday', class_time: '8:00 PM', fellowship: 'UWATERLOO', enrolled_count: 14, max_capacity: 20 },
+    { class_option_id: 'syn-class-3', day: 'Saturday', class_time: '10:00 AM', fellowship: 'UCALGARY', enrolled_count: 11, max_capacity: 12 },
+  ],
+  get_stale_queue_items: () => [{ cnt: 3 }],
+  get_attendance_health: () => [{
+    submission_rate_pct: 72.4,
+    total_submitted_records: 118,
+    total_expected_sessions: 163,
+    classes_zero_submissions: 1,
+    classes_missing_2w: 2,
+    missing_classes: [
+      { teacher_name: 'Synthetic Teacher 2', class_label: 'Thursday 8:00 PM — UWATERLOO', last_submitted: new Date(Date.UTC(2026, 9, 10)).toISOString(), sessions_missing: 3 },
+      { teacher_name: 'Synthetic Teacher 3', class_label: 'Saturday 10:00 AM — UCALGARY', last_submitted: null, sessions_missing: 4 },
+    ],
+    calculated_at: new Date(Date.UTC(2026, 9, 22, 8, 0)).toISOString(),
+  }],
+  get_milestone_summary: () => [{
+    total_active_students: 142,
+    students_all_complete: 38,
+    students_zero_complete: 17,
+    avg_completion_pct: 46.5,
+    milestones_breakdown: [
+      { milestone_name: 'Foundation class', completion_pct: 81.0 },
+      { milestone_name: 'Water baptism', completion_pct: 64.2 },
+      { milestone_name: 'Cell placement', completion_pct: 37.9 },
+      { milestone_name: 'Maturity class', completion_pct: 18.3 },
+    ],
+    calculated_at: new Date(Date.UTC(2026, 9, 22, 8, 0)).toISOString(),
+  }],
+  get_registration_funnel: () => [{ registered_count: 142, reviewed_count: 112, assigned_count: 89, waitlisted_count: 23, duplicate_count: 4 }],
+  get_active_certified_teachers_count: () => [{ count: 6 }],
+  get_currently_teaching_count: () => [{ count: 4 }],
+  get_escalation_details: () => [],
 };
 
 // Scenario overrides: "empty" returns no rows everywhere; "error" fails every read.
@@ -147,7 +214,15 @@ const authSession = { session: null, user: null };
 
 export const supabase = {
   from: (table) => query(table),
-  rpc: () => ({ then: (fn, err) => Promise.resolve({ data: null, error: WRITE_ERROR }).then(fn, err) }),
+  rpc: (name) => {
+    const result = (() => {
+      if (SCENARIO === 'error') return { data: null, error: { message: 'Synthetic fixture: simulated RPC failure.', code: 'FIXTURE_ERROR' } };
+      if (SCENARIO === 'empty') return { data: [], error: null };
+      const make = RPC_FIXTURES[name];
+      return make ? { data: make(), error: null } : { data: null, error: { message: 'Synthetic fixture: no RPC fixture for ' + name + '.' } };
+    })();
+    return { then: (fn, err) => Promise.resolve(result).then(fn, err) };
+  },
   auth: {
     getSession: async () => ({ data: authSession, error: null }),
     getUser: async () => ({ data: { user: null }, error: null }),
