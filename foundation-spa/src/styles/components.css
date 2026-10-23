@@ -964,3 +964,37 @@
 @media (max-width: 900px) {
   .rso-reports-split { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ── Teacher modals (After board 2.o1b) ── */
+.rso-form-grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.rso-form-grid2 > .rso-field[style*="1 / -1"] { grid-column: 1 / -1; }
+@media (max-width: 640px) {
+  .rso-form-grid2 { grid-template-columns: minmax(0, 1fr); }
+}
+.rso-teacher-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  min-width: 0;
+}
+.rso-teacher-chip-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--soft-purple);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
