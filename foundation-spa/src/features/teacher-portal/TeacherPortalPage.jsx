@@ -59,7 +59,7 @@ export default function TeacherPortalPage() {
     <div className="page-content">
       <PageHeader title="Teacher Portal" subtitle={teacher.data ? `Welcome, ${teacher.data.full_name}` : undefined} />
 
-      <div role="tablist" aria-label="Teacher portal sections" className="rso-tab-list">
+      <div role="tablist" aria-label="Teacher portal sections" className="rso-tabs">
         {TAB_LABELS.map((label, i) => (
           <button key={label} role="tab" aria-selected={tab === i} className="rso-tab"
             onClick={() => navigate(TAB_PATHS[i], { replace: true })}>{label}</button>
@@ -115,20 +115,6 @@ function MyClassesTab({ teacherId }) {
             </article>
           );
         })}
-      </div>
-      <div className="rso-table-cards">
-        {classes.map((c, i) => (
-          <div className="rso-table-card" key={c.class_option_id || i}>
-            <div className="rso-tp-card-head">
-              <span className="rso-tp-card-title">{c.class_name || c.class_option_id || `Class ${i + 1}`}</span>
-              <Badge status={c.active ? 'active' : 'inactive'}>{c.active ? 'Active' : 'Inactive'}</Badge>
-            </div>
-            <div className="rso-table-card-row"><span className="rso-table-card-label">Day</span><span>{c.day || '—'}</span></div>
-            <div className="rso-table-card-row"><span className="rso-table-card-label">Time</span><span>{c.class_time || '—'}</span></div>
-            <div className="rso-table-card-row"><span className="rso-table-card-label">Campus</span><span>{c.fellowship_codes?.join(', ') || '—'}</span></div>
-            <div className="rso-table-card-row"><span className="rso-table-card-label">Enrolled</span><span>{c.current_enrollment ?? c.enrollment_count ?? '—'}</span></div>
-          </div>
-        ))}
       </div>
     </>
   );

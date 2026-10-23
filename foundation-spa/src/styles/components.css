@@ -1003,31 +1003,6 @@
    from tokens only; the only inline style left on these pages is a computed
    width (attendance-rate bar). */
 
-.rso-tab-list {
-  display: flex;
-  gap: 0.25rem;
-  margin-bottom: 1.25rem;
-  border-bottom: 2px solid var(--border);
-  overflow-x: auto;
-}
-.rso-tab {
-  padding: 0.7rem 1.2rem;
-  min-height: 44px;
-  border: none;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  background: transparent;
-  color: var(--text);
-  border-radius: var(--r-md) var(--r-md) 0 0;
-  font-weight: 400;
-  font-size: var(--fs-sm);
-}
-.rso-tab[aria-selected="true"] {
-  background: var(--primary);
-  color: var(--color-primary-fg);
-  font-weight: 700;
-}
 
 .rso-tp-cell-strong { font-weight: 600; }
 .rso-tp-cell-center { text-align: center; }
