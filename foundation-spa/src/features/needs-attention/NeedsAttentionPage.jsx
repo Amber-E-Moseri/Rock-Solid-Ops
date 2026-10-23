@@ -7,6 +7,8 @@ import {
   PageHeader, Toolbar, SearchInput, Skeleton, EmptyState, Badge, Button,
 } from '../../components/ui/index.js';
 
+const SECTIONS = ['students', 'teachers', 'system'];
+
 function SeverityBadge({ severity }) {
   const s = String(severity ?? '').toLowerCase();
   const variant = s === 'critical' ? 'danger' : s === 'warning' ? 'warning' : 'info';
@@ -33,6 +35,7 @@ export default function NeedsAttentionPage() {
   const [search, setSearch] = useState('');
   const [severity, setSeverity] = useState('');
   const [showResolved, setShowResolved] = useState(false);
+  const [section, setSection] = useState('students');
 
   const { data: batches } = useBatches();
   const { data, isLoading, dataUpdatedAt } = useAttentionData(batchId || undefined);
@@ -67,6 +70,12 @@ export default function NeedsAttentionPage() {
     }
   }
 
+  const tabLabels = {
+    students: `Students (${studentFlags.length})`,
+    teachers: `Teachers (${teacherFlags.length})`,
+    system: `System (${systemCount})`,
+  };
+
   return (
     <div className="page-content">
       <PageHeader
@@ -74,29 +83,29 @@ export default function NeedsAttentionPage() {
         subtitle={dataUpdatedAt ? `Updated ${relTime(dataUpdatedAt)}` : ''}
       />
 
-      {/* KPI pills */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
-        <div className="card" style={{ padding: '0.75rem 1rem', borderLeft: '3px solid #b91c1c' }}>
-          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>Students</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{studentFlags.length}</div>
+      {/* Summary tiles: counts come from the live flag lists. */}
+      <div className="rso-kpi-grid">
+        <div className="rso-kpi-tile rso-kpi-tile-coral">
+          <div className="rso-kpi-tile-value">{studentFlags.length}</div>
+          <div className="rso-kpi-tile-label">Students</div>
         </div>
-        <div className="card" style={{ padding: '0.75rem 1rem', borderLeft: '3px solid #b45309' }}>
-          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>Teachers</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{teacherFlags.length}</div>
+        <div className="rso-kpi-tile rso-kpi-tile-gold">
+          <div className="rso-kpi-tile-value">{teacherFlags.length}</div>
+          <div className="rso-kpi-tile-label">Teachers</div>
         </div>
-        <div className="card" style={{ padding: '0.75rem 1rem', borderLeft: '3px solid #7c2d12' }}>
-          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>System</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 800 }}>{systemCount}</div>
+        <div className="rso-kpi-tile rso-kpi-tile-dark">
+          <div className="rso-kpi-tile-value">{systemCount}</div>
+          <div className="rso-kpi-tile-label">System</div>
         </div>
       </div>
 
       <Toolbar>
         <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, email, flag…" />
-        <select className="rso-select" value={batchId} onChange={(e) => setBatchId(e.target.value)}>
+        <select className="rso-select" aria-label="Filter by batch" value={batchId} onChange={(e) => setBatchId(e.target.value)}>
           <option value="">All batches</option>
           {(batches ?? []).map((b) => <option key={b.batch_id} value={b.batch_id}>{b.batch_name}</option>)}
         </select>
-        <select className="rso-select" value={severity} onChange={(e) => setSeverity(e.target.value)}>
+        <select className="rso-select" aria-label="Filter by severity" value={severity} onChange={(e) => setSeverity(e.target.value)}>
           <option value="">All severities</option>
           <option value="critical">Critical</option>
           <option value="warning">Warning</option>
@@ -111,148 +120,200 @@ export default function NeedsAttentionPage() {
         <Skeleton variant="rows" rows={6} />
       ) : (
         <>
-          {/* Student flags */}
-          <Section title="Student Attention Flags" count={studentFlags.length} color="#b91c1c">
-            {studentFlags.length === 0 ? (
-              <EmptyState icon="✅" title="No student flags" subtitle="All clear." />
-            ) : isRegSec ? (
-              <SummaryCards flags={studentFlags} />
-            ) : (
-              <div className="rso-table-wrap">
-                <table className="rso-table">
-                  <thead>
-                    <tr>
-                      <th>Flag</th>
-                      <th>Student</th>
-                      <th>Fellowship</th>
-                      <th>Teacher</th>
-                      <th>Detail</th>
-                      <th>Severity</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+          <div className="rso-tabs" role="tablist" aria-label="Attention sections" style={{ marginTop: 16 }}>
+            {SECTIONS.map((key) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                id={`attention-tab-${key}`}
+                aria-selected={section === key}
+                aria-controls="attention-tabpanel"
+                className="rso-tab"
+                onClick={() => setSection(key)}
+              >{tabLabels[key]}</button>
+            ))}
+          </div>
+
+          <div role="tabpanel" id="attention-tabpanel" aria-labelledby={`attention-tab-${section}`}>
+            {section === 'students' && (
+              studentFlags.length === 0 ? (
+                <EmptyState icon="✅" title="No student flags" message="All clear." />
+              ) : isRegSec ? (
+                <SummaryCards flags={studentFlags} />
+              ) : (
+                <>
+                  <div className="rso-table-wrap">
+                    <table className="rso-table">
+                      <thead>
+                        <tr>
+                          <th>Flag</th>
+                          <th>Student</th>
+                          <th>Fellowship</th>
+                          <th>Teacher</th>
+                          <th>Detail</th>
+                          <th>Severity</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {studentFlags.map((f, i) => {
+                          const rid = f.applicant_id || i;
+                          const res = isResolved(resolved, f.flag_type, 'student', f.applicant_id);
+                          return (
+                            <tr key={`s-${rid}-${f.flag_type}`} style={{ opacity: res ? 0.58 : 1 }}>
+                              <td>{FLAG_LABELS[f.flag_type] || f.flag_type}</td>
+                              <td>
+                                <div style={{ fontWeight: 600 }}>{f.full_name}</div>
+                                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--muted)' }}>{f.email}</div>
+                                {res && <div style={{ fontSize: '0.65rem', color: 'var(--muted)', fontStyle: 'italic' }}>{resolvedNote(resolved, f.flag_type, 'student', f.applicant_id)}</div>}
+                              </td>
+                              <td>{f.fellowship_code || '—'}</td>
+                              <td>{f.teacher_name || '—'}</td>
+                              <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.detail}</td>
+                              <td><SeverityBadge severity={f.severity} /></td>
+                              <td>
+                                {!res && (
+                                  <Button variant="ghost" size="sm" onClick={() => handleResolve(f.flag_type, 'student', f.applicant_id)}>
+                                    Resolve
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="rso-table-cards">
                     {studentFlags.map((f, i) => {
                       const rid = f.applicant_id || i;
                       const res = isResolved(resolved, f.flag_type, 'student', f.applicant_id);
                       return (
-                        <tr key={`s-${rid}-${f.flag_type}`} style={{ opacity: res ? 0.58 : 1 }}>
-                          <td>{FLAG_LABELS[f.flag_type] || f.flag_type}</td>
-                          <td>
-                            <div style={{ fontWeight: 600 }}>{f.full_name}</div>
-                            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{f.email}</div>
-                            {res && <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>{resolvedNote(resolved, f.flag_type, 'student', f.applicant_id)}</div>}
-                          </td>
-                          <td>{f.fellowship_code || '—'}</td>
-                          <td>{f.teacher_name || '—'}</td>
-                          <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.detail}</td>
-                          <td><SeverityBadge severity={f.severity} /></td>
-                          <td>
-                            {!res && (
-                              <Button variant="ghost" size="sm" onClick={() => handleResolve(f.flag_type, 'student', f.applicant_id)}>
-                                Resolve
-                              </Button>
-                            )}
-                          </td>
-                        </tr>
+                        <div key={`sc-${rid}-${f.flag_type}`} className="rso-table-card" style={{ opacity: res ? 0.58 : 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontWeight: 700 }}>{f.full_name}</div>
+                              <div style={{ fontSize: 12, color: 'var(--muted)', overflowWrap: 'anywhere' }}>{f.email}</div>
+                            </div>
+                            <SeverityBadge severity={f.severity} />
+                          </div>
+                          <div className="rso-table-card-row"><span className="rso-table-card-label">Flag</span><span>{FLAG_LABELS[f.flag_type] || f.flag_type}</span></div>
+                          <div className="rso-table-card-row"><span className="rso-table-card-label">Detail</span><span>{f.detail || '—'}</span></div>
+                          {!res && (
+                            <div style={{ marginTop: 8 }}>
+                              <Button variant="ghost" size="sm" onClick={() => handleResolve(f.flag_type, 'student', f.applicant_id)}>Resolve</Button>
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
-                  </tbody>
-                </table>
-              </div>
+                  </div>
+                </>
+              )
             )}
-          </Section>
 
-          {/* Teacher flags */}
-          <Section title="Teacher Attention Flags" count={teacherFlags.length} color="#b45309">
-            {teacherFlags.length === 0 ? (
-              <EmptyState icon="✅" title="No teacher flags" subtitle="All clear." />
-            ) : (
-              <div className="rso-table-wrap">
-                <table className="rso-table">
-                  <thead>
-                    <tr>
-                      <th>Flag</th>
-                      <th>Teacher</th>
-                      <th>Email</th>
-                      <th>Classes</th>
-                      <th>Detail</th>
-                      <th>Severity</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+            {section === 'teachers' && (
+              teacherFlags.length === 0 ? (
+                <EmptyState icon="✅" title="No teacher flags" message="All clear." />
+              ) : (
+                <>
+                  <div className="rso-table-wrap">
+                    <table className="rso-table">
+                      <thead>
+                        <tr>
+                          <th>Flag</th>
+                          <th>Teacher</th>
+                          <th>Email</th>
+                          <th>Classes</th>
+                          <th>Detail</th>
+                          <th>Severity</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {teacherFlags.map((f, i) => {
+                          const rid = f.teacher_id || i;
+                          const res = isResolved(resolved, f.flag_type, 'teacher', f.teacher_id);
+                          return (
+                            <tr key={`t-${rid}-${f.flag_type}`} style={{ opacity: res ? 0.58 : 1 }}>
+                              <td>{FLAG_LABELS[f.flag_type] || f.flag_type}</td>
+                              <td style={{ fontWeight: 600 }}>{f.full_name}</td>
+                              <td>{f.email}</td>
+                              <td>{f.class_count ?? '—'}</td>
+                              <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.detail}</td>
+                              <td><SeverityBadge severity={f.severity} /></td>
+                              <td>
+                                {!res && (
+                                  <Button variant="ghost" size="sm" onClick={() => handleResolve(f.flag_type, 'teacher', f.teacher_id)}>
+                                    Resolve
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="rso-table-cards">
                     {teacherFlags.map((f, i) => {
                       const rid = f.teacher_id || i;
                       const res = isResolved(resolved, f.flag_type, 'teacher', f.teacher_id);
                       return (
-                        <tr key={`t-${rid}-${f.flag_type}`} style={{ opacity: res ? 0.58 : 1 }}>
-                          <td>{FLAG_LABELS[f.flag_type] || f.flag_type}</td>
-                          <td style={{ fontWeight: 600 }}>{f.full_name}</td>
-                          <td>{f.email}</td>
-                          <td>{f.class_count ?? '—'}</td>
-                          <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.detail}</td>
-                          <td><SeverityBadge severity={f.severity} /></td>
-                          <td>
-                            {!res && (
-                              <Button variant="ghost" size="sm" onClick={() => handleResolve(f.flag_type, 'teacher', f.teacher_id)}>
-                                Resolve
-                              </Button>
-                            )}
-                          </td>
-                        </tr>
+                        <div key={`tc-${rid}-${f.flag_type}`} className="rso-table-card" style={{ opacity: res ? 0.58 : 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontWeight: 700 }}>{f.full_name}</div>
+                              <div style={{ fontSize: 12, color: 'var(--muted)', overflowWrap: 'anywhere' }}>{f.email}</div>
+                            </div>
+                            <SeverityBadge severity={f.severity} />
+                          </div>
+                          <div className="rso-table-card-row"><span className="rso-table-card-label">Flag</span><span>{FLAG_LABELS[f.flag_type] || f.flag_type}</span></div>
+                          <div className="rso-table-card-row"><span className="rso-table-card-label">Classes</span><span>{f.class_count ?? '—'}</span></div>
+                          {!res && (
+                            <div style={{ marginTop: 8 }}>
+                              <Button variant="ghost" size="sm" onClick={() => handleResolve(f.flag_type, 'teacher', f.teacher_id)}>Resolve</Button>
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
-                  </tbody>
-                </table>
-              </div>
+                  </div>
+                </>
+              )
             )}
-          </Section>
 
-          {/* System flags */}
-          <Section title="System Flags" count={systemCount} color="#7c2d12">
-            {systemFlags.length === 0 ? (
-              <EmptyState icon="✅" title="No system flags" subtitle="All systems nominal." />
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
-                {systemFlags.map((f) => {
-                  const res = isResolved(resolved, f.flag_type, 'system', f.flag_type);
-                  return (
-                    <div key={f.flag_type} className="card" style={{ padding: '1rem', opacity: res ? 0.58 : 1 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                        <span style={{ fontWeight: 700 }}>{FLAG_LABELS[f.flag_type] || f.flag_type}</span>
-                        <SeverityBadge severity={f.severity} />
+            {section === 'system' && (
+              systemFlags.length === 0 ? (
+                <EmptyState icon="✅" title="No system flags" message="All systems nominal." />
+              ) : (
+                <div className="rso-quick-grid">
+                  {systemFlags.map((f) => {
+                    const res = isResolved(resolved, f.flag_type, 'system', f.flag_type);
+                    return (
+                      <div key={f.flag_type} className="rso-kpi-tile" style={{ opacity: res ? 0.58 : 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                          <span style={{ fontWeight: 700 }}>{FLAG_LABELS[f.flag_type] || f.flag_type}</span>
+                          <SeverityBadge severity={f.severity} />
+                        </div>
+                        <div className="rso-kpi-tile-value">{f.count}</div>
+                        <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--muted)', margin: '6px 0 10px' }}>{f.detail}</div>
+                        {!res && (
+                          <Button variant="ghost" size="sm" onClick={() => handleResolve(f.flag_type, 'system', f.flag_type)}>
+                            Mark Resolved
+                          </Button>
+                        )}
                       </div>
-                      <div style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.25rem' }}>{f.count}</div>
-                      <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>{f.detail}</div>
-                      {!res && (
-                        <Button variant="ghost" size="sm" onClick={() => handleResolve(f.flag_type, 'system', f.flag_type)}>
-                          Mark Resolved
-                        </Button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )
             )}
-          </Section>
+          </div>
         </>
       )}
     </div>
-  );
-}
-
-function Section({ title, count, color, children }) {
-  return (
-    <section style={{ marginTop: '1.5rem' }}>
-      <h2 style={{ fontSize: 'var(--fs-lg)', fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        {title}
-        <span style={{ fontSize: 'var(--fs-xs)', background: color, color: '#fff', borderRadius: 'var(--r-sm)', padding: '0.15rem 0.5rem', fontWeight: 600 }}>
-          {count}
-        </span>
-      </h2>
-      {children}
-    </section>
   );
 }
 
@@ -265,12 +326,12 @@ function SummaryCards({ flags }) {
     else if (f.severity === 'warning' && grouped[f.flag_type].maxSeverity !== 'critical') grouped[f.flag_type].maxSeverity = 'warning';
   }
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem' }}>
+    <div className="rso-quick-grid">
       {Object.entries(grouped).map(([type, { count, maxSeverity }]) => (
-        <div key={type} className="card" style={{ padding: '1rem' }}>
-          <div style={{ fontWeight: 700, marginBottom: '0.25rem' }}>{FLAG_LABELS[type] || type}</div>
+        <div key={type} className="rso-kpi-tile">
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>{FLAG_LABELS[type] || type}</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '1.25rem', fontWeight: 800 }}>{count}</span>
+            <span className="rso-kpi-tile-value">{count}</span>
             <SeverityBadge severity={maxSeverity} />
           </div>
         </div>
