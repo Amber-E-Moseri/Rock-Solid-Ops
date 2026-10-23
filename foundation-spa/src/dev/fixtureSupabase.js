@@ -96,6 +96,12 @@ const TABLES = {
       { id: 5, student_id: 305, batch_id: 1, class_missed: 'Synthetic Class B', makeup_type: 'Video', deadline: new Date(now + 7 * day).toISOString(), makeup_completed: true, completed_at: new Date(now - 1 * day).toISOString(), created_at: new Date(now - 10 * day).toISOString(), students: student(305, 'Synthetic Student 305', 'CSGB') },
     ];
   },
+  // Archive rows for the Reports preview. Recipients are placeholder addresses.
+  report_archive: () => [
+    { id: 1, report_type: 'weekly', scope: 'regional', scope_value: null, date_from: '2026-10-12', date_to: '2026-10-18', batch_id: 1, generated_by: 'synthetic.admin@example.invalid', recipients: ['synthetic.admin@example.invalid'], body_html: null, created_at: '2026-10-19T08:00:00.000Z' },
+    { id: 2, report_type: 'monthly', scope: 'group', scope_value: 'CESGA', date_from: '2026-09-01', date_to: '2026-09-30', batch_id: 1, generated_by: 'synthetic.admin@example.invalid', recipients: ['a@example.invalid', 'b@example.invalid'], body_html: null, created_at: '2026-10-01T08:00:00.000Z' },
+    { id: 3, report_type: 'pastor_digest', scope: 'subgroup', scope_value: 'WSGA', date_from: '2026-10-05', date_to: '2026-10-11', batch_id: null, generated_by: 'system', recipients: [], body_html: null, created_at: '2026-10-12T08:00:00.000Z' },
+  ],
   attention_flags: () => [],
   moodle_enrollment_sync: () => [
     ...synth(18, () => ({ sync_status: 'SYNCED', synced_at: new Date(Date.UTC(2026, 9, 21, 12, 0)).toISOString(), updated_at: new Date(Date.UTC(2026, 9, 21, 12, 0)).toISOString() })),
