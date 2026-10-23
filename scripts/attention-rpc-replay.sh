@@ -20,10 +20,12 @@ trap '"${PSQL[@]}" -d postgres -c "drop database if exists $DB" >/dev/null' EXIT
 
 "${PSQL[@]}" -d "$DB" -f "$ROOT/supabase/tests/security/attention-rpc/00_shim.sql" >/dev/null
 
+LOG="$(mktemp)"
 applied=0
 for f in $(ls "$ROOT"/supabase/migrations/*.sql | sort); do
-  if ! "${PSQL[@]}" -d "$DB" -f "$f" >/dev/null 2>&1; then
+  if ! "${PSQL[@]}" -d "$DB" -f "$f" >"$LOG" 2>&1; then
     echo "REPLAY FAILED at $(basename "$f")" >&2
+    tail -n 20 "$LOG" >&2
     exit 1
   fi
   applied=$((applied + 1))
