@@ -950,3 +950,17 @@
 @media (max-width: 900px) {
   .rso-two-pane { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ── Reports (After board 2.r1b) ── */
+.rso-reports-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 16px;
+  align-items: start;
+  margin-top: 4px;
+}
+.rso-reports-split > * { min-width: 0; }
+.rso-reports-archive { margin-top: 0; }
+@media (max-width: 900px) {
+  .rso-reports-split { grid-template-columns: minmax(0, 1fr); }
+}
