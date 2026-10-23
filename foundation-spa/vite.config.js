@@ -1,8 +1,19 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { resolveFixtureAlias } from './src/lib/devFlags.js';
 
-export default defineConfig({
+const here = path.dirname(fileURLToPath(import.meta.url));
+
+export default defineConfig(({ command, mode }) => {
+  // Dev-server-only synthetic Supabase client (opt-in via VITE_PREVIEW_FIXTURES=true).
+  // Builds never receive this alias, so the fixture module cannot reach production.
+  const fixtureAlias = resolveFixtureAlias({ command, env: process.env }) === 'fixtures'
+    ? [{ find: /^(?:\.{1,2}\/)+supabase\.js$/, replacement: path.join(here, 'src/dev/fixtureSupabase.js') }]
+    : [];
+  return {
   plugins: [
     react(),
     VitePWA({
@@ -50,9 +61,11 @@ export default defineConfig({
     setupFiles: ['./src/tests/setup.js'],
   },
   resolve: {
-    alias: {
-      '@': '/src',
-    },
+    alias: [
+      ...fixtureAlias,
+      { find: '@', replacement: '/src' },
+    ],
     dedupe: ['react', 'react-dom'],
   },
+  };
 });
