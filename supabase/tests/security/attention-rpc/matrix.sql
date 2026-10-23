@@ -219,4 +219,54 @@ SELECT 'fault_injection_student_as_superadmin' AS check_name, outcome AS result,
 FROM att_fault_result;
 ROLLBACK TO SAVEPOINT att_fault;
 
+-- ---- Fault injection for the teacher and system functions -----------------------------
+-- Each body reads a table that is renamed inside its own savepoint. The call as superadmin
+-- must raise SQLSTATE 42P01 (undefined_table), not return OK with zero rows or zero counts.
+CREATE TEMP TABLE att_fault_all (check_name text, outcome text) ON COMMIT DROP;
+GRANT ALL ON att_fault_all TO authenticated;
+
+SAVEPOINT att_fault_teacher;
+ALTER TABLE public.teachers RENAME TO teachers_fault;
+SELECT set_config('request.jwt.claims', json_build_object('sub', '00000000-0000-0000-0000-0000000000a1', 'role', 'authenticated')::text, true);
+SET LOCAL ROLE authenticated;
+DO $ft$
+DECLARE v_outcome text := 'OK-NO-ERROR';
+BEGIN
+  BEGIN
+    PERFORM 1 FROM public.get_teacher_attention_flags();
+  EXCEPTION WHEN OTHERS THEN
+    v_outcome := SQLSTATE;
+  END;
+  INSERT INTO att_fault_all VALUES ('fault_injection_teacher_as_superadmin', v_outcome);
+END
+$ft$;
+RESET ROLE;
+-- Rename back inside the transaction. A ROLLBACK TO SAVEPOINT here would also discard the result row.
+ALTER TABLE public.teachers_fault RENAME TO teachers;
+RELEASE SAVEPOINT att_fault_teacher;
+
+SAVEPOINT att_fault_system;
+ALTER TABLE public.applicants RENAME TO applicants_fault;
+SELECT set_config('request.jwt.claims', json_build_object('sub', '00000000-0000-0000-0000-0000000000a1', 'role', 'authenticated')::text, true);
+SET LOCAL ROLE authenticated;
+DO $fs$
+DECLARE v_outcome text := 'OK-NO-ERROR';
+BEGIN
+  BEGIN
+    PERFORM 1 FROM public.get_system_attention_flags();
+  EXCEPTION WHEN OTHERS THEN
+    v_outcome := SQLSTATE;
+  END;
+  INSERT INTO att_fault_all VALUES ('fault_injection_system_as_superadmin', v_outcome);
+END
+$fs$;
+RESET ROLE;
+ALTER TABLE public.applicants_fault RENAME TO applicants;
+RELEASE SAVEPOINT att_fault_system;
+
+SELECT check_name AS check_name, outcome AS result,
+       CASE WHEN outcome = '42P01' THEN 'PASS' ELSE 'FAIL' END AS verdict
+FROM att_fault_all
+ORDER BY check_name;
+
 ROLLBACK;

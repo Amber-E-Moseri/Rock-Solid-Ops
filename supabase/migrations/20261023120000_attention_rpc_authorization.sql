@@ -26,7 +26,9 @@
 --        removed from this function because a raised error rolls it back anyway.
 --      - 42703: the milestone check referenced sms.completed and sms.value, which do not exist.
 --        The canonical completion state is status = 'completed'; those branches were dead.
---      The teacher and system functions keep their handlers in this migration unchanged.
+--   5. get_teacher_attention_flags and get_system_attention_flags: the same re-raise handler.
+--      Both used WHEN OTHERS ... RETURN, which turned unexpected errors into zero rows or zero
+--      counts. The teacher handler's audit insert was removed for the same reason as the student one.
 --
 -- Not in this migration: subgroup or fellowship scoping, and any client-side route change.
 -- Rollback is not a migration. Restoring the previous definitions reopens the exposure
@@ -401,22 +403,8 @@ EXCEPTION
   WHEN insufficient_privilege THEN
     RAISE;
   WHEN OTHERS THEN
-  INSERT INTO public.audit_logs (actor_email, action, entity_type, entity_id, status, details, created_at)
-  VALUES (
-    'system@attention-flags',
-    'ATTENTION_FLAGS_ERROR',
-    'rpc',
-    'get_teacher_attention_flags',
-    'FAILED',
-    jsonb_build_object(
-      'function', 'get_teacher_attention_flags',
-      'sqlstate', SQLSTATE,
-      'error', SQLERRM,
-      'p_batch_id', p_batch_id
-    ),
-    now()
-  );
-  RETURN;
+    -- Unexpected errors surface to the caller; an empty result would look like "no flags".
+    RAISE;
 END;
 $$;
 
@@ -472,7 +460,8 @@ EXCEPTION
   WHEN insufficient_privilege THEN
     RAISE;
   WHEN OTHERS THEN
-  RETURN;
+    -- Unexpected errors surface to the caller; an empty count would look like "no flags".
+    RAISE;
 END;
 $$;
 
