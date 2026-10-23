@@ -229,7 +229,7 @@ function AddTeacherModal({ fellowships, onClose, onAdd }) {
           <pre style={{ fontSize: '11px', background: 'var(--surface)', padding: '0.5rem', borderRadius: 'var(--r-sm)', marginTop: '0.5rem' }}>Password: {form.temp_password}</pre>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+        <div className="rso-form-grid2">
           <label className="rso-field"><span>Full Name *</span><input className="rso-input" value={form.full_name} onChange={(e) => set('full_name', e.target.value)} required /></label>
           <label className="rso-field"><span>Email *</span><input className="rso-input" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} required /></label>
           <label className="rso-field"><span>Temporary Password *</span>
@@ -280,12 +280,20 @@ function LinkAuthModal({ teacher, onClose, onLink }) {
       </>
     }>
       <div style={{ display: 'grid', gap: '0.75rem' }}>
-        <label className="rso-field"><span>Teacher ID</span><input className="rso-input" value={teacher.teacher_id} disabled /></label>
-        <label className="rso-field"><span>Teacher Email</span><input className="rso-input" value={teacher.email} disabled /></label>
+        <div className="rso-teacher-chip">
+          <span className="rso-teacher-chip-avatar" aria-hidden="true">{String(teacher.full_name || teacher.email || '?').split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase()}</span>
+          <span style={{ minWidth: 0 }}>
+            <span style={{ display: 'block', fontWeight: 700, fontSize: 13 }}>{teacher.full_name || teacher.email}</span>
+            <span style={{ display: 'block', fontSize: 12, color: 'var(--muted)', overflowWrap: 'anywhere' }}>{teacher.email} · {teacher.teacher_id}</span>
+          </span>
+        </div>
         <label className="rso-field"><span>Auth User ID (UUID)</span><input className="rso-input" value={authUserId} onChange={(e) => setAuthUserId(e.target.value)} /></label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '13px' }}>
-          <input type="checkbox" checked={allowRelink} onChange={(e) => setAllowRelink(e.target.checked)} /> Allow relink
-        </label>
+        <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>Enter the exact auth user ID. Email-only linking is not supported.</p>
+        <div className="rso-toggle-group">
+          <label className={`rso-toggle${allowRelink ? ' is-on' : ''}`}>
+            <input type="checkbox" checked={allowRelink} onChange={(e) => setAllowRelink(e.target.checked)} /> Allow relink
+          </label>
+        </div>
       </div>
     </Modal>
   );
