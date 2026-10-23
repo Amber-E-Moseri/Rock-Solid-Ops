@@ -66,6 +66,16 @@ The following workflows stay disabled and are NOT certified for full operational
 Release condition: each flag may be set to `true` only after its own backend certification is recorded.
 Do not set any flag as part of PR #12 or this documentation change.
 
+### PR #21 (`brief/legacy-login-safe-next`) — login-security dependency for PR #20 (2026-10-23)
+
+PR #21 is the separate legacy `/foundation` login open-redirect fix (`safe-next`), head `026d88d`, open and
+not merged. It is a release dependency of PR #20 (`brief/spa-cutover-integration`), not part of it. PR #20 does
+not contain the legacy login fix. The older candidate `d39ed1e` (`brief/static-login-next-hardening`) is
+superseded by PR #21 and must not be imported or merged.
+
+Release condition: PR #21 must be reviewed and merged under its own owner gate before any limited SPA launch
+that keeps `/foundation/auth/login.html` live. Verify its status before the next staging run.
+
 Known limitation: the staging harness must refresh authentication after sign-out, because the sign-out test
 revokes the teacher session that later tests reuse.
 
