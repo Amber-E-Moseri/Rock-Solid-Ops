@@ -5,6 +5,8 @@ import { fetchPortalStats, fetchActivityFeed, greeting, relTime } from './lib/ad
 import { useAuth } from '../../hooks/useAuth.js';
 import { Card, Skeleton, Badge, PageHeader, ErrorBanner } from '../../components/ui/index.js';
 
+const KPI_TONE = ['navy', 'gold', 'dark', 'coral'];
+
 export default function AdminPortalPage() {
   const { profile } = useAuth();
   const role = profile?.role;
@@ -17,7 +19,7 @@ export default function AdminPortalPage() {
   const kpis = useMemo(() => [
     { label: 'Enrolled', value: stats.data?.enrolled ?? '—' },
     { label: 'Active Batches', value: stats.data?.activeBatches ?? '—' },
-    { label: 'Pending Review', value: stats.data?.pending ?? '—', accent: true },
+    { label: 'Pending Review', value: stats.data?.pending ?? '—' },
     { label: 'Teachers', value: stats.data?.teachers ?? '—' },
   ], [stats.data]);
 
@@ -50,12 +52,12 @@ export default function AdminPortalPage() {
       {stats.isLoading ? <Skeleton style={{ height: 90 }} /> : stats.isError ? (
         <ErrorBanner message="Could not load stats." onRetry={() => stats.refetch()} />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
-          {kpis.map((k) => (
-            <Card key={k.label}>
-              <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', color: k.accent ? 'var(--color-warning)' : 'var(--text)' }}>{k.value}</div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginTop: 4 }}>{k.label}</div>
-            </Card>
+        <div className="rso-kpi-grid">
+          {kpis.map((k, i) => (
+            <div key={k.label} className={`rso-kpi-tile rso-kpi-tile-${KPI_TONE[i]}`}>
+              <div className="rso-kpi-tile-value">{k.value}</div>
+              <div className="rso-kpi-tile-label">{k.label}</div>
+            </div>
           ))}
         </div>
       )}
@@ -69,26 +71,22 @@ export default function AdminPortalPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
         {/* Recent activity */}
         <Card>
-          <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}>Recent Activity</div>
+          <div className="rso-section-title">Recent Activity</div>
           {feed.isLoading ? <Skeleton style={{ height: 120 }} /> : feed.isError ? (
             <ErrorBanner message="Could not load recent activity." onRetry={() => feed.refetch()} />
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {(feed.data?.recentLogs ?? []).map((log, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                  <div style={{
-                    width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: log.actor_name === 'system' ? 'var(--surface-2)' : 'var(--soft-lav, #ede9fe)',
-                    fontSize: 10, fontWeight: 700, color: 'var(--primary)', flexShrink: 0,
-                  }}>
+                <div key={i} className="rso-activity-row">
+                  <div className="rso-avatar">
                     {(log.actor_name || '?').slice(0, 2).toUpperCase()}
                   </div>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ fontWeight: 600 }}>{log.actor_name || 'System'}</span>{' '}
                     <span style={{ color: 'var(--muted)' }}>{(log.action || '').replace(/_/g, ' ')}</span>{' '}
                     <span style={{ color: 'var(--muted)', fontSize: 11 }}>{log.entity_type}</span>
                   </div>
-                  <span style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{relTime(log.created_at)}</span>
+                  <span className="rso-mono-time">{relTime(log.created_at)}</span>
                 </div>
               ))}
               {(feed.data?.recentLogs ?? []).length === 0 && (
@@ -100,11 +98,11 @@ export default function AdminPortalPage() {
 
         {/* System health */}
         <Card>
-          <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 12 }}>System Health</div>
+          <div className="rso-section-title">System Health</div>
           {feed.isLoading ? <Skeleton style={{ height: 80 }} /> : feed.isError ? (
             <ErrorBanner message="Could not load system health." onRetry={() => feed.refetch()} />
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <HealthRow label="Email sender" count={feed.data?.pendingEmails ?? 0} warn={feed.data?.pendingEmails > 0} />
               <HealthRow label="Moodle sync" count={feed.data?.failedMoodle ?? 0} warn={feed.data?.failedMoodle > 0} />
               <HealthRow label="Registration processor" count={0} active />
@@ -119,17 +117,12 @@ export default function AdminPortalPage() {
 function CardSection({ title, cards }) {
   return (
     <div>
-      <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>{title}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+      <div className="rso-section-title">{title}</div>
+      <div className="rso-quick-grid">
         {cards.map((c) => (
-          <Link key={c.to} to={c.to} style={{ textDecoration: 'none', color: 'inherit' }}>
-            <Card style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
-              <span style={{
-                width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 18, background: 'var(--surface-2)', flexShrink: 0,
-              }}>{c.icon}</span>
-              <span style={{ fontWeight: 700, fontSize: 13 }}>{c.title}</span>
-            </Card>
+          <Link key={c.to} to={c.to} className="rso-quick-card">
+            <span className="rso-quick-icon" aria-hidden="true">{c.icon}</span>
+            <span>{c.title}</span>
           </Link>
         ))}
       </div>
@@ -138,16 +131,12 @@ function CardSection({ title, cards }) {
 }
 
 function HealthRow({ label, count, warn, active }) {
-  const dotColor = active ? 'var(--color-success)' : warn ? 'var(--color-warning)' : 'var(--color-success)';
+  const tone = active || !warn ? 'success' : 'warning';
+  const text = active ? 'Active' : count > 0 ? `${count} pending` : 'OK';
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor, display: 'inline-block', flexShrink: 0 }} />
-        {label}
-      </div>
-      <span style={{ color: 'var(--muted)', fontSize: 11 }}>
-        {active ? 'Active' : count > 0 ? `${count} pending` : 'OK'}
-      </span>
+    <div className="rso-health-row">
+      <span>{label}</span>
+      <Badge variant={tone}>{text}</Badge>
     </div>
   );
 }
