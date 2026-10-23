@@ -188,7 +188,7 @@ function AvailabilityTab({ teacherId, teacherEmail, addToast }) {
                       aria-pressed={selected.has(s.id)}
                       onClick={() => setSelected((prev) => {
                         const next = new Set(prev); next.has(s.id) ? next.delete(s.id) : next.add(s.id); return next;
-                      })}>{to12h(s.time_slot)} <Badge status={s.status?.toLowerCase() === 'approved' ? 'active' : 'draft'}>{s.status || 'Tentative'}</Badge></button>
+                      })}>{to12h(s.time_slot)} <Badge status={s.status === 'Available' ? 'active' : 'draft'}>{s.status || 'Tentative'}</Badge></button>
                   ))}
                 </div>
               </div>
