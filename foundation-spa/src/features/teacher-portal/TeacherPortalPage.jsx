@@ -90,22 +90,31 @@ function MyClassesTab({ teacherId }) {
 
   return (
     <>
-      <div className="rso-table-wrap">
-        <table className="rso-table">
-          <thead><tr><th>Class</th><th>Day</th><th>Time</th><th>Campus</th><th>Enrolled</th><th>Status</th></tr></thead>
-          <tbody>
-            {classes.map((c, i) => (
-              <tr key={c.class_option_id || i}>
-                <td className="rso-tp-cell-strong">{c.class_name || c.class_option_id || `Class ${i + 1}`}</td>
-                <td>{c.day || '—'}</td>
-                <td>{c.class_time || '—'}</td>
-                <td>{c.fellowship_codes?.join(', ') || '—'}</td>
-                <td>{c.current_enrollment ?? c.enrollment_count ?? '—'}</td>
-                <td><Badge status={c.active ? 'active' : 'inactive'}>{c.active ? 'Active' : 'Inactive'}</Badge></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="rso-class-grid">
+        {classes.map((c, i) => {
+          const enrolled = c.current_enrollment ?? c.enrollment_count ?? '—';
+          return (
+            <article key={c.class_option_id || i} className="rso-class-card">
+              <div className="rso-class-card-head">
+                <div style={{ minWidth: 0 }}>
+                  <div className="rso-class-name">{c.class_name || c.class_option_id || `Class ${i + 1}`}</div>
+                  <div className="rso-class-meta">{[c.day, c.class_time].filter(Boolean).join(' · ') || 'Schedule to be confirmed'}</div>
+                </div>
+                <Badge status={c.active ? 'active' : 'inactive'}>{c.active ? 'Active' : 'Inactive'}</Badge>
+              </div>
+              <div className="rso-class-stats">
+                <div>
+                  <div className="rso-class-stat-value">{enrolled}</div>
+                  <div className="rso-class-stat-label">Enrolled</div>
+                </div>
+                <div>
+                  <div className="rso-class-stat-text">{c.fellowship_codes?.join(', ') || '—'}</div>
+                  <div className="rso-class-stat-label">Campus</div>
+                </div>
+              </div>
+            </article>
+          );
+        })}
       </div>
       <div className="rso-table-cards">
         {classes.map((c, i) => (
