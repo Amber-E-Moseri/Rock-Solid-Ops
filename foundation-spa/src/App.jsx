@@ -54,7 +54,11 @@ const GraduationStatusPage = lazy(() => import('./features/graduation-status/Gra
 const NexusManagementPage = lazy(() => import('./features/nexus-management/NexusManagementPage.jsx'));
 const TeacherPortalPage  = lazy(() => import('./features/teacher-portal/TeacherPortalPage.jsx'));
 const PlaceholderPage    = lazy(() => import('./features/placeholder/PlaceholderPage.jsx'));
-const ShowcasePage       = lazy(() => import('./features/design-showcase/ShowcasePage.jsx'));
+// Showcase exists only in development builds; production never imports it.
+const SHOWCASE_ENABLED = import.meta.env.DEV;
+const ShowcasePage       = SHOWCASE_ENABLED
+  ? lazy(() => import('./features/design-showcase/ShowcasePage.jsx'))
+  : null;
 
 // Legacy auth-client.js role sets: isAdmin() = ADMIN_ROLES; several pages allow +regional_secretary
 const ADMIN_ROLES = ['superadmin', 'admin', 'subgroup_admin', 'pastor', 'principal'];
@@ -86,15 +90,17 @@ export default function App() {
               <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
               <Route path="/auth/*" element={<Navigate to="/auth/login" replace />} />
 
-              {/* Design system showcase (dev only) */}
-              <Route
-                path="/dev/showcase"
-                element={
-                  <StaffShell title="Design Showcase">
-                    <ShowcasePage />
-                  </StaffShell>
-                }
-              />
+              {/* Design system showcase: registered in development builds only */}
+              {SHOWCASE_ENABLED && (
+                <Route
+                  path="/dev/showcase"
+                  element={
+                    <StaffShell title="Design Showcase">
+                      <ShowcasePage />
+                    </StaffShell>
+                  }
+                />
+              )}
 
               {/* Staff — audit log (Phase 2 pilot) */}
               <Route

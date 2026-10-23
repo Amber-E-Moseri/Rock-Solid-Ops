@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabase.js';
+import { resolveDevBypassRole } from '../lib/devFlags.js';
 
 // ── Role constants (mirrors auth-client.js) ──────────────────────────────────
 
@@ -30,13 +31,8 @@ const STAFF_ROLES = new Set([
 
 const DASHBOARD_ROLES = new Set([...STAFF_ROLES]);
 
-// Dev-only bypass (localhost only)
-const BYPASS_ROLE =
-  import.meta.env.VITE_BYPASS_ROLE &&
-  import.meta.env.MODE !== 'test' &&
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? String(import.meta.env.VITE_BYPASS_ROLE).trim().toLowerCase()
-    : '';
+// Dev-only bypass: requires a development build, an explicit opt-in and a local host.
+const BYPASS_ROLE = import.meta.env.DEV ? resolveDevBypassRole(import.meta.env, window.location.hostname) : '';
 
 if (BYPASS_ROLE) {
   console.warn('[AuthContext] BYPASS_ROLE active — all role checks bypassed. Dev only.');
