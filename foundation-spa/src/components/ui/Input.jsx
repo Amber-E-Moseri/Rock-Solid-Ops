@@ -17,7 +17,7 @@ export const Textarea = forwardRef(function Textarea({ className = '', ...props 
   return <textarea ref={ref} className={`rso-textarea${className ? ` ${className}` : ''}`} {...props} />;
 });
 
-export function SearchInput({ className = '', ...props }) {
+export function SearchInput({ className = '', style, ...props }) {
   return (
     <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>
       <Search
@@ -33,7 +33,7 @@ export function SearchInput({ className = '', ...props }) {
       />
       <input
         className={`rso-input${className ? ` ${className}` : ''}`}
-        style={{ paddingLeft: 34 }}
+        style={{ paddingLeft: 34, ...style }}
         {...props}
       />
     </div>
