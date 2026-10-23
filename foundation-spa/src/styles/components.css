@@ -838,3 +838,49 @@
   .rso-msg-thread-body { height: 360px; }
   .rso-msg-bubble { max-width: 92%; }
 }
+
+/* ── Class Editor (After board 2.c1b) ── */
+.rso-class-split {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.rso-class-list {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--sh-xs);
+  overflow: hidden;
+  max-height: 75vh;
+  overflow-y: auto;
+  min-width: 0;
+}
+.rso-class-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  min-height: 44px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  border-left: 3px solid transparent;
+  background: transparent;
+}
+.rso-class-row:hover { background: var(--surface-2); }
+.rso-class-row.is-active {
+  border-left-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+.rso-class-row.is-inactive { opacity: .55; }
+.rso-capacity {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 768px) {
+  .rso-class-split { grid-template-columns: minmax(0, 1fr); }
+  .rso-class-list { max-height: 40vh; }
+}
