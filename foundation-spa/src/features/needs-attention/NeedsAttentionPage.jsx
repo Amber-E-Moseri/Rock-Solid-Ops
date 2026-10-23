@@ -38,7 +38,7 @@ export default function NeedsAttentionPage() {
   const [section, setSection] = useState('students');
 
   const { data: batches } = useBatches();
-  const { data, isLoading, dataUpdatedAt } = useAttentionData(batchId || undefined);
+  const { data, isLoading, isError, dataUpdatedAt } = useAttentionData(batchId || undefined);
   const resolve = useMarkResolved();
 
   const resolved = data?.resolved ?? new Map();
@@ -118,6 +118,8 @@ export default function NeedsAttentionPage() {
 
       {isLoading ? (
         <Skeleton variant="rows" rows={6} />
+      ) : isError ? (
+        <EmptyState icon="⚠️" title="Needs Attention data unavailable" subtitle="The flags could not be loaded for your account. Nothing is shown as clear." />
       ) : (
         <>
           <div className="rso-tabs" role="tablist" aria-label="Attention sections" style={{ marginTop: 16 }}>
