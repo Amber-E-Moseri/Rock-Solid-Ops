@@ -37,6 +37,10 @@ export async function fetchAttentionData(batchId) {
   ]);
 
   if (flagsRes.error) throw flagsRes.error;
+  // A denied RPC (42501) returns error with data null. Surface it instead of an empty list.
+  if (studentRes.error) throw studentRes.error;
+  if (teacherRes.error) throw teacherRes.error;
+  if (systemRes.error) throw systemRes.error;
 
   const resolved = new Map();
   for (const f of flagsRes.data ?? []) {
