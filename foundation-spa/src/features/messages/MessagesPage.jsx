@@ -67,6 +67,8 @@ export default function MessagesPage() {
     }
   }, [draft, selectedId, refresh, toast]);
 
+  const selectedConv = conversations.find((c) => String(c.id) === String(selectedId));
+
   return (
     <div>
       <PageHeader
@@ -75,50 +77,57 @@ export default function MessagesPage() {
         actions={!isTeacher && <Button variant="secondary" onClick={() => setComposeOpen(true)}>New</Button>}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 320px) 1fr', gap: 12, alignItems: 'start' }}>
+      <div className="rso-msg-layout">
         {/* Conversation list */}
-        <aside style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', background: 'var(--surface)', padding: 12, maxHeight: '70vh', overflowY: 'auto' }}>
-          <strong style={{ fontSize: 13, display: 'block', marginBottom: 8 }}>Conversations</strong>
-          {convsLoading ? (
-            <Skeleton variant="row" count={4} />
-          ) : !conversations.length ? (
-            <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-              {isTeacher ? 'No messages yet. Your admin will reach out here.' : 'No conversations yet.'}
-            </div>
-          ) : (
-            conversations.map((c) => {
-              const active = String(c.id) === String(selectedId);
-              const unread = Number(c.unread_count || 0);
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => setSelectedId(String(c.id))}
-                  style={{
-                    display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer',
-                    border: `1px solid ${active ? 'var(--primary)' : 'var(--border)'}`,
-                    background: active ? 'color-mix(in srgb, var(--primary) 7%, transparent)' : 'var(--surface)',
-                    borderRadius: 10, padding: 10, marginBottom: 8, color: 'var(--text)', font: 'inherit',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-                    <strong style={{ fontSize: 13 }}>{c.subject || 'Conversation'}</strong>
-                    {unread > 0 && <Badge variant="info">{unread}</Badge>}
-                  </div>
-                  <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4 }}>
-                    <Badge variant="neutral">{scopeLabel(c)}</Badge> · {fmtDate(c.updated_at || c.created_at)}
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {c.latest_message?.body ? String(c.latest_message.body).slice(0, 90) : 'No messages yet'}
-                  </div>
-                </button>
-              );
-            })
-          )}
+        <aside className="rso-msg-panel" aria-label="Conversations">
+          <div className="rso-msg-panel-head">
+            <strong style={{ fontSize: 13 }}>Conversations</strong>
+            {conversations.length > 0 && <Badge variant="neutral">{conversations.length}</Badge>}
+          </div>
+          <div className="rso-msg-list">
+            {convsLoading ? (
+              <div style={{ padding: 16 }}><Skeleton variant="row" count={4} /></div>
+            ) : !conversations.length ? (
+              <div style={{ padding: 16, fontSize: 13, color: 'var(--muted)' }}>
+                {isTeacher ? 'No messages yet. Your admin will reach out here.' : 'No conversations yet.'}
+              </div>
+            ) : (
+              conversations.map((c) => {
+                const active = String(c.id) === String(selectedId);
+                const unread = Number(c.unread_count || 0);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setSelectedId(String(c.id))}
+                    className={`rso-msg-item${active ? ' is-active' : ''}`}
+                  >
+                    <div className="rso-msg-item-top">
+                      <span className="rso-msg-item-title">{c.subject || 'Conversation'}</span>
+                      {unread > 0 && <Badge variant="info">{unread}</Badge>}
+                    </div>
+                    <div className="rso-msg-item-preview">
+                      {c.latest_message?.body ? String(c.latest_message.body).slice(0, 90) : 'No messages yet'}
+                    </div>
+                    <div className="rso-msg-item-meta">
+                      <Badge variant="neutral">{scopeLabel(c)}</Badge> · {fmtDate(c.updated_at || c.created_at)}
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
         </aside>
 
         {/* Thread + composer */}
-        <section style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', background: 'var(--surface)', overflow: 'hidden' }}>
-          <div ref={bodyRef} style={{ height: 420, overflowY: 'auto', padding: 12, background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
+        <section className="rso-msg-panel" aria-label="Conversation thread">
+          <div className="rso-msg-panel-head">
+            <strong style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {selectedConv?.subject || (selectedId ? 'Conversation' : 'No conversation selected')}
+            </strong>
+          </div>
+          <div ref={bodyRef} className="rso-msg-thread-body">
             {!selectedId ? (
               <div style={{ fontSize: 13, color: 'var(--muted)', padding: 8 }}>Select or start a conversation.</div>
             ) : msgsLoading ? (
@@ -129,22 +138,18 @@ export default function MessagesPage() {
               messages.map((m) => {
                 const mine = String(m.sender_user_id) === String(profile?.user_id);
                 return (
-                  <article key={m.id} style={{
-                    background: mine ? 'color-mix(in srgb, var(--primary) 8%, var(--surface))' : 'var(--surface)',
-                    border: `1px solid ${mine ? 'color-mix(in srgb, var(--primary) 35%, var(--border))' : 'var(--border)'}`,
-                    borderRadius: 10, padding: 10, marginBottom: 8,
-                  }}>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>
+                  <article key={m.id} className={`rso-msg-bubble${mine ? ' is-mine' : ''}`}>
+                    <div className="rso-msg-bubble-meta">
                       <strong>{m.sender_name || m.sender_role || 'Staff'}</strong> · {fmtDate(m.created_at)}
                     </div>
-                    <div style={{ fontSize: 13.5, whiteSpace: 'pre-wrap' }}>{m.body || ''}</div>
+                    <div className="rso-msg-bubble-text">{m.body || ''}</div>
                   </article>
                 );
               })
             )}
           </div>
-          <div style={{ display: 'grid', gap: 8, padding: 12 }}>
-            <Textarea rows={4} placeholder="Type your message..." value={draft} onChange={(e) => setDraft(e.target.value)} />
+          <div className="rso-msg-compose">
+            <Textarea rows={3} placeholder="Type your message..." value={draft} onChange={(e) => setDraft(e.target.value)} />
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <Button variant="primary" onClick={handleSend} disabled={sending || !draft.trim()}>
                 {sending ? 'Sending…' : 'Send'}

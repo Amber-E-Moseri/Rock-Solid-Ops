@@ -26,6 +26,22 @@ function synth(count, make) {
   return Array.from({ length: count }, (_, i) => make(i + 1));
 }
 
+// Synthetic conversations for the Messages preview. Sender id 'dev-bypass' is the dev identity.
+const SYNTHETIC_CONVERSATIONS = [
+  { id: 'syn-conv-1', subject: 'Synthetic class swap', scope: 'INDIVIDUAL', unread_count: 2, updated_at: new Date(Date.UTC(2026, 9, 22, 6, 12)).toISOString(), latest_message: { body: 'Synthetic: can the Thursday class move to 8:30 PM?' } },
+  { id: 'syn-conv-2', subject: 'Synthetic attendance reminder', scope: 'GROUP', unread_count: 0, updated_at: new Date(Date.UTC(2026, 9, 20, 9, 0)).toISOString(), latest_message: { body: 'Synthetic: please submit this week’s sessions.' } },
+  { id: 'syn-conv-3', subject: 'Synthetic onboarding note', scope: 'INDIVIDUAL', unread_count: 0, updated_at: new Date(Date.UTC(2026, 9, 18, 15, 30)).toISOString(), latest_message: null },
+];
+const SYNTHETIC_MESSAGES = {
+  'syn-conv-1': [
+    { id: 'm1', sender_user_id: 'syn-user-2', sender_name: 'Synthetic Teacher 2', sender_role: 'teacher', body: 'Synthetic: can I move Thursday’s class to 8:30 PM?', created_at: new Date(Date.UTC(2026, 9, 22, 6, 10)).toISOString() },
+    { id: 'm2', sender_user_id: 'dev-bypass', sender_name: 'Dev Bypass', sender_role: 'admin', body: 'Synthetic: approved — I will update the class editor.', created_at: new Date(Date.UTC(2026, 9, 22, 6, 12)).toISOString() },
+  ],
+  'syn-conv-2': [
+    { id: 'm3', sender_user_id: 'dev-bypass', sender_name: 'Dev Bypass', sender_role: 'admin', body: 'Synthetic: please submit this week’s sessions.', created_at: new Date(Date.UTC(2026, 9, 20, 9, 0)).toISOString() },
+  ],
+};
+
 // Synthetic class options for the Teacher Home preview.
 const TEACHER_CLASSES = [
   { class_option_id: 'syn-class-1', class_name: 'Synthetic Foundation Class A', day: 'Tuesday', class_time: '7:00 PM', fellowship_codes: ['UMANITOBA'], current_enrollment: 18, active: true },
@@ -60,6 +76,7 @@ const TABLES = {
     { actor_name: 'Synthetic Admin', action: 'suspend_teacher', entity_type: 'teacher', created_at: new Date(Date.UTC(2026, 9, 20, 17, 12)).toISOString() },
   ],
   moodle_sync: () => synth(3, (i) => ({ id: i, status: 'failed' })),
+  attention_flags: () => [],
   moodle_enrollment_sync: () => [
     ...synth(18, () => ({ sync_status: 'SYNCED', synced_at: new Date(Date.UTC(2026, 9, 21, 12, 0)).toISOString(), updated_at: new Date(Date.UTC(2026, 9, 21, 12, 0)).toISOString() })),
     ...synth(3, () => ({ sync_status: 'PENDING', synced_at: null, updated_at: null })),
@@ -128,6 +145,19 @@ const RPC_FIXTURES = {
   get_active_certified_teachers_count: () => [{ count: 6 }],
   get_currently_teaching_count: () => [{ count: 4 }],
   get_escalation_details: () => [],
+  get_student_attention_flags: () => [
+    { flag_type: 'inactive_no_attendance', applicant_id: 201, full_name: 'Synthetic Student 201', email: 'student201@example.invalid', fellowship_code: 'UMANITOBA', teacher_name: 'Synthetic Teacher 1', detail: 'No attendance in 14 days', severity: 'critical' },
+    { flag_type: 'repeat_absence_3_plus', applicant_id: 202, full_name: 'Synthetic Student 202', email: 'student202@example.invalid', fellowship_code: 'UWATERLOO', teacher_name: 'Synthetic Teacher 2', detail: 'Three consecutive absences', severity: 'critical' },
+    { flag_type: 'moodle_synced_no_login', applicant_id: 203, full_name: 'Synthetic Student 203', email: 'student203@example.invalid', fellowship_code: 'UCALGARY', teacher_name: 'Synthetic Teacher 3', detail: 'Synced to Moodle but never signed in', severity: 'warning' },
+  ],
+  get_teacher_attention_flags: () => [
+    { flag_type: 'missing_attendance', teacher_id: 2, full_name: 'Synthetic Teacher 2', email: 'teacher2@example.invalid', class_count: 2, detail: 'Two sessions without attendance', severity: 'warning' },
+    { flag_type: 'missing_attendance', teacher_id: 3, full_name: 'Synthetic Teacher 3', email: 'teacher3@example.invalid', class_count: 1, detail: 'Session overdue by one week', severity: 'critical' },
+  ],
+  get_system_attention_flags: () => [
+    { flag_type: 'moodle_sync_failed', count: 3, detail: 'Moodle enrollment sync failures', severity: 'critical' },
+    { flag_type: 'email_queue_backlog', count: 12, detail: 'Emails waiting in the queue', severity: 'warning' },
+  ],
 };
 
 // Scenario overrides: "empty" returns no rows everywhere; "error" fails every read.
@@ -241,6 +271,19 @@ export const supabase = {
         if (SCENARIO === 'empty') return { data: [], error: null };
         if (SCENARIO === 'error') return { data: null, error: { message: 'Synthetic fixture: simulated function failure.' } };
         return { data: TEACHER_CLASSES, error: null };
+      }
+      if (functionName === 'messaging-api') {
+        if (SCENARIO === 'empty') return { data: { ok: true, data: [] }, error: null };
+        if (SCENARIO === 'error') return { data: null, error: { message: 'Synthetic fixture: simulated messaging failure.' } };
+        const action = body?.action;
+        if (action === 'listConversations') return { data: { ok: true, data: SYNTHETIC_CONVERSATIONS }, error: null };
+        if (action === 'listMessages') {
+          const conv = body?.params?.conversationId;
+          return { data: { ok: true, data: { messages: SYNTHETIC_MESSAGES[String(conv)] || [] } }, error: null };
+        }
+        if (action === 'getRecipientOptions') return { data: { ok: true, data: { recipients: [] } }, error: null };
+        if (action === 'markRead') return { data: { ok: true, data: {} }, error: null };
+        return { data: { ok: false, error: 'Synthetic fixture: messaging writes are disabled in preview mode.' }, error: null };
       }
       return { data: null, error: { message: 'Synthetic fixture: no preview fixture for ' + functionName + '.' } };
     },
