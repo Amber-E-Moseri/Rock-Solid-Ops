@@ -45,16 +45,16 @@
   /* ── Light mode (warm / parchment) ── */
 
   /* Semantic color roles */
-  --color-bg:             #f8f5ee;
-  --color-surface:        #ffffff;
-  --color-surface-raised: #faf7f2;
-  --color-border:         #e8dfd0;
-  --color-border-strong:  #cfc0ae;
-  --color-text-primary:   #261f35;
-  --color-text-secondary: #4a3d5c;
-  --color-text-muted:     #6f6881;
-  --color-primary:        #4C2A92;
-  --color-primary-hover:  #7d62c8;
+  --color-bg:             var(--bg);
+  --color-surface:        var(--surface);
+  --color-surface-raised: var(--surface-2);
+  --color-border:         var(--border);
+  --color-border-strong:  #D6CDE6;
+  --color-text-primary:   var(--text);
+  --color-text-secondary: var(--text-2);
+  --color-text-muted:     var(--muted);
+  --color-primary:        var(--primary);
+  --color-primary-hover:  var(--primary-hover);
   --color-primary-fg:     #ffffff;
   --color-success:        #16a34a;
   --color-success-bg:     #e7f7ec;
@@ -68,9 +68,9 @@
   --color-info:           #2563eb;
   --color-info-bg:        #e9eeff;
   --color-info-fg:        #1e3a8a;
-  --color-neutral:        #6f6881;
-  --color-neutral-bg:     #f2eef9;
-  --color-neutral-fg:     #261f35;
+  --color-neutral:        var(--muted);
+  --color-neutral-bg:     var(--soft-lavender);
+  --color-neutral-fg:     var(--text);
 
   /* premium-theme.css aliases (used by ported JS / inline styles) */
   --bg:            #F7F5FB;
