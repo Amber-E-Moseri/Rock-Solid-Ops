@@ -88,6 +88,7 @@ export default function ReportsPage() {
         </div>
       ) : (
         <>
+          <div className="rso-reports-split">
           {/* Generate form */}
           <Card icon="📊" title="Generate Report">
             <div style={{ display: 'grid', gap: '0.75rem' }}>
@@ -152,11 +153,11 @@ export default function ReportsPage() {
                 <textarea className="rso-input" rows={3} value={recipients} onChange={(e) => setRecipients(e.target.value)} placeholder="Defaults to all admins if left blank" />
               </label>
 
-              <div style={{ display: 'flex', gap: '1rem', fontSize: 'var(--fs-sm)' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
+              <div className="rso-toggle-group">
+                <label className={`rso-toggle${sendEmail ? ' is-on' : ''}`}>
                   <input type="checkbox" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} /> Send email
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
+                <label className={`rso-toggle${saveArchive ? ' is-on' : ''}`}>
                   <input type="checkbox" checked={saveArchive} onChange={(e) => setSaveArchive(e.target.checked)} /> Save to archive
                 </label>
               </div>
@@ -169,11 +170,13 @@ export default function ReportsPage() {
             </div>
           </Card>
 
+          </div>
+
           {/* Preview */}
           {previewHtml && (
             <div style={{ marginTop: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <h3 style={{ fontSize: 'var(--fs-md)', fontWeight: 700 }}>Preview</h3>
+                <h3 className="rso-section-title" style={{ marginBottom: 0 }}>Preview</h3>
                 <Button variant="secondary" size="sm" onClick={() => {
                   const w = window.open('', '_blank');
                   if (w) { w.document.write(previewHtml); w.document.close(); w.print(); }
@@ -186,8 +189,8 @@ export default function ReportsPage() {
           )}
 
           {/* Archive */}
-          <div style={{ marginTop: '1.5rem' }}>
-            <h3 style={{ fontSize: 'var(--fs-md)', fontWeight: 700, marginBottom: '0.75rem' }}>Archive</h3>
+          <div className="rso-reports-archive">
+            <h3 className="rso-section-title">Recent Reports</h3>
             {archive.isLoading ? <Skeleton variant="rows" rows={3} /> : (archive.data ?? []).length === 0 ? (
               <EmptyState icon="📂" title="No archived reports" />
             ) : (

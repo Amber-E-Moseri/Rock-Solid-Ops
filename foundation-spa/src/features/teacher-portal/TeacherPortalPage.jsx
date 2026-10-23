@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useToast } from '../../context/ToastContext.jsx';
@@ -7,11 +7,12 @@ import {
   deleteAvailability, insertAvailability, fetchStudentProgress,
   computeAttendanceRate, getMilestoneFlags,
 } from './lib/teacherPortal.js';
-import { PageHeader, Skeleton, EmptyState, Badge, Button } from '../../components/ui/index.js';
+import { PageHeader, Skeleton, EmptyState, Badge, Button, ErrorBanner } from '../../components/ui/index.js';
 
 const ADMIN_ROLES = ['admin', 'superadmin', 'principal', 'subgroup_admin', 'pastor', 'regional_secretary'];
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const MILESTONES = ['milestone_1', 'milestone_2', 'milestone_3', 'milestone_4'];
+const TABS = ['My Classes', 'My Availability', 'Student Progress'];
 
 export default function TeacherPortalPage() {
   const { profile } = useAuth();
@@ -36,55 +37,70 @@ export default function TeacherPortalPage() {
     <div className="page-content">
       <PageHeader title="Teacher Portal" subtitle={teacher.data ? `Welcome, ${teacher.data.full_name}` : undefined} />
 
-      <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.25rem', borderBottom: '2px solid var(--border)' }}>
-        {['My Classes', 'My Availability', 'Student Progress'].map((label, i) => (
-          <button key={label} onClick={() => setTab(i)} style={{
-            padding: '0.6rem 1.2rem', border: 'none', cursor: 'pointer',
-            background: tab === i ? 'var(--primary)' : 'transparent',
-            color: tab === i ? '#fff' : 'var(--text)',
-            borderRadius: 'var(--r-md) var(--r-md) 0 0',
-            fontWeight: tab === i ? 700 : 400, fontSize: 'var(--fs-sm)',
-          }}>{label}</button>
+      <div className="rso-tabs" role="tablist" aria-label="Teacher portal sections">
+        {TABS.map((label, i) => (
+          <button
+            key={label}
+            type="button"
+            role="tab"
+            id={`teacher-tab-${i}`}
+            aria-selected={tab === i}
+            aria-controls="teacher-tabpanel"
+            className="rso-tab"
+            onClick={() => setTab(i)}
+          >{label}</button>
         ))}
       </div>
 
-      {teacher.isLoading ? <Skeleton variant="rows" rows={3} /> :
-        !teacherId ? <EmptyState icon="👤" title="Teacher not found" subtitle="No teacher profile linked to your account" /> :
-        tab === 0 ? <MyClassesTab teacherId={teacherId} /> :
-        tab === 1 ? <AvailabilityTab teacherId={teacherId} teacherEmail={teacher.data?.email} addToast={addToast} /> :
-        <ProgressTab teacherId={teacherId} />}
+      <div role="tabpanel" id="teacher-tabpanel" aria-labelledby={`teacher-tab-${tab}`}>
+        {teacher.isLoading ? <Skeleton variant="rows" rows={3} /> :
+          !teacherId ? <EmptyState icon="👤" title="Teacher not found" message="No teacher profile linked to your account" /> :
+          tab === 0 ? <MyClassesTab teacherId={teacherId} /> :
+          tab === 1 ? <AvailabilityTab teacherId={teacherId} teacherEmail={teacher.data?.email} addToast={addToast} /> :
+          <ProgressTab teacherId={teacherId} />}
+      </div>
     </div>
   );
 }
 
 function MyClassesTab({ teacherId }) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['teacher-classes', teacherId],
     queryFn: () => fetchTeacherClasses(teacherId),
     staleTime: 60_000,
   });
 
   if (isLoading) return <Skeleton variant="rows" rows={3} />;
+  if (isError) return <ErrorBanner message="Could not load your classes." onRetry={() => refetch()} />;
   const classes = data ?? [];
-  if (!classes.length) return <EmptyState icon="📚" title="No classes" subtitle="You have no active class assignments" />;
+  if (!classes.length) return <EmptyState icon="📚" title="No classes" message="You have no active class assignments" />;
 
   return (
-    <div className="rso-table-wrap">
-      <table className="rso-table">
-        <thead><tr><th>Class</th><th>Day</th><th>Time</th><th>Campus</th><th>Enrolled</th><th>Status</th></tr></thead>
-        <tbody>
-          {classes.map((c, i) => (
-            <tr key={c.class_option_id || i}>
-              <td style={{ fontWeight: 600 }}>{c.class_name || c.class_option_id || `Class ${i + 1}`}</td>
-              <td>{c.day || '—'}</td>
-              <td>{c.class_time || '—'}</td>
-              <td>{c.fellowship_codes?.join(', ') || '—'}</td>
-              <td>{c.current_enrollment ?? c.enrollment_count ?? '—'}</td>
-              <td><Badge status={c.active ? 'active' : 'inactive'}>{c.active ? 'Active' : 'Inactive'}</Badge></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="rso-class-grid">
+      {classes.map((c, i) => {
+        const enrolled = c.current_enrollment ?? c.enrollment_count ?? '—';
+        return (
+          <article key={c.class_option_id || i} className="rso-class-card">
+            <div className="rso-class-card-head">
+              <div style={{ minWidth: 0 }}>
+                <div className="rso-class-name">{c.class_name || c.class_option_id || `Class ${i + 1}`}</div>
+                <div className="rso-class-meta">{[c.day, c.class_time].filter(Boolean).join(' · ') || 'Schedule to be confirmed'}</div>
+              </div>
+              <Badge status={c.active ? 'active' : 'inactive'}>{c.active ? 'Active' : 'Inactive'}</Badge>
+            </div>
+            <div className="rso-class-stats">
+              <div>
+                <div className="rso-class-stat-value">{enrolled}</div>
+                <div className="rso-class-stat-label">Enrolled</div>
+              </div>
+              <div>
+                <div className="rso-class-stat-text">{c.fellowship_codes?.join(', ') || '—'}</div>
+                <div className="rso-class-stat-label">Campus</div>
+              </div>
+            </div>
+          </article>
+        );
+      })}
     </div>
   );
 }
@@ -122,12 +138,12 @@ function AvailabilityTab({ teacherId, teacherEmail, addToast }) {
   }
 
   if (isLoading) return <Skeleton variant="rows" rows={4} />;
-  if (!slots.length) return <EmptyState icon="📅" title="No availability" subtitle="Submit your availability from the Teacher Schedule page" />;
+  if (!slots.length) return <EmptyState icon="📅" title="No availability" message="Submit your availability from the Teacher Schedule page" />;
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-        <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{slots.length} slot(s) on file</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+        <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--muted)' }}>{slots.length} slot(s) on file</span>
         {selected.size > 0 && <Button variant="danger" size="sm" onClick={handleDelete} disabled={saving}>{saving ? 'Removing…' : `Remove ${selected.size} selected`}</Button>}
       </div>
       {DAYS.map((day) => {
@@ -138,12 +154,12 @@ function AvailabilityTab({ teacherId, teacherEmail, addToast }) {
             <div style={{ fontWeight: 700, fontSize: 'var(--fs-sm)', marginBottom: '0.25rem' }}>{day}</div>
             <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
               {daySlots.map((s) => (
-                <button key={s.id} onClick={() => setSelected((prev) => {
+                <button key={s.id} type="button" aria-pressed={selected.has(s.id)} onClick={() => setSelected((prev) => {
                   const next = new Set(prev); next.has(s.id) ? next.delete(s.id) : next.add(s.id); return next;
                 })} style={{
-                  padding: '0.3rem 0.6rem', borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
-                  fontSize: 'var(--fs-xs)',
-                  background: selected.has(s.id) ? 'var(--color-danger, #dc3545)' : 'var(--surface)',
+                  padding: '0.3rem 0.6rem', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)', cursor: 'pointer',
+                  minHeight: 44, fontSize: 'var(--fs-xs)',
+                  background: selected.has(s.id) ? 'var(--danger)' : 'var(--surface)',
                   color: selected.has(s.id) ? '#fff' : 'var(--text)',
                 }}>{s.time_slot} <Badge status={s.status?.toLowerCase() === 'approved' ? 'active' : 'draft'}>{s.status || 'Tentative'}</Badge></button>
               ))}
@@ -166,7 +182,7 @@ function ProgressTab({ teacherId }) {
 
   if (isLoading) return <Skeleton variant="rows" rows={5} />;
   const { classes = [], students = [], milestones = [], attendance = [] } = data || {};
-  if (!students.length) return <EmptyState icon="📊" title="No students" subtitle="No students enrolled in your classes" />;
+  if (!students.length) return <EmptyState icon="📊" title="No students" message="No students enrolled in your classes" />;
 
   const filtered = classFilter ? students.filter((s) => s.class_option_id === classFilter) : students;
 
@@ -174,7 +190,7 @@ function ProgressTab({ teacherId }) {
     <div>
       {classes.length > 1 && (
         <div style={{ marginBottom: '0.75rem' }}>
-          <select className="rso-select" value={classFilter} onChange={(e) => setClassFilter(e.target.value)}>
+          <select className="rso-select" aria-label="Filter by class" value={classFilter} onChange={(e) => setClassFilter(e.target.value)}>
             <option value="">All classes</option>
             {classes.map((c) => <option key={c.class_option_id || c.id} value={c.class_option_id || c.id}>{c.class_name || c.class_option_id || c.id}</option>)}
           </select>
@@ -197,8 +213,8 @@ function ProgressTab({ teacherId }) {
                   <td>
                     {rate != null ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <div style={{ width: 60, height: 6, borderRadius: 3, background: 'var(--border)', overflow: 'hidden' }}>
-                          <div style={{ width: `${rate}%`, height: '100%', background: rate >= 75 ? 'var(--color-success, #28a745)' : 'var(--color-danger, #dc3545)', borderRadius: 3 }} />
+                        <div className="rso-progress-track">
+                          <div className={`rso-progress-fill${rate >= 75 ? '' : ' is-low'}`} style={{ width: `${rate}%` }} />
                         </div>
                         <span style={{ fontSize: 'var(--fs-xs)' }}>{rate}%</span>
                       </div>

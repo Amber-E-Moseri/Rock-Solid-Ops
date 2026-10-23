@@ -146,9 +146,9 @@ export default function ClassEditorPage() {
       {!rows.length ? (
         <EmptyState icon="🏫" title="No classes" message="No class options found for the current filters." />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 340px) 1fr', gap: 14, alignItems: 'start' }}>
+        <div className="rso-class-split">
           {/* Class list */}
-          <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', background: 'var(--surface)', overflow: 'hidden', maxHeight: '75vh', overflowY: 'auto' }}>
+          <div className="rso-class-list">
             {rows.map((co) => {
               const enrolledCount = data.enrolled[co.class_option_id] || 0;
               const capacity = co.max_capacity ?? 25;
@@ -159,12 +159,7 @@ export default function ClassEditorPage() {
                 <div
                   key={co.class_option_id}
                   onClick={() => setOpenId(co.class_option_id)}
-                  style={{
-                    display: 'flex', gap: 10, alignItems: 'center', padding: '10px 12px', cursor: 'pointer',
-                    borderBottom: '1px solid var(--border)', opacity: inactive ? 0.55 : 1,
-                    background: active ? 'color-mix(in srgb, var(--primary) 8%, transparent)' : 'transparent',
-                    borderLeft: `3px solid ${active ? 'var(--primary)' : 'transparent'}`,
-                  }}
+                  className={`rso-class-row${active ? ' is-active' : ''}${inactive ? ' is-inactive' : ''}`}
                 >
                   {massOpen ? (
                     <input
@@ -187,7 +182,7 @@ export default function ClassEditorPage() {
                       {warn ? ' · Reg closed' : inactive ? ' · Inactive' : ''}
                     </div>
                   </div>
-                  <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--muted)' }}>{enrolledCount}/{capacity}</span>
+                  <span className="rso-capacity">{enrolledCount}/{capacity}</span>
                 </div>
               );
             })}
@@ -346,7 +341,7 @@ function DetailEditor({ co, data, canEdit, canSuperadmin, busy, onSave, onDuplic
       </div>
 
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+        <div className="rso-form-grid">
           <Field label="Day">
             <Select value={day} onChange={(e) => setDay(e.target.value)}>{DAYS.map((d) => <option key={d} value={d}>{d}</option>)}</Select>
           </Field>
@@ -373,13 +368,13 @@ function DetailEditor({ co, data, canEdit, canSuperadmin, busy, onSave, onDuplic
             onChange={(updated) => setFcCodes(enforceCodesForOnlineMode(updated, isOnline))} />
         </Field>
 
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <div className="rso-toggle-group">
           {[
             ['Class Active', isActive, setIsActive],
             ['Registration Open', enrollOpen, setEnrollOpen],
             ['Online Class', isOnline, (v) => { setIsOnline(v); setFcCodes((c) => enforceCodesForOnlineMode(c, v)); }],
           ].map(([label, value, setter]) => (
-            <label key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            <label key={label} className={`rso-toggle${value ? ' is-on' : ''}`}>
               <input type="checkbox" checked={value} onChange={(e) => setter(e.target.checked)} /> {label}
             </label>
           ))}
@@ -390,8 +385,8 @@ function DetailEditor({ co, data, canEdit, canSuperadmin, busy, onSave, onDuplic
 
         <div>
           <Field label="Capacity Preview">
-            <div style={{ height: 8, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden', margin: '6px 0' }}>
-              <span style={{ display: 'block', height: '100%', width: `${fill}%`, background: 'var(--primary)' }} />
+            <div className="rso-capacity-bar">
+              <span style={{ width: `${fill}%` }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--muted)' }}>
               <span>{Math.max(cap - enrolledCount, 0)} seats available</span>

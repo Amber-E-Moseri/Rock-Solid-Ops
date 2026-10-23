@@ -52,15 +52,12 @@ export default function SystemHealthPage() {
       {/* Runtime checks grid */}
       {healthChecks.length > 0 && (
         <Card>
-          <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 14 }}>Runtime checks</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
+          <div className="rso-section-title">Runtime checks</div>
+          <div className="rso-health-grid">
             {healthChecks.map((c) => (
-              <div key={c.key} style={{
-                background: 'var(--surface)', border: '1px solid var(--border)',
-                borderRadius: 'var(--r-lg, 12px)', padding: 16, boxShadow: 'var(--sh-xs)',
-              }}>
+              <div key={c.key} className="rso-health-tile">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                  <div style={{ fontSize: 14, fontWeight: 800, flex: 1, minWidth: 0, color: 'var(--text)' }}>{c.title}</div>
+                  <div className="rso-health-title">{c.title}</div>
                   <HealthChip state={c.state} />
                 </div>
                 <div style={{ color: 'var(--muted)', fontSize: 12, lineHeight: 1.55, minHeight: 32 }}>{c.detail}</div>
@@ -71,10 +68,10 @@ export default function SystemHealthPage() {
       )}
 
       {/* Queue depths + failures */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 340px', gap: 18, alignItems: 'start' }}>
+      <div className="rso-two-pane">
         {/* Recent failures */}
         <Card>
-          <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 14 }}>Recent failures</div>
+          <div className="rso-section-title">Recent failures</div>
           {failureRows.length === 0 ? (
             <div style={{ padding: 14, border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 13, fontWeight: 600 }}>
               No recent failures found across monitored tables.
@@ -104,29 +101,31 @@ export default function SystemHealthPage() {
         {queueMetrics && (
           <Card>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <div style={{ fontSize: 16, fontWeight: 800 }}>Queue depths</div>
+              <div className="rso-section-title" style={{ marginBottom: 0 }}>Queue depths</div>
               <span style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 600 }}>live</span>
             </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className="rso-table-wrap">
+            <table className="rso-table">
               <thead>
                 <tr>
-                  <th style={qth}>Queue</th>
-                  <th style={{ ...qth, textAlign: 'right' }}>Depth</th>
-                  <th style={{ ...qth, textAlign: 'right' }}>Status</th>
+                  <th>Queue</th>
+                  <th style={{ textAlign: 'right' }}>Depth</th>
+                  <th style={{ textAlign: 'right' }}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {queueMetrics.queues.map((q) => (
                   <tr key={q.name}>
-                    <td style={qtd}><span style={{ fontWeight: 700 }}>{q.name}</span></td>
-                    <td style={{ ...qtd, textAlign: 'right', fontFamily: 'monospace', fontWeight: 600 }}>{q.depth}</td>
-                    <td style={{ ...qtd, textAlign: 'right' }}>
+                    <td><span style={{ fontWeight: 700 }}>{q.name}</span></td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--fs-font-mono)', fontWeight: 600 }}>{q.depth}</td>
+                    <td style={{ textAlign: 'right' }}>
                       <QueueBadge depth={q.depth} warnAt={q.warnAt} badAt={q.badAt} />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
           </Card>
         )}
       </div>
@@ -134,7 +133,7 @@ export default function SystemHealthPage() {
       {/* Table notes */}
       {missingTables.length > 0 && (
         <Card>
-          <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>Table notes</div>
+          <div className="rso-section-title">Table notes</div>
           <ul style={{ margin: '0 0 0 18px', color: 'var(--muted)', fontSize: 13, fontWeight: 600, lineHeight: 1.7 }}>
             {missingTables.map((t) => <li key={t}>Optional table missing: {t}</li>)}
           </ul>

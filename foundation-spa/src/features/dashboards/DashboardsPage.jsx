@@ -126,7 +126,7 @@ export default function DashboardsPage() {
       )}
 
       {/* KPI row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+      <div className="rso-kpi-grid">
         <KpiCard value={reg?.enrolled} label="Total Enrolled" asOf={d?.fetchedAt} />
         <KpiCard value={reg?.waitlisted} label="Waitlisted" variant="warn" asOf={d?.fetchedAt} />
         <KpiCard value={reg?.pendingReview} label="Pending Review" variant="danger" asOf={d?.fetchedAt} />
@@ -141,7 +141,7 @@ export default function DashboardsPage() {
         <Card>
           <div className="rso-media-row">
             <div>
-              <div style={{ fontSize: 14, fontWeight: 800 }}>Duplicate Registrations</div>
+              <div className="rso-section-title">Duplicate Registrations</div>
               <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--danger)', lineHeight: 1.1, marginTop: 4 }}>
                 {d.duplicates.count.toLocaleString()}
               </div>
@@ -162,7 +162,7 @@ export default function DashboardsPage() {
       {att && (
         <Card>
           <SectionHeader title="Attendance Health" asOf={att.calculatedAt || d?.fetchedAt} />
-          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: att.rate > 80 ? '#15803d' : att.rate >= 60 ? '#b45309' : '#b91c1c' }}>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: att.rate > 80 ? 'var(--success)' : att.rate >= 60 ? 'var(--warn)' : 'var(--danger)' }}>
             {att.rate.toFixed(1)}% attendance submission rate
           </div>
           <ProgressBar value={att.rate} />
@@ -222,10 +222,10 @@ export default function DashboardsPage() {
           <Card>
             <SectionHeader title="Moodle Sync Health" asOf={d?.fetchedAt} />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-              <FunnelStep label="SYNCED" value={moodle.counts.SYNCED} cls="#15803d" />
-              <FunnelStep label="PENDING" value={moodle.counts.PENDING} cls="#b45309" />
-              <FunnelStep label="FAILED" value={moodle.counts.FAILED} cls="#b91c1c" />
-              <FunnelStep label="PROCESSING" value={moodle.counts.PROCESSING} cls="#15803d" />
+              <FunnelStep label="SYNCED" value={moodle.counts.SYNCED} cls="var(--success)" />
+              <FunnelStep label="PENDING" value={moodle.counts.PENDING} cls="var(--warn)" />
+              <FunnelStep label="FAILED" value={moodle.counts.FAILED} cls="var(--danger)" />
+              <FunnelStep label="PROCESSING" value={moodle.counts.PROCESSING} cls="var(--success)" />
             </div>
             <div style={{ marginTop: 10, fontSize: 12, color: 'var(--muted)' }}>
               Last successful sync: {fmtTime(moodle.lastSuccess)}
@@ -238,7 +238,7 @@ export default function DashboardsPage() {
 
         {/* Quick actions */}
         <Card>
-          <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12, color: 'var(--text)' }}>Quick Actions</div>
+          <div className="rso-section-title">Quick Actions</div>
           <div style={{ display: 'grid', gap: 8 }}>
             <Button size="sm" variant="secondary" onClick={() => navigate('/staff/teacher-schedule')}>Approve Teacher Slots</Button>
             <Button size="sm" variant="secondary" onClick={handleRetryMoodle} disabled={retrying}>Retry all failed Moodle syncs</Button>
@@ -264,7 +264,7 @@ export default function DashboardsPage() {
         {/* Registration status bar chart */}
         {reg?.rows?.length > 0 && (
           <Card>
-            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 14 }}>Registration Status</div>
+            <div className="rso-section-title">Registration Status</div>
             <HorizontalBarChart rows={reg.rows.map((r) => ({ label: r.reg_status, value: Number(r.cnt) }))} />
           </Card>
         )}
@@ -272,7 +272,7 @@ export default function DashboardsPage() {
         {/* Fellowship doughnut */}
         {d?.fellowship?.length > 0 && (
           <Card>
-            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 14 }}>Fellowship Breakdown</div>
+            <div className="rso-section-title">Fellowship Breakdown</div>
             <DoughnutChart rows={d.fellowship.map((r) => ({ label: r.fellowship, value: Number(r.cnt) }))} />
           </Card>
         )}
@@ -281,7 +281,7 @@ export default function DashboardsPage() {
       {/* Weekly trend sparkline */}
       {d?.weeklyTrend?.length > 0 && (
         <Card>
-          <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 14 }}>Weekly Registrations (last 12 weeks)</div>
+          <div className="rso-section-title">Weekly Registrations (last 12 weeks)</div>
           <SparklineChart
             points={d.weeklyTrend.map((r) => Number(r.cnt))}
             labels={d.weeklyTrend.map((r) => fmtDate(r.week_start).replace(/,?\s*\d{4}$/, ''))}
@@ -292,7 +292,7 @@ export default function DashboardsPage() {
       {/* Class capacity */}
       {d?.capacity?.length > 0 && (
         <Card>
-          <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 14 }}>Class Capacity</div>
+          <div className="rso-section-title">Class Capacity</div>
           <div className="rso-table-wrap">
             <table className="rso-table">
               <thead><tr><th>Class</th><th>Teacher</th><th>Enrolled</th><th>Status</th></tr></thead>
@@ -345,7 +345,7 @@ export default function DashboardsPage() {
             )}
           </Card>
           <Card>
-            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 12 }}>Recent Activity</div>
+            <div className="rso-section-title">Recent Activity</div>
             <div className="rso-table-wrap">
               <table className="rso-table">
                 <thead><tr><th>Time</th><th>Action</th><th>Actor</th><th>Entity</th></tr></thead>
@@ -370,7 +370,7 @@ export default function DashboardsPage() {
       {/* Recent registrations */}
       {d?.recentRegistrations?.length > 0 && (
         <Card>
-          <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 14 }}>Recent Registrations</div>
+          <div className="rso-section-title">Recent Registrations</div>
           <div className="rso-table-wrap">
             <table className="rso-table">
               <thead><tr><th>Time</th><th>Name</th><th>Email</th><th>Fellowship</th><th>Batch</th><th>Status</th><th>Availability</th></tr></thead>
@@ -417,30 +417,25 @@ export default function DashboardsPage() {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function KpiCard({ value, label, variant, asOf }) {
-  const color = variant === 'danger' ? 'var(--danger)'
-    : variant === 'warn' ? 'var(--warn)'
-    : variant === 'muted' ? 'var(--muted)'
-    : 'var(--primary)';
+  const tone = variant === 'danger' ? 'coral'
+    : variant === 'warn' ? 'gold'
+    : variant === 'muted' ? 'dark'
+    : 'navy';
   return (
-    <article style={{
-      border: '1px solid var(--border)', borderLeft: `3px solid ${color}`,
-      background: 'var(--surface)', borderRadius: 12, padding: 20, boxShadow: 'var(--sh-xs)',
-    }}>
-      <div style={{ fontSize: '2rem', fontWeight: 800, color, lineHeight: 1.1 }}>
+    <article className={`rso-kpi-tile rso-kpi-tile-${tone}`}>
+      <div className="rso-kpi-tile-value">
         {value != null ? Number(value).toLocaleString() : '-'}
       </div>
-      <div style={{ marginTop: 4, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--muted)' }}>
-        {label}
-      </div>
-      {asOf && <div style={{ marginTop: 8, fontSize: 11, color: 'var(--muted)' }}>as of {relativeMinutes(asOf)}</div>}
+      <div className="rso-kpi-tile-label">{label}</div>
+      {asOf && <div style={{ marginTop: 8, fontSize: 11, opacity: 0.85 }}>as of {relativeMinutes(asOf)}</div>}
     </article>
   );
 }
 
 function SectionHeader({ title, asOf }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-      <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)' }}>{title}</div>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+      <div className="rso-section-title" style={{ marginBottom: 0 }}>{title}</div>
       {asOf && <span style={{ fontSize: 11, color: 'var(--muted)' }}>as of {relativeMinutes(asOf)}</span>}
     </div>
   );

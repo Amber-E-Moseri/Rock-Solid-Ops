@@ -146,8 +146,8 @@
   white-space: nowrap;
 }
 .rso-table th {
-  background: var(--surface);
-  font-size: 11px;
+  background: var(--surface-2);
+  font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: .05em;
   font-weight: 700;
@@ -366,7 +366,7 @@
   margin-bottom: 20px;
 }
 .rso-page-title {
-  font-size: 26px;
+  font-size: 21px;
   font-weight: 800;
   letter-spacing: -0.02em;
   margin: 0 0 4px;
@@ -581,4 +581,420 @@
      so selects and buttons are easy to hit one-handed. */
   .rso-page-actions { width: 100%; }
   .rso-page-actions .rso-select { flex: 1 1 auto; min-width: 0 !important; }
+}
+
+/* ── Dashboard tiles (Portal Polish After boards) ── */
+.rso-kpi-tile {
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 16px 18px;
+  box-shadow: var(--sh-xs);
+  color: var(--text);
+  text-decoration: none;
+  display: block;
+}
+.rso-kpi-tile-value {
+  font-size: 27px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.rso-kpi-tile-label {
+  margin-top: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.rso-kpi-tile-navy { background: var(--primary); border-color: var(--primary); color: #fff; }
+.rso-kpi-tile-navy .rso-kpi-tile-label { color: rgba(255, 255, 255, .78); }
+.rso-kpi-tile-gold { background: var(--gold); border-color: var(--gold); color: var(--text); }
+.rso-kpi-tile-gold .rso-kpi-tile-label { color: var(--text-2); }
+.rso-kpi-tile-dark { background: var(--text); border-color: var(--text); color: #fff; }
+.rso-kpi-tile-dark .rso-kpi-tile-label { color: rgba(255, 255, 255, .72); }
+.rso-kpi-tile-coral { background: var(--danger-bg); border-color: var(--danger-bd, var(--border)); color: var(--danger); }
+.rso-kpi-tile-coral .rso-kpi-tile-label { color: var(--danger); }
+
+.rso-section-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.rso-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.rso-quick-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--sh-xs);
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 13px;
+}
+.rso-quick-card:hover { border-color: var(--primary); text-decoration: none; }
+.rso-quick-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-sm);
+  background: var(--soft-purple);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.rso-activity-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.rso-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--soft-purple);
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.rso-mono-time {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.rso-health-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .rso-quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rso-quick-card { padding: 12px; }
+}
+
+/* ── Tabs (underline style from the After boards) ── */
+.rso-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.rso-tab {
+  padding: 12px 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 44px;
+}
+.rso-tab:hover { color: var(--primary); }
+.rso-tab[aria-selected="true"] {
+  color: var(--primary);
+  font-weight: 700;
+  border-bottom-color: var(--primary);
+}
+.rso-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+/* ── Class cards (teacher home) ── */
+.rso-class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+.rso-class-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-xs);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.rso-class-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.rso-class-name { font-weight: 800; font-size: 14px; color: var(--text); overflow-wrap: anywhere; }
+.rso-class-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.rso-class-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rso-class-stat-value { font-size: 20px; font-weight: 800; color: var(--text); line-height: 1.1; }
+.rso-class-stat-label { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
+.rso-progress-track { width: 64px; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.rso-progress-fill { height: 100%; border-radius: 3px; background: var(--success); }
+.rso-progress-fill.is-low { background: var(--danger); }
+
+/* Text-valued class stats (campus codes) sit smaller than numeric stats. */
+.rso-class-stat-text { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.3; overflow-wrap: anywhere; }
+
+/* KPI tiles pair up on phones so the dashboard stays scannable. */
+@media (max-width: 640px) {
+  .rso-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .rso-kpi-tile { padding: 14px; }
+  .rso-kpi-tile-value { font-size: 24px; }
+}
+
+/* ── Messages (After board 2.m1b) ── */
+.rso-msg-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+.rso-msg-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-xs);
+  min-width: 0;
+  overflow: hidden;
+}
+.rso-msg-panel-head {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.rso-msg-list { max-height: 62vh; overflow-y: auto; }
+.rso-msg-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-bottom: 1px solid var(--border-l, var(--border));
+  background: transparent;
+  padding: 12px 16px;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  min-height: 44px;
+}
+.rso-msg-item:hover { background: var(--surface-2); }
+.rso-msg-item.is-active { background: var(--soft-purple); box-shadow: inset 3px 0 0 var(--primary); }
+.rso-msg-item-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.rso-msg-item-title { font-weight: 700; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rso-msg-item-preview { margin-top: 3px; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rso-msg-item-meta { margin-top: 4px; font-size: 11px; color: var(--muted); }
+.rso-msg-thread-body {
+  height: 420px;
+  overflow-y: auto;
+  padding: 14px 16px;
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rso-msg-bubble {
+  max-width: 82%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px 12px 12px 4px;
+  padding: 10px 12px;
+  align-self: flex-start;
+}
+.rso-msg-bubble.is-mine {
+  align-self: flex-end;
+  background: var(--soft-purple);
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+  border-radius: 12px 12px 4px 12px;
+}
+.rso-msg-bubble-meta { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.rso-msg-bubble-text { font-size: 13.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rso-msg-compose { display: grid; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
+
+@media (max-width: 768px) {
+  .rso-msg-layout { grid-template-columns: minmax(0, 1fr); }
+  .rso-msg-list { max-height: 30vh; }
+  .rso-msg-thread-body { height: 360px; }
+  .rso-msg-bubble { max-width: 92%; }
+}
+
+/* ── Class Editor (After board 2.c1b) ── */
+.rso-class-split {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.rso-class-list {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--sh-xs);
+  overflow: hidden;
+  max-height: 75vh;
+  overflow-y: auto;
+  min-width: 0;
+}
+.rso-class-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  min-height: 44px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  border-left: 3px solid transparent;
+  background: transparent;
+}
+.rso-class-row:hover { background: var(--surface-2); }
+.rso-class-row.is-active {
+  border-left-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+.rso-class-row.is-inactive { opacity: .55; }
+.rso-capacity {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 768px) {
+  .rso-class-split { grid-template-columns: minmax(0, 1fr); }
+  .rso-class-list { max-height: 40vh; }
+}
+
+/* ── Class Editor detail form (After board 2.c1b) ── */
+.rso-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 16px;
+}
+.rso-toggle-group { display: flex; gap: 8px; flex-wrap: wrap; }
+.rso-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.rso-toggle input { accent-color: var(--primary); margin: 0; }
+.rso-toggle.is-on {
+  border-color: var(--success-bd, var(--border));
+  background: var(--success-bg);
+  color: var(--success);
+}
+.rso-capacity-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin: 6px 0;
+}
+.rso-capacity-bar > span { display: block; height: 100%; background: var(--primary); border-radius: 999px; }
+@media (max-width: 900px) {
+  .rso-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .rso-form-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── System Health (After board 3.s1b) ── */
+.rso-health-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.rso-health-tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  box-shadow: var(--sh-xs);
+  min-width: 0;
+}
+.rso-health-tile-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.rso-health-title { font-size: 14px; font-weight: 800; flex: 1; min-width: 0; color: var(--text); overflow-wrap: anywhere; }
+.rso-two-pane {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: start;
+}
+.rso-two-pane > * { min-width: 0; }
+@media (max-width: 900px) {
+  .rso-two-pane { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── Reports (After board 2.r1b) ── */
+.rso-reports-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 16px;
+  align-items: start;
+  margin-top: 4px;
+}
+.rso-reports-split > * { min-width: 0; }
+.rso-reports-archive { margin-top: 0; }
+@media (max-width: 900px) {
+  .rso-reports-split { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── Teacher modals (After board 2.o1b) ── */
+.rso-form-grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.rso-form-grid2 > .rso-field[style*="1 / -1"] { grid-column: 1 / -1; }
+@media (max-width: 640px) {
+  .rso-form-grid2 { grid-template-columns: minmax(0, 1fr); }
+}
+.rso-teacher-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  min-width: 0;
+}
+.rso-teacher-chip-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--soft-purple);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
