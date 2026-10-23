@@ -250,6 +250,15 @@ select test_harness.expect_state('A9 authenticated cannot call the outbox helper
 select test_harness.expect_state('A10 authenticated cannot read auth.users directly', 'authenticated', '00000000-0000-4000-8000-000000000001',
   $$select count(*) from auth.users$$, '42501');
 
+select test_harness.expect_state('A11 anon cannot execute the trigger helper directly', 'anon', null,
+  $$select public.teacher_applications_set_updated_at()$$, '42501');
+
+select test_harness.expect_state('A12 anon cannot execute the lifecycle contract function', 'anon', null,
+  $$select public.teacher_application_transition_allowed('SUBMITTED', 'REJECTED')$$, '42501');
+
+select test_harness.expect_state('A13 authenticated cannot execute the trigger helper directly', 'authenticated', '00000000-0000-4000-8000-000000000001',
+  $$select public.teacher_applications_set_updated_at()$$, '42501');
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- B. Applicant identity, submission and duplicate handling
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -611,6 +620,13 @@ select test_harness.record('H2 applicant view exposes no internal columns',
     where table_schema = 'public' and table_name = 'teacher_applications_applicant'
       and column_name in ('rejection_reason', 'reviewed_by', 'reviewed_at', 'applicant_user_id',
                           'email_normalized', 'approved_teacher_id', 'email_verified_at')));
+
+select test_harness.record('I1 audit rows carry the actor in details, with no actor_id column present',
+  (select not exists (select 1 from information_schema.columns
+                       where table_schema = 'public' and table_name = 'audit_logs' and column_name = 'actor_id')
+      and (select count(*) >= 1 from public.audit_logs l
+            where l.action like 'TEACHER_APPLICATION_%'
+              and l.details ->> 'actor_id' = '00000000-0000-4000-8000-000000000001')));
 
 select test_harness.record('H3 applicant view shows only the caller''s own row',
   test_harness.count_as_row('authenticated', '00000000-0000-4000-8000-000000000001',

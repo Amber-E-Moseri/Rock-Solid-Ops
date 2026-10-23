@@ -77,11 +77,11 @@ create table public.teachers (
   updated_at       timestamptz not null default now()
 );
 
+-- actor_id is deliberately absent: production lacks it (drift inventory, row 7).
 create table public.audit_logs (
   id          bigserial primary key,
   logged_at   timestamptz not null default now(),
   actor_email text,
-  actor_id    text,
   action      text not null,
   entity_type text,
   entity_id   text,

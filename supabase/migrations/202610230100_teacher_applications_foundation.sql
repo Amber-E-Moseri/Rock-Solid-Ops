@@ -304,12 +304,13 @@ begin
     end;
   end if;
 
-  insert into public.audit_logs (logged_at, actor_email, actor_id, action, entity_type, entity_id, status, details)
+  -- The actor id travels in details. Production audit_logs lacks an actor_id column (drift inventory, row 7).
+  insert into public.audit_logs (logged_at, actor_email, action, entity_type, entity_id, status, details)
   values (
-    now(), v_email, v_uid::text,
+    now(), v_email,
     'TEACHER_APPLICATION_' || v_outcome,
     'teacher_application', v_id::text, 'SUCCESS',
-    jsonb_build_object('application_id', v_id, 'version', v_version, 'fellowship_code', v_fellowship)
+    jsonb_build_object('actor_id', v_uid, 'application_id', v_id, 'version', v_version, 'fellowship_code', v_fellowship)
   );
 
   -- Confirmation mail only for a first submission or a resubmission, never for a plain edit.
@@ -367,11 +368,11 @@ begin
          version = a.version + 1
    where id = a.id;
 
-  insert into public.audit_logs (logged_at, actor_email, actor_id, action, entity_type, entity_id, status, details)
+  insert into public.audit_logs (logged_at, actor_email, action, entity_type, entity_id, status, details)
   values (
-    now(), (select u.email from auth.users u where u.id = v_uid), v_uid::text,
+    now(), (select u.email from auth.users u where u.id = v_uid),
     'TEACHER_APPLICATION_WITHDRAWN', 'teacher_application', a.id::text, 'SUCCESS',
-    jsonb_build_object('application_id', a.id, 'from_status', a.status, 'version', a.version + 1)
+    jsonb_build_object('actor_id', v_uid, 'application_id', a.id, 'from_status', a.status, 'version', a.version + 1)
   );
 
   return jsonb_build_object('ok', true, 'application_id', a.id, 'status', 'WITHDRAWN', 'version', a.version + 1);
@@ -453,14 +454,13 @@ begin
          rejection_reason = case when v_to = 'REJECTED' then v_msg else rejection_reason end
    where id = a.id;
 
-  insert into public.audit_logs (logged_at, actor_email, actor_id, action, entity_type, entity_id, status, details)
+  insert into public.audit_logs (logged_at, actor_email, action, entity_type, entity_id, status, details)
   values (
     now(),
     (select u.email from auth.users u where u.id = v_actor),
-    v_actor::text,
     'TEACHER_APPLICATION_' || v_to,
     'teacher_application', a.id::text, 'SUCCESS',
-    jsonb_build_object('application_id', a.id, 'from_status', a.status, 'to_status', v_to,
+    jsonb_build_object('actor_id', v_actor, 'application_id', a.id, 'from_status', a.status, 'to_status', v_to,
                        'version', a.version + 1, 'has_message', true)
   );
 
@@ -513,6 +513,7 @@ grant select on public.teacher_applications_review to authenticated;
 
 revoke all on function public.teacher_application_transition_allowed(text, text) from public, anon, authenticated;
 revoke all on function public.teacher_application_reviewer() from public, anon;
+revoke all on function public.teacher_applications_set_updated_at() from public, anon, authenticated;
 grant execute on function public.teacher_application_reviewer() to authenticated;
 revoke all on function public.enqueue_teacher_application_email(uuid, text, text, text, text) from public, anon, authenticated;
 revoke all on function public.submit_teacher_application(text, text, text, text) from public, anon;
