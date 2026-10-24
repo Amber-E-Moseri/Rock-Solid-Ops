@@ -26,12 +26,13 @@ DENO_UNIT_TESTS=(
   "supabase/functions/waitlist-processor/waitlist-dedup.test.ts"
   "supabase/functions/registration-processor/registration-processor.test.ts"
   "supabase/functions/nexus-users-search/nexus-cors.test.ts"
+  "supabase/functions/retry-worker/moodle-hold.test.ts"
   # moodle-sync/moodle-sync.test.ts excluded: pre-existing type errors +
   # top-level Deno.serve() in index.ts prevents import (tracked separately)
 )
 
 cd "$ROOT"
-deno test --allow-env --no-prompt --no-check --node-modules-dir=auto "${DENO_UNIT_TESTS[@]}"
+deno test --allow-env --allow-read --no-prompt --no-check --node-modules-dir=auto "${DENO_UNIT_TESTS[@]}"
 DENO_EXIT=$?
 
 echo ""
