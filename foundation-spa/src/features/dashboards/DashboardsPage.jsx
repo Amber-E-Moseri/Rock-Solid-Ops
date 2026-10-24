@@ -9,6 +9,7 @@ import { useAuth } from '../../hooks/useAuth.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useBatches, useScope, useDashboardData } from './hooks/useDashboard.js';
 import { retryAllFailedMoodleSyncs, exportCapacityCsv, fmtDate, fmtTime, relativeMinutes, isRegionalSecretary } from './lib/dashboard.js';
+import { MOODLE_RETRY_CERTIFIED, MOODLE_RETRY_HOLD_MESSAGE } from '../../releaseHolds.js';
 import { HorizontalBarChart, DoughnutChart, SparklineChart, ProgressBar, FunnelGrid } from './components/MiniCharts.jsx';
 
 const STATUS_VARIANT = { ASSIGNED: 'success', PENDING: 'info', WAITLISTED: 'warning', DUPLICATE: 'danger', REVIEW: 'warning', INACTIVE: 'neutral' };
@@ -33,13 +34,14 @@ export default function DashboardsPage() {
   }, [queryClient]);
 
   const handleRetryMoodle = useCallback(async () => {
+    if (!MOODLE_RETRY_CERTIFIED) return;
     setRetrying(true);
     try {
       await retryAllFailedMoodleSyncs();
       queryClient.invalidateQueries({ queryKey: ['dashboard-data'] });
-      toast('Moodle sync retry initiated', 'success');
-    } catch {
-      toast('Retry failed', 'error');
+      toast('Moodle sync retry completed', 'success');
+    } catch (e) {
+      toast(`Retry failed: ${e.message || 'unknown error'}`, 'error');
     } finally {
       setRetrying(false);
     }
@@ -119,7 +121,7 @@ export default function DashboardsPage() {
               active={batchId === b.batch_id}
               onClick={() => setBatchId(b.batch_id)}
               label={b.displayName}
-              meta={`${fmtDate(b.start_date)} — ${b.active ? 'Active' : 'Inactive'} — ${b.studentCount} students`}
+              meta={`${fmtDate(b.start_date)} — ${b.active ? 'Active' : 'Inactive'} — ${b.studentCount ?? '—'} students`}
             />
           ))}
         </div>
@@ -131,7 +133,7 @@ export default function DashboardsPage() {
         <KpiCard value={reg?.waitlisted} label="Waitlisted" variant="warn" asOf={d?.fetchedAt} />
         <KpiCard value={reg?.pendingReview} label="Pending Review" variant="danger" asOf={d?.fetchedAt} />
         <KpiCard value={reg?.duplicates} label="Duplicates" variant="muted" asOf={d?.fetchedAt} />
-        <KpiCard value={teacherKpis?.activeCertified} label="Active/Certified Teachers" asOf={d?.fetchedAt} />
+        <KpiCard value={teacherKpis?.activeTeachers} label="Active Teachers" asOf={d?.fetchedAt} />
         <KpiCard value={teacherKpis?.currentlyTeaching} label="Currently Teaching" asOf={d?.fetchedAt} />
         <KpiCard value={stale?.count} label="Stale Reviews (>48 h)" variant={stale?.count > 10 ? 'danger' : 'warn'} asOf={d?.fetchedAt} />
       </div>
@@ -143,12 +145,14 @@ export default function DashboardsPage() {
             <div>
               <div className="rso-section-title">Duplicate Registrations</div>
               <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--danger)', lineHeight: 1.1, marginTop: 4 }}>
-                {d.duplicates.count.toLocaleString()}
+                {d.duplicates.count == null ? '—' : d.duplicates.count.toLocaleString()}
               </div>
               <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>
-                {d.duplicates.count > 0
-                  ? `Newest duplicate: ${fmtDate(d.duplicates.newestDate)}`
-                  : 'No unresolved duplicate groups in your current scope.'}
+                {d.duplicates.count == null
+                  ? 'Duplicate count could not be loaded.'
+                  : d.duplicates.count > 0
+                    ? `Newest duplicate: ${fmtDate(d.duplicates.newestDate)}`
+                    : 'No unresolved duplicate groups in your current scope.'}
               </div>
             </div>
             <Button variant="secondary" onClick={() => navigate('/staff/applicant-directory?duplicate=unresolved_only')}>
@@ -230,9 +234,12 @@ export default function DashboardsPage() {
             <div style={{ marginTop: 10, fontSize: 12, color: 'var(--muted)' }}>
               Last successful sync: {fmtTime(moodle.lastSuccess)}
             </div>
-            <Button size="sm" variant="secondary" onClick={handleRetryMoodle} disabled={retrying} style={{ marginTop: 12 }}>
+            <Button size="sm" variant="secondary" onClick={handleRetryMoodle} disabled={!MOODLE_RETRY_CERTIFIED || retrying} title={MOODLE_RETRY_CERTIFIED ? undefined : MOODLE_RETRY_HOLD_MESSAGE} style={{ marginTop: 12 }}>
               {retrying ? 'Retrying…' : 'Retry all failed'}
             </Button>
+            {!MOODLE_RETRY_CERTIFIED && (
+              <div role="status" style={{ marginTop: 8, fontSize: 12, color: 'var(--muted)' }}>{MOODLE_RETRY_HOLD_MESSAGE}</div>
+            )}
           </Card>
         )}
 
@@ -240,8 +247,8 @@ export default function DashboardsPage() {
         <Card>
           <div className="rso-section-title">Quick Actions</div>
           <div style={{ display: 'grid', gap: 8 }}>
-            <Button size="sm" variant="secondary" onClick={() => navigate('/staff/teacher-schedule')}>Approve Teacher Slots</Button>
-            <Button size="sm" variant="secondary" onClick={handleRetryMoodle} disabled={retrying}>Retry all failed Moodle syncs</Button>
+            <Button size="sm" variant="secondary" onClick={() => navigate('/staff/teacher-schedule')}>View Teacher Schedule</Button>
+            <Button size="sm" variant="secondary" onClick={handleRetryMoodle} disabled={!MOODLE_RETRY_CERTIFIED || retrying} title={MOODLE_RETRY_CERTIFIED ? undefined : MOODLE_RETRY_HOLD_MESSAGE}>Retry all failed Moodle syncs</Button>
             <Button size="sm" variant="secondary" onClick={() => navigate('/staff/audit-log')}>View audit log</Button>
             <Button size="sm" variant="secondary" onClick={() => d?.capacity && exportCapacityCsv(d.capacity)}>
               <Download size={14} style={{ marginRight: 4 }} />

@@ -121,8 +121,8 @@ self.addEventListener('fetch', (event) => {
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request).catch(() =>
-        caches.match('/index.html', { ignoreSearch: true }).then(
-          (cached) => cached || caches.match('/')
+        caches.match(new URL('index.html', self.registration.scope).href, { ignoreSearch: true }).then(
+          (cached) => cached || caches.match(self.registration.scope)
         ).then(
           (cached) => cached || Response.error()
         )
@@ -184,10 +184,10 @@ self.addEventListener('push', (event) => {
   const title = payload.title || 'Rock Solid Ops';
   const options = {
     body: payload.body || payload.message || '',
-    icon: '/pwa-icon.svg',
-    badge: '/pwa-icon.svg',
+    icon: new URL('pwa-icon.svg', self.registration.scope).href,
+    badge: new URL('pwa-icon.svg', self.registration.scope).href,
     tag: payload.type || 'rso-notification',
-    data: { url: payload.url || '/', type: payload.type },
+    data: { url: payload.url || self.registration.scope, type: payload.type },
     requireInteraction: !!payload.requireInteraction,
   };
   event.waitUntil(self.registration.showNotification(title, options));
@@ -195,7 +195,7 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const target = (event.notification.data && event.notification.data.url) || '/';
+  const target = (event.notification.data && event.notification.data.url) || self.registration.scope;
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {

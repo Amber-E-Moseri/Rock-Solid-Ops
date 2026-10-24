@@ -1,62 +1,58 @@
 import { supabase } from '../../../supabase.js';
 
+// Read-only class and roster contract, from the tracked schema:
+//   class_options: class_option_id, teacher_id, teacher_name, subgroup_id, day, class_time, active, deleted_at
+//   class_roster:  class_option_id, student_id, status ('Active') -> students(full_name)
+// Attendance submission state is not read here. Every submission-derived value is null (unknown), never zero.
 export async function fetchClasses() {
-  const [availRes, logRes] = await Promise.all([
-    supabase
-      .from('teacher_availability')
-      .select('id, subgroup_id, day, time_slot, batch_id, teachers(full_name)')
-      .eq('status', 'Active')
-      .order('subgroup_id')
-      .limit(50),
-    supabase
-      .from('attendance_log')
-      .select('subgroup_id, student_id, present, students(full_name)')
-      .limit(500),
-  ]);
-  if (availRes.error) throw availRes.error;
+  const { data: classes, error } = await supabase
+    .from('class_options')
+    .select('class_option_id, teacher_id, teacher_name, subgroup_id, day, class_time')
+    .eq('active', true)
+    .is('deleted_at', null)
+    .order('day')
+    .limit(200);
+  if (error) throw error;
 
-  const rmap = {};
-  (logRes.data || []).forEach(r => {
-    const key = r.subgroup_id;
-    if (!rmap[key]) rmap[key] = [];
-    rmap[key].push({
+  const ids = (classes || []).map(c => c.class_option_id);
+  let rosterRows = [];
+  if (ids.length) {
+    const { data, error: rosterError } = await supabase
+      .from('class_roster')
+      .select('class_option_id, student_id, status, students(full_name)')
+      .in('class_option_id', ids)
+      .eq('status', 'Active')
+      .limit(2000);
+    if (rosterError) throw rosterError;
+    rosterRows = data || [];
+  }
+
+  const rosterByClass = {};
+  rosterRows.forEach(r => {
+    if (!rosterByClass[r.class_option_id]) rosterByClass[r.class_option_id] = [];
+    rosterByClass[r.class_option_id].push({
       name: (r.students && r.students.full_name) || r.student_id,
       student_id: r.student_id,
-      status: r.present === true ? 'present' : r.present === false ? 'absent' : null,
+      status: null,
     });
   });
 
-  return (availRes.data || []).map(a => {
+  return (classes || []).map(c => {
     let time = '—';
-    if (a.time_slot) {
-      try { time = new Date('1970-01-01T' + a.time_slot).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }); } catch (_) {}
+    if (c.class_time) {
+      try { time = new Date('1970-01-01T' + c.class_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }); } catch (_) {}
     }
     return {
-      id: a.id,
-      time: (a.day || 'Sun') + ' · ' + time,
-      loc: a.subgroup_id || '—',
-      teacher: (a.teachers && a.teachers.full_name) || '—',
-      session: a.batch_id || '—',
+      id: c.class_option_id,
+      time: (c.day || '—') + ' · ' + time,
+      loc: c.subgroup_id || '—',
+      teacher: c.teacher_name || '—',
+      session: '—',
       flagSessions: [],
-      submitted: false,
-      roster: rmap[a.subgroup_id] || [],
+      submitted: null,
+      roster: rosterByClass[c.class_option_id] || [],
     };
   });
-}
-
-export function demoClasses() {
-  return [
-    { id: 1, time: 'Sun · 10:00 AM', loc: 'CE · Downtown', teacher: 'J. Musa', session: '4b', flagSessions: [], submitted: true,
-      roster: [{ name: 'Hannah Lawal', status: 'present' }, { name: 'Isaac Mensah', status: 'present' }, { name: 'John Musa', status: 'late' }, { name: 'Faith Udo', status: 'present' }, { name: 'Caleb Thomas', status: 'absent' }, { name: 'Joy Eke', status: 'present' }] },
-    { id: 2, time: 'Sun · 4:00 PM', loc: 'CE · Uptown', teacher: 'F. Udo', session: '4b', flagSessions: [], submitted: true,
-      roster: [{ name: 'Daniel Okoro', status: 'present' }, { name: 'Ruth Bello', status: 'present' }, { name: 'Esther Ade', status: 'present' }, { name: 'Samuel Eze', status: 'late' }, { name: 'Grace Adeyemi', status: 'present' }] },
-    { id: 3, time: 'Sun · 10:00 AM', loc: 'CSGA · Scarborough', teacher: 'E. Ade', session: '4b', flagSessions: [], submitted: false,
-      roster: [{ name: 'Peter Nwosu', status: null }, { name: 'Mary Johnson', status: null }, { name: 'Blessing Obi', status: null }, { name: 'David Eke', status: null }, { name: 'Sarah Ade', status: null }] },
-    { id: 4, time: 'Sun · 4:00 PM', loc: 'CSGB · Markham', teacher: 'S. Eze', session: '4b', flagSessions: ['4a', '4b'], submitted: true,
-      roster: [{ name: 'Naomi Bassey', status: 'present' }, { name: 'Paul Inyang', status: 'present' }, { name: 'Lydia Etim', status: 'absent' }] },
-    { id: 5, time: 'Sun · 10:00 AM', loc: 'WS · Brampton', teacher: 'K. Obi', session: '4b', flagSessions: [], submitted: false,
-      roster: [{ name: 'Joy Eke', status: null }, { name: 'Caleb Thomas', status: null }, { name: 'Ruth Bello', status: null }, { name: 'Mark Ojo', status: null }] },
-  ];
 }
 
 export function counts(c) {
@@ -71,22 +67,27 @@ export function counts(c) {
 }
 
 export function classStatus(c) {
+  if (c.submitted === null || c.submitted === undefined) return 'unknown';
   if (c.submitted) return 'ok';
   const cc = counts(c);
   return cc.m === cc.total ? 'miss' : 'part';
 }
 
+// Submission-derived KPIs are unavailable unless every class reports a submission state, and the on-time
+// rate is unavailable unless a roster status has been recorded. Unknown is shown as '—', never as 0.
 export function computeKpis(classes) {
-  const miss = classes.filter(c => !c.submitted).length;
-  const flagged = classes.filter(c => c.flagSessions && c.flagSessions.length > 1).length;
-  const rate = classes.length ? Math.round((classes.length - miss) / classes.length * 100) : 0;
+  const submissionKnown = classes.length > 0 && classes.every(c => typeof c.submitted === 'boolean');
+  const rosterKnown = classes.some(c => (c.roster || []).some(r => r.status));
+  const miss = submissionKnown ? classes.filter(c => !c.submitted).length : null;
+  const flagged = submissionKnown ? classes.filter(c => c.flagSessions && c.flagSessions.length > 1).length : null;
+  const rate = submissionKnown ? Math.round((classes.length - miss) / classes.length * 100) + '%' : '—';
   const totalS = classes.reduce((s, c) => s + (c.roster || []).length, 0);
   const onTimeS = classes.reduce((s, c) => s + (c.roster || []).filter(r => r.status === 'present').length, 0);
   return {
-    rate: classes.length ? rate + '%' : '—',
-    missing: miss,
-    flagged,
-    onTime: totalS ? Math.round(onTimeS / totalS * 100) + '%' : '—',
+    rate,
+    missing: miss ?? '—',
+    flagged: flagged ?? '—',
+    onTime: rosterKnown && totalS ? Math.round(onTimeS / totalS * 100) + '%' : '—',
   };
 }
 

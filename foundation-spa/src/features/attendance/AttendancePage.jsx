@@ -1,26 +1,29 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Download } from 'lucide-react';
-import { PageHeader, Card, Badge, Button, Skeleton } from '../../components/ui/index.js';
+import { PageHeader, Card, Badge, Button, Skeleton, ErrorBanner, EmptyState } from '../../components/ui/index.js';
 import { useToast } from '../../context/ToastContext.jsx';
-import { fetchClasses, demoClasses, counts, classStatus, computeKpis, initials } from './lib/attendance.js';
+import { fetchClasses, counts, classStatus, computeKpis, initials } from './lib/attendance.js';
+import { ATTENDANCE_SUBMIT_CERTIFIED, ATTENDANCE_SUBMIT_HOLD_MESSAGE } from '../../releaseHolds.js';
 
 export default function AttendancePage() {
   const toast = useToast();
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [selId, setSelId] = useState(null);
 
+  // No demo fallback: invented classes must never appear as real staff data. A failed read is shown as an error.
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchClasses();
-      if (!data.length) throw new Error('no data');
       setClasses(data);
       setSelId(data[0]?.id ?? null);
-    } catch {
-      const demo = demoClasses();
-      setClasses(demo);
-      setSelId(demo[0]?.id ?? null);
+      setLoadError(null);
+    } catch (e) {
+      setClasses([]);
+      setSelId(null);
+      setLoadError(e?.message || 'Failed to load classes');
     } finally {
       setLoading(false);
     }
@@ -29,6 +32,8 @@ export default function AttendancePage() {
   useEffect(() => { load(); }, [load]);
 
   const kpis = useMemo(() => computeKpis(classes), [classes]);
+  // A failed or pending read has no data, so its KPIs show a dash rather than a zero.
+  const kpiPending = loading || Boolean(loadError);
   const selected = classes.find(c => c.id === selId) || null;
   const cc = selected ? counts(selected) : null;
 
@@ -52,8 +57,8 @@ export default function AttendancePage() {
     if (!selected) return;
     const c = counts(selected);
     if (c.m === c.total) { toast('Mark at least one student first.', 'warning'); return; }
-    setClasses(prev => prev.map(cl => cl.id === selId ? { ...cl, submitted: true } : cl));
-    toast(`${selected.loc} attendance submitted (${c.p} present, ${c.a} absent).`, 'success');
+    // Recording is not connected to a backend in this build. Never report attendance as saved.
+    toast(`Attendance for ${selected.loc} was not saved: recording is not connected yet.`, 'warning');
   };
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
@@ -69,10 +74,10 @@ export default function AttendancePage() {
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
         {[
-          { label: 'Submission rate', value: loading ? '—' : kpis.rate },
-          { label: 'Classes missing', value: loading ? '—' : kpis.missing, color: kpis.missing > 0 ? 'var(--color-danger)' : undefined },
-          { label: 'Flagged · multi-session', value: loading ? '—' : kpis.flagged, color: kpis.flagged > 0 ? 'var(--color-danger)' : undefined },
-          { label: 'On-time rate', value: loading ? '—' : kpis.onTime, color: 'var(--color-warning)' },
+          { label: 'Submission rate', value: loading || loadError ? '—' : kpis.rate },
+          { label: 'Classes missing', value: loading || loadError ? '—' : kpis.missing, color: kpis.missing > 0 ? 'var(--color-danger)' : undefined },
+          { label: 'Flagged · multi-session', value: loading || loadError ? '—' : kpis.flagged, color: kpis.flagged > 0 ? 'var(--color-danger)' : undefined },
+          { label: 'On-time rate', value: loading || loadError ? '—' : kpis.onTime, color: 'var(--color-warning)' },
         ].map(k => (
           <Card key={k.label}>
             <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1, color: k.color || 'var(--text)' }}>{k.value}</div>
@@ -81,7 +86,11 @@ export default function AttendancePage() {
         ))}
       </div>
 
-      {loading ? <Skeleton style={{ height: 400 }} /> : (
+      {loading ? <Skeleton style={{ height: 400 }} /> : loadError ? (
+        <ErrorBanner message={`Could not load classes. ${loadError}`} onRetry={load} />
+      ) : classes.length === 0 ? (
+        <EmptyState icon="📭" title="No classes found" message="No class sessions are available to record attendance for." />
+      ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '380px minmax(0, 1fr)', gap: 18, alignItems: 'start' }}>
           {/* Class list */}
           <div>
@@ -124,7 +133,7 @@ export default function AttendancePage() {
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 800 }}>{pct}</div>
                       <div style={{ fontSize: 10.5, color: 'var(--muted)', fontWeight: 700 }}>
-                        {st === 'ok' ? 'Submitted' : st === 'miss' ? 'Missing' : 'In progress'}
+                        {st === 'ok' ? 'Submitted' : st === 'miss' ? 'Missing' : st === 'unknown' ? 'Not recorded' : 'In progress'}
                       </div>
                     </div>
                   </div>
@@ -203,10 +212,13 @@ export default function AttendancePage() {
                   display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
                 }}>
                   <span style={{ fontSize: 12.5, color: 'var(--muted)', fontWeight: 600 }}>
-                    {selected.submitted ? 'Submitted · you can update and re-submit.' : `${cc.m} of ${cc.total} still unmarked.`}
+                    {selected.submitted === null || selected.submitted === undefined
+                      ? 'Attendance status is not loaded in this view.'
+                      : selected.submitted ? 'Submitted · you can update and re-submit.' : `${cc.m} of ${cc.total} still unmarked.`}
                   </span>
                   <Button variant="secondary" onClick={markAllPresent} style={{ marginLeft: 'auto' }}>Mark all present</Button>
-                  <Button onClick={submitAttendance}>{selected.submitted ? 'Update attendance' : 'Submit attendance'}</Button>
+                  {!ATTENDANCE_SUBMIT_CERTIFIED && <p role="status" style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>{ATTENDANCE_SUBMIT_HOLD_MESSAGE}</p>}
+                  <Button onClick={submitAttendance} disabled={!ATTENDANCE_SUBMIT_CERTIFIED}>{selected.submitted ? 'Update attendance' : 'Submit attendance'}</Button>
                 </div>
               </>
             )}
