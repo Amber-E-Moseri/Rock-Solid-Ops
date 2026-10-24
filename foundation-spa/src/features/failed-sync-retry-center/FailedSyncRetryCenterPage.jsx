@@ -9,8 +9,13 @@ import { useToast } from '../../context/ToastContext.jsx';
 import {
   fetchFailedJobs, computeKpis, filterJobs, invokeRetryAction, statusVariant, fmtDateTime,
 } from './lib/failed-syncs.js';
+import { isMoodleRetryHeld, MOODLE_RETRY_CERTIFIED, MOODLE_RETRY_HOLD_MESSAGE } from '../../releaseHolds.js';
 
 const PAGE_SIZE = 25;
+
+// A Moodle retry is held while MOODLE_RETRY_CERTIFIED is false. Held rows keep
+// Resolve and the Details view, but their Retry is disabled and skipped in bulk.
+const isHeldRetry = (row) => isMoodleRetryHeld('retry', row.source, MOODLE_RETRY_CERTIFIED);
 
 export default function FailedSyncRetryCenterPage() {
   const { profile } = useAuth();
@@ -46,10 +51,12 @@ export default function FailedSyncRetryCenterPage() {
   }, [queryClient]);
 
   const handleAction = useCallback(async (action, rows) => {
+    const runnable = action === 'retry' ? rows.filter((r) => !isHeldRetry(r)) : rows;
+    const held = rows.length - runnable.length;
     setBusy(true);
     try {
-      for (const row of rows) await invokeRetryAction(action, row.source, row.id);
-      toast(`${action === 'retry' ? 'Retried' : 'Resolved'} ${rows.length} item(s)`, 'success');
+      for (const row of runnable) await invokeRetryAction(action, row.source, row.id);
+      toast(`${action === 'retry' ? 'Retried' : 'Resolved'} ${runnable.length} item(s)${held ? `; ${held} Moodle retry on hold` : ''}`, 'success');
       setSelected(new Set());
       refresh();
     } catch (e) {
@@ -62,8 +69,10 @@ export default function FailedSyncRetryCenterPage() {
   const handleBulkVisible = useCallback(async () => {
     setBusy(true);
     try {
-      for (const row of filtered) await invokeRetryAction('retry', row.source, row.id);
-      toast(`Retried ${filtered.length} visible item(s)`, 'success');
+      const runnable = filtered.filter((r) => !isHeldRetry(r));
+      for (const row of runnable) await invokeRetryAction('retry', row.source, row.id);
+      const held = filtered.length - runnable.length;
+      toast(`Retried ${runnable.length} visible item(s)${held ? `; ${held} Moodle retry on hold` : ''}`, 'success');
       refresh();
     } catch (e) {
       toast(String(e?.message || e), 'error');
@@ -136,7 +145,7 @@ export default function FailedSyncRetryCenterPage() {
         {!isReadOnly && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '0 12px 12px' }}>
             <Button size="sm" variant="secondary" disabled={busy || selected.size === 0} onClick={() => handleAction('retry', selectedRows)}>Retry Selected</Button>
-            <Button size="sm" variant="secondary" disabled={busy || filtered.length === 0} onClick={handleBulkVisible}>Retry All Visible</Button>
+            <Button size="sm" variant="secondary" disabled={busy || !filtered.some((r) => !isHeldRetry(r))} onClick={handleBulkVisible}>Retry All Visible</Button>
             <Button size="sm" variant="secondary" disabled={busy || selected.size === 0} onClick={() => handleAction('resolve', selectedRows)}>Mark Resolved</Button>
             <span style={{ flex: 1 }} />
             <span style={{ color: 'var(--muted)', fontSize: 13, alignSelf: 'center' }}>{filtered.length} visible of {(allRows || []).length} total</span>
@@ -205,7 +214,7 @@ export default function FailedSyncRetryCenterPage() {
                           <div style={{ display: 'flex', gap: 4 }}>
                             {!isReadOnly && (
                               <>
-                                <Button size="sm" variant="secondary" disabled={busy} onClick={() => handleAction('retry', [r])}>Retry</Button>
+                                <Button size="sm" variant="secondary" disabled={busy || isHeldRetry(r)} title={isHeldRetry(r) ? MOODLE_RETRY_HOLD_MESSAGE : undefined} onClick={() => handleAction('retry', [r])}>Retry</Button>
                                 <Button size="sm" variant="secondary" disabled={busy} onClick={() => handleAction('resolve', [r])}>Resolve</Button>
                               </>
                             )}
