@@ -429,12 +429,15 @@
         if (!supabaseUrl || !anonKey) {
           pushCheck("moodle-api", "Moodle API Connectivity", "warn", "Missing runtime config — cannot test Moodle connection.");
         } else {
+          // Moodle sync is staff-only. Send the signed-in session token; the anon key is refused.
+          const { data: sess } = await supabase.auth.getSession();
+          const token = sess?.session?.access_token || "";
           const moodleRes = await withTimeout(
             "moodle-api-test",
             () => fetch(`${supabaseUrl}/functions/v1/moodle-sync`, {
               method: "POST",
               headers: {
-                Authorization: `Bearer ${anonKey}`,
+                Authorization: `Bearer ${token}`,
                 apikey: anonKey,
                 "Content-Type": "application/json"
               },

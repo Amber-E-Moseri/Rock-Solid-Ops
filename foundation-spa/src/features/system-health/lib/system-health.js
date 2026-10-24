@@ -33,6 +33,18 @@ async function countTable(table, apply, optional = false) {
 
 // ── Health checks ───────────────────────────────────────────────────────────
 
+// Moodle sync is staff-only. The check sends the signed-in session token, never the anon key. With no session the
+// bearer is empty and the function refuses the request, so the check reports a failure instead of passing.
+export async function requestMoodleConnectivityTest(supabaseUrl, anonKey) {
+  const { data: sess } = await supabase.auth.getSession();
+  const token = sess?.session?.access_token || '';
+  return fetch(`${supabaseUrl}/functions/v1/moodle-sync`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, apikey: anonKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'test' }),
+  });
+}
+
 export async function runHealthChecks(supabaseUrl, anonKey) {
   const checks = [];
   const missingTables = new Set();
@@ -136,11 +148,7 @@ export async function runHealthChecks(supabaseUrl, anonKey) {
   if (supabaseUrl && anonKey) {
     try {
       const res = await withTimeout('moodle-api-test',
-        () => fetch(`${supabaseUrl}/functions/v1/moodle-sync`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${anonKey}`, apikey: anonKey, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'test' }),
-        }), 10000);
+        () => requestMoodleConnectivityTest(supabaseUrl, anonKey), 10000);
       const data = await res.json().catch(() => ({}));
       if (data.ok) push('moodle-api', 'Moodle API Connectivity', 'pass', `Connected — ${data.sitename || data.siteurl || 'Moodle'}`);
       else if (data.code === 'MOODLE_NOT_CONFIGURED') push('moodle-api', 'Moodle API Connectivity', 'warn', 'MOODLE_URL / MOODLE_TOKEN not configured.');
