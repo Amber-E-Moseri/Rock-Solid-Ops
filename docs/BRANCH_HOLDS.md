@@ -113,6 +113,31 @@ Holds (each must clear before launch):
 3. CI coverage. `ci.yml` now also runs `pull_request` for base `brief/spa-cutover-integration`, and the unit job runs the PR #21 test. Owner approval is required for this workflow change to stay.
 4. Live sign-in and token-refresh test, to confirm the fail-closed refresh does not cause an unintended sign-out loop. Not verified.
 
+### `integration/spa-consolidated-release-candidate` — consolidated SPA candidate, HOLD: no merge, deploy or activation (2026-10-24)
+
+Integration of PR #23 (`28bd91d`), PR #24 (`6782183`), PR #25 (`1cf3db3`) and the PR #20 delta (`f2cf8c7`).
+Base for review: `integration/teacher-onboarding-candidate` (PR #23). Not merged, not deployed.
+
+Holds that stay in force (all `false`): `APPROVAL_CERTIFIED`, `MOODLE_RETRY_CERTIFIED`,
+`ATTENDANCE_SUBMIT_CERTIFIED`, `TEACHER_ONBOARDING_CERTIFIED`. Teacher application approval is disabled
+(`APPROVAL_CONTRACT_AVAILABLE = false`).
+
+Open blockers:
+
+- Legacy static login (`foundation/auth/login.html`) still calls `supabase.auth.resetPasswordForEmail`. This is
+  an unprotected reset path. It is on `main` already and is not introduced by this candidate. Needs an owner
+  decision before any release that keeps the legacy login live.
+- PR #22 foundation is not deployed to staging.
+- P1 privileged teacher approval and activation contract is outstanding.
+- Legacy Teacher Management approval writes (`teacherManagement.js`) need reconciliation with the approval path.
+- Real sign-in and token-refresh testing, live profile self-read under RLS, inactive and missing profile denial.
+- Password recovery and redirect allow-list; CAPTCHA configuration and real validation.
+- Legacy navigation and production bypass configuration.
+
+Release condition: owner review of this candidate. The limited SPA release and the teacher onboarding release
+are separate decisions. Teacher onboarding stays off until its own certification is recorded.
+
+
 ## Resolved (moot — already merged)
 
 ### `brief/moodle-credential-safety` — RESOLVED 2026-07-23
