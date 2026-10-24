@@ -107,7 +107,7 @@
       <input id="email" type="email" required placeholder="Email" class="login-input" />
       <input id="password" type="password" required placeholder="Password" class="login-input" />
       <button type="submit" class="login-submit">Sign In</button>
-      <a id="forgotPasswordBtn" href="#">Forgot password?</a>
+      <a id="forgotPasswordBtn" href="/app/auth/forgot-password">Forgot password?</a>
     </form>
     <p id="msg" class="login-msg"></p>
     <p id="supportMsg" class="login-msg hidden"></p>
@@ -145,7 +145,6 @@
     const msg = document.getElementById("msg");
     const submitBtn = form.querySelector('button[type="submit"]');
     const emailInput = document.getElementById("email");
-    const forgotPasswordBtn = document.getElementById("forgotPasswordBtn");
     const supportMsg = document.getElementById("supportMsg");
     const supportEmail = String(window.FS_CONFIG?.SUPPORT_EMAIL || "support@rocksolid.school").trim() || "support@rocksolid.school";
     let loginPending = false;
@@ -280,26 +279,8 @@
       window.location.href = safeNext();
     });
 
-    forgotPasswordBtn.addEventListener("click", async (e) => {
-      e.preventDefault();
-      const email = emailInput.value.trim();
-      if (!email) {
-        msg.textContent = "Enter your email address first.";
-        emailInput.focus();
-        return;
-      }
-
-      msg.textContent = "Sending reset link...";
-      setSupportLine(false);
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}${appPath("auth/reset-password.html")}`,
-      });
-      if (error) {
-        msg.textContent = "Could not send reset link. Please try again or contact support.";
-        return;
-      }
-      msg.textContent = "Check your email for a reset link.";
-    });
+    // Password reset is requested only from the protected recovery page (Turnstile-gated in the SPA).
+    // This page no longer calls resetPasswordForEmail, so no unprotected reset email is sent from here.
   </script>
   <script src="../ui/premium-shell.js"></script>
 </body>

@@ -6,8 +6,9 @@ on:
   pull_request:
     # brief/spa-cutover-integration is the stacked base for the SPA integration candidate (PR #23).
     # integration/teacher-onboarding-candidate is the stacked base for the legacy auth fix (PR #24) and the teacher experience candidate (PR #25).
+    # integration/consolidated-spa-release-candidate is the stacked base for the consolidated candidate (PR #26) and its security remediation.
     # Only pull requests into these branches are added. Pushes to them do not run CI, and nothing here deploys.
-    branches: [main, brief/spa-cutover-integration, integration/teacher-onboarding-candidate]
+    branches: [main, brief/spa-cutover-integration, integration/teacher-onboarding-candidate, integration/consolidated-spa-release-candidate]
 
 # Only one CI run per branch at a time; newer pushes cancel in-flight runs.
 concurrency:
@@ -53,6 +54,10 @@ jobs:
       - name: Run legacy profile-trust authorization test
         # Legacy /foundation auth: roles come only from the profiles row, and lookups fail closed.
         run: node --test tests/legacy-profile-trust.test.mjs
+
+      - name: Run legacy teacher-activation and login-recovery tests
+        # Legacy Teacher Management never marks a teacher ACTIVE without the sign-in role. The legacy login does not send reset emails.
+        run: node --test tests/legacy-teacher-activation.test.mjs tests/legacy-login-recovery.test.mjs
 
   # ──────────────────────────────────────────────────────────────
   # Job 2: Migration gate — db reset + schema invariant check.

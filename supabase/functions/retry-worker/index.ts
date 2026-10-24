@@ -9,6 +9,15 @@ import {
   isValidString,
   safeLogAudit,
 } from "../_shared/http.ts";
+import {
+  isMoodleRetryCertified,
+  isMoodleRetryHeld,
+  isMoodleSweepHeld,
+  isUnauthenticatedRequestAllowed,
+  MOODLE_RETRY_CERTIFIED_ENV,
+  MOODLE_RETRY_HELD_CODE,
+  MOODLE_RETRY_HELD_MESSAGE,
+} from "./moodle-hold.ts";
 
 type RetryAction = "retry" | "resolve";
 type RetrySource = "email_queue" | "scheduled_notifications" | "moodle_sync" | "moodle_enrollment_sync" | "failed_syncs";
@@ -442,7 +451,29 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: idErr.message, code: "INVALID_ID" }, 400);
     }
 
+    // Server-side Moodle hold. Certification is read from the function environment and defaults to
+    // false. The SPA's releaseHolds.js is not consulted.
+    const moodleCertified = isMoodleRetryCertified(Deno.env.get(MOODLE_RETRY_CERTIFIED_ENV));
+
+    // Requests without an Authorization header skip the admin check, so they may only run the
+    // scheduled sweep. A named row or an action from an unauthenticated caller is refused.
+    if (isCronCall && !isUnauthenticatedRequestAllowed({ action, id })) {
+      return json({ ok: false, error: "Admin session required", code: "ADMIN_REQUIRED" }, 403);
+    }
+
     if (isCronCall && !id) {
+      if (isMoodleSweepHeld(moodleCertified)) {
+        await logAudit(
+          serviceDb,
+          actorEmail,
+          "RETRY_SWEEP_HELD",
+          "moodle_enrollment_sync",
+          "batch",
+          "SKIPPED",
+          { source: "moodle_enrollment_sync", reason: MOODLE_RETRY_HELD_CODE, limit },
+        );
+        return json({ ok: true, mode: "auto_sweep", source: "moodle_enrollment_sync", held: true, code: MOODLE_RETRY_HELD_CODE, attempted: 0 });
+      }
       const sweep = await sweepMoodleEnrollmentRetries(serviceDb, limit);
       let escalated = 0;
       for (const row of sweep.candidates || []) {
@@ -482,6 +513,20 @@ Deno.serve(async (req) => {
     }
 
     if (!id) return json({ ok: false, error: "id is required", code: "MISSING_ID" }, 400);
+
+    // Refused before any retry mutation or moodle-sync invocation. Resolve is not affected.
+    if (isMoodleRetryHeld(action, source, moodleCertified)) {
+      await logAudit(
+        serviceDb,
+        actorEmail,
+        "MOODLE_RETRY_HELD",
+        source,
+        id,
+        "SKIPPED",
+        { action, source, id, reason: MOODLE_RETRY_HELD_CODE },
+      );
+      return json({ ok: false, error: MOODLE_RETRY_HELD_MESSAGE, code: MOODLE_RETRY_HELD_CODE }, 423);
+    }
 
     if (action === "retry") {
       if (source === "moodle_enrollment_sync") {
