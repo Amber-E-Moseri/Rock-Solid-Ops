@@ -5,8 +5,10 @@ import AuthShell from '../components/AuthShell.jsx';
 import Field, { fieldAria } from '../components/Field.jsx';
 import Notice from '../components/Notice.jsx';
 import { AUTH_REDIRECT_PATHS, buildAuthRedirect } from '../lib/redirects.js';
-import { GENERIC_ERROR, authErrorMessage } from '../lib/messages.js';
+import { GENERIC_ERROR, VERIFICATION_REQUIRED, VERIFICATION_UNAVAILABLE, authErrorMessage } from '../lib/messages.js';
 import { hasErrors, normalizeEmail, validateRegistration } from '../lib/validation.js';
+import TurnstileField from '../../../components/security/TurnstileField.jsx';
+import { captchaOptions, captchaReady, turnstileStatus } from '../../../components/security/turnstile.js';
 
 const EMPTY = { fullName: '', email: '', password: '', confirm: '' };
 
@@ -17,6 +19,9 @@ export default function TeacherRegisterPage() {
   const [notice, setNotice] = useState(null);
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
+  const captcha = turnstileStatus(import.meta.env);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaKey, setCaptchaKey] = useState(0);
 
   // A signed-in user has nothing to register. Send them to their application instead.
   useEffect(() => {
@@ -46,6 +51,11 @@ export default function TeacherRegisterPage() {
       return;
     }
 
+    if (!captchaReady(captcha, captchaToken)) {
+      setNotice({ tone: 'error', text: VERIFICATION_REQUIRED });
+      return;
+    }
+
     inFlight.current = true;
     setBusy(true);
     const email = normalizeEmail(form.email);
@@ -57,6 +67,7 @@ export default function TeacherRegisterPage() {
         options: {
           data: { full_name: form.fullName.trim() },
           emailRedirectTo: redirect,
+          ...captchaOptions(captcha, captchaToken),
         },
       });
       if (error) {
@@ -73,6 +84,8 @@ export default function TeacherRegisterPage() {
     } finally {
       inFlight.current = false;
       setBusy(false);
+      setCaptchaToken('');
+      setCaptchaKey((value) => value + 1);
     }
   }
 
@@ -96,7 +109,14 @@ export default function TeacherRegisterPage() {
         <Field id="confirm" label="Confirm password">
           <input className="rso-input" type="password" autoComplete="new-password" value={form.confirm} onChange={update('confirm')} {...fieldAria('confirm', { error: errors.password })} />
         </Field>
-        <button type="submit" className="rso-btn rso-btn-primary rso-btn-lg to-submit" disabled={busy}>
+        <TurnstileField
+          key={captchaKey}
+          status={captcha}
+          onToken={setCaptchaToken}
+          unavailableText={VERIFICATION_UNAVAILABLE}
+          idPrefix="register"
+        />
+        <button type="submit" className="rso-btn rso-btn-primary rso-btn-lg to-submit" disabled={busy || !captchaReady(captcha, captchaToken)}>
           {busy ? 'Creating account…' : 'Create account'}
         </button>
       </form>

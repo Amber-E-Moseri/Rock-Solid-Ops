@@ -6,7 +6,7 @@ import { vi } from 'vitest';
 // returns `data[0]` for maybeSingle(), matching the query shapes the pages use.
 export function queryChain(result) {
   const chain = {};
-  for (const method of ['select', 'eq', 'order', 'limit']) {
+  for (const method of ['select', 'eq', 'order', 'limit', 'ilike', 'contains']) {
     chain[method] = vi.fn(() => chain);
   }
   chain.maybeSingle = vi.fn(async () => ({

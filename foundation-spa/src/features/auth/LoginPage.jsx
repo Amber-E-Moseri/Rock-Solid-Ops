@@ -17,8 +17,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
-  const [resetMsg, setResetMsg] = useState('');
-  const [resetPending, setResetPending] = useState(false);
   // Set once Supabase accepts the password. Navigation waits until the auth
   // context has the profile, so the route guard never sees a half-finished sign-in.
   const [pendingNext, setPendingNext] = useState(null);
@@ -61,26 +59,6 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  async function handleForgotPassword(e) {
-    e.preventDefault();
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail) {
-      setResetMsg('Enter your email address first.');
-      return;
-    }
-    setResetPending(true);
-    setResetMsg('Sending reset link...');
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
-      redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}auth/reset-password`,
-    });
-    setResetPending(false);
-    if (resetError) {
-      setResetMsg('Could not send reset link. Please try again or contact support.');
-      return;
-    }
-    setResetMsg('Check your email for a reset link.');
   }
 
   return (
@@ -173,8 +151,7 @@ export default function LoginPage() {
           </button>
           <button
             type="button"
-            onClick={TEACHER_ONBOARDING_CERTIFIED ? () => navigate('/auth/forgot-password') : handleForgotPassword}
-            disabled={resetPending}
+            onClick={() => navigate('/auth/forgot-password')}
             style={forgotButtonStyle}
           >
             Forgot password?
@@ -191,11 +168,6 @@ export default function LoginPage() {
           </button>
         )}
 
-        {resetMsg && (
-          <p style={{ color: 'var(--muted)', fontSize: 13, margin: '12px 0 0', lineHeight: 1.5 }}>
-            {resetMsg}
-          </p>
-        )}
       </div>
     </div>
   );

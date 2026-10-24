@@ -6,8 +6,10 @@ import Field, { fieldAria } from '../components/Field.jsx';
 import Notice from '../components/Notice.jsx';
 import useCooldown from '../lib/useCooldown.js';
 import { AUTH_REDIRECT_PATHS, buildAuthRedirect } from '../lib/redirects.js';
-import { RESEND_SENT, GENERIC_ERROR, RATE_LIMIT, isRateLimit } from '../lib/messages.js';
+import { RESEND_SENT, GENERIC_ERROR, RATE_LIMIT, VERIFICATION_REQUIRED, VERIFICATION_UNAVAILABLE, isRateLimit } from '../lib/messages.js';
 import { normalizeEmail, validateEmail } from '../lib/validation.js';
+import TurnstileField from '../../../components/security/TurnstileField.jsx';
+import { captchaOptions, captchaReady, turnstileStatus } from '../../../components/security/turnstile.js';
 
 export default function CheckEmailPage() {
   const location = useLocation();
@@ -16,6 +18,9 @@ export default function CheckEmailPage() {
   const [emailError, setEmailError] = useState('');
   const [busy, setBusy] = useState(false);
   const cooldown = useCooldown(60);
+  const captcha = turnstileStatus(import.meta.env);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaKey, setCaptchaKey] = useState(0);
 
   async function resend(event) {
     event.preventDefault();
@@ -29,13 +34,17 @@ export default function CheckEmailPage() {
       setNotice({ tone: 'error', text: 'This site is not configured for account email links. Contact an administrator.' });
       return;
     }
+    if (!captchaReady(captcha, captchaToken)) {
+      setNotice({ tone: 'error', text: VERIFICATION_REQUIRED });
+      return;
+    }
 
     setBusy(true);
     try {
       const { error } = await supabase.auth.resend({
         type: 'signup',
         email: normalizeEmail(email),
-        options: { emailRedirectTo: redirect },
+        options: { emailRedirectTo: redirect, ...captchaOptions(captcha, captchaToken) },
       });
       // Unknown addresses do not error, so the same message covers registered and unregistered ones.
       if (isRateLimit(error)) setNotice({ tone: 'error', text: RATE_LIMIT });
@@ -46,6 +55,8 @@ export default function CheckEmailPage() {
       setNotice({ tone: 'error', text: GENERIC_ERROR });
     } finally {
       setBusy(false);
+      setCaptchaToken('');
+      setCaptchaKey((value) => value + 1);
     }
   }
 
@@ -63,7 +74,14 @@ export default function CheckEmailPage() {
         <Field id="resendEmail" label="Email" error={emailError}>
           <input className="rso-input" type="email" autoComplete="email" inputMode="email" value={email} onChange={(event) => setEmail(event.target.value)} {...fieldAria('resendEmail', { error: emailError })} />
         </Field>
-        <button type="submit" className="rso-btn rso-btn-secondary rso-btn-lg to-submit" disabled={busy || cooldown.remaining > 0}>
+        <TurnstileField
+          key={captchaKey}
+          status={captcha}
+          onToken={setCaptchaToken}
+          unavailableText={VERIFICATION_UNAVAILABLE}
+          idPrefix="resend"
+        />
+        <button type="submit" className="rso-btn rso-btn-secondary rso-btn-lg to-submit" disabled={busy || cooldown.remaining > 0 || !captchaReady(captcha, captchaToken)}>
           {cooldown.remaining > 0 ? `Resend available in ${cooldown.remaining}s` : 'Resend confirmation link'}
         </button>
       </form>

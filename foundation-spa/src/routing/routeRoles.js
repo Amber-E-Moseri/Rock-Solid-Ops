@@ -45,6 +45,7 @@ export const ROUTE_ACCESS = Object.freeze({
   '/staff/teacher-management': OPERATIONAL_ROLES,
   '/staff/operational-trace': Object.freeze(['admin', 'superadmin', 'regional_secretary']),
   '/staff/fellowship-management': SYSTEM_ADMIN,
+  '/staff/teacher-applications': SYSTEM_ADMIN,
   '/staff/nexus-management': SYSTEM_ADMIN,
   '/staff/failed-sync-retry-center': ADMIN_ROLES,
   '/staff/system-health': ADMIN_ROLES,
