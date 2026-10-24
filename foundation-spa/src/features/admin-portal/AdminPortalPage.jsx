@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { fetchPortalStats, fetchActivityFeed, greeting, relTime } from './lib/adminPortal.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { Card, Skeleton, Badge, PageHeader, ErrorBanner } from '../../components/ui/index.js';
+import NamedIcon from '../../components/ui/NamedIcon.jsx';
 
 const KPI_TONE = ['navy', 'gold', 'dark', 'coral'];
 
@@ -24,24 +25,24 @@ export default function AdminPortalPage() {
   ], [stats.data]);
 
   const regCards = [
-    { icon: '📋', title: 'Review Queue', to: '/staff/applicant-directory' },
-    isSuperadmin && { icon: '📅', title: 'Batch Management', to: '/staff/batch-management' },
-    { icon: '⏳', title: 'Waiting Students', to: '/staff/waitlist' },
-    { icon: '🔲', title: 'Class Editor', to: '/staff/class-editor' },
+    { icon: 'clipboard', title: 'Review Queue', to: '/staff/applicant-directory' },
+    isSuperadmin && { icon: 'calendar', title: 'Batch Management', to: '/staff/batch-management' },
+    { icon: 'clock', title: 'Waiting Students', to: '/staff/waitlist' },
+    { icon: 'grid', title: 'Class Editor', to: '/staff/class-editor' },
   ].filter(Boolean);
 
   const teachCards = [
-    { icon: '✅', title: 'Attendance', to: '/staff/dashboards' },
-    { icon: '📅', title: 'Schedule', to: '/staff/teacher-schedule' },
-    { icon: '👥', title: 'Teachers', to: '/staff/teacher-management' },
-    { icon: '💬', title: 'Messages', to: '/staff/messages' },
+    { icon: 'check', title: 'Attendance', to: '/staff/dashboards' },
+    { icon: 'calendar', title: 'Schedule', to: '/staff/teacher-schedule' },
+    { icon: 'users', title: 'Teachers', to: '/staff/teacher-management' },
+    { icon: 'message', title: 'Messages', to: '/staff/messages' },
   ];
 
   const sysCards = isSuperadmin ? [
-    { icon: '🔄', title: 'Failed Syncs', to: '/staff/failed-sync-retry-center' },
-    { icon: '💚', title: 'System Health', to: '/staff/system-health' },
-    { icon: '📧', title: 'Email Campaigns', to: '/staff/email-campaigns' },
-    { icon: '📝', title: 'Audit Log', to: '/staff/audit-log' },
+    { icon: 'refresh', title: 'Failed Syncs', to: '/staff/failed-sync-retry-center' },
+    { icon: 'activity', title: 'System Health', to: '/staff/system-health' },
+    { icon: 'mail', title: 'Email Campaigns', to: '/staff/email-campaigns' },
+    { icon: 'file', title: 'Audit Log', to: '/staff/audit-log' },
   ] : [];
 
   return (
@@ -121,7 +122,7 @@ function CardSection({ title, cards }) {
       <div className="rso-quick-grid">
         {cards.map((c) => (
           <Link key={c.to} to={c.to} className="rso-quick-card">
-            <span className="rso-quick-icon" aria-hidden="true">{c.icon}</span>
+            <span className="rso-quick-icon" aria-hidden="true"><NamedIcon name={c.icon} size={20} /></span>
             <span>{c.title}</span>
           </Link>
         ))}

@@ -340,7 +340,7 @@
       const rows = currentRows();
 
       if (!rows.length) {
-        els.tableHost.innerHTML = `<div class="fs-table-empty"><div class="emoji">📭</div><h3 style="margin:0 0 6px">No mappings found.</h3><p style="margin:0">${state.search ? "No records matched your search." : "Add a mapping to get started."}</p></div>`;
+        els.tableHost.innerHTML = `<div class="fs-table-empty"><h3 style="margin:0 0 6px">No mappings found.</h3><p style="margin:0">${state.search ? "No records matched your search." : "Add a mapping to get started."}</p></div>`;
         return;
       }
 
@@ -421,7 +421,7 @@
       if (!display) return;
 
       if (state.selectedNexusUser) {
-        display.innerHTML = `<div class="selected-user">${esc(state.selectedNexusUser.name)} (${esc(state.selectedNexusUser.email)}) <span class="selected-user-remove" data-action="clear-user">✕</span></div>`;
+        display.innerHTML = `<div class="selected-user">${esc(state.selectedNexusUser.name)} (${esc(state.selectedNexusUser.email)}) <span class="selected-user-remove" data-action="clear-user"></span></div>`;
         $("[data-action=clear-user]")?.addEventListener("click", () => {
           state.selectedNexusUser = null;
           $("userPickerInput").value = "";

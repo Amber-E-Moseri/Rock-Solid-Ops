@@ -173,7 +173,7 @@ function renderPortal() {
       <div class="ap-hero">
         <div class="ap-hero-deco" aria-hidden="true"><div class="ap-deco-1"></div><div class="ap-deco-2"></div></div>
         <div class="ap-hero-content">
-          <h2 class="ap-greeting">${greet}, ${esc(firstName)} 👋</h2>
+          <h2 class="ap-greeting">${greet}, ${esc(firstName)} </h2>
           <p class="ap-hero-sub" id="ap-hero-sub">Loading your workspace…</p>
           <div class="ap-stats">
             <div class="ap-stat"><span class="ap-stat-val" id="stat-enrolled">—</span><span class="ap-stat-lbl">Enrolled</span></div>

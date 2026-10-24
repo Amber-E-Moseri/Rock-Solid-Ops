@@ -89,7 +89,7 @@ export default function AttendancePage() {
       {loading ? <Skeleton style={{ height: 400 }} /> : loadError ? (
         <ErrorBanner message={`Could not load classes. ${loadError}`} onRetry={load} />
       ) : classes.length === 0 ? (
-        <EmptyState icon="📭" title="No classes found" message="No class sessions are available to record attendance for." />
+        <EmptyState icon="inbox" title="No classes found" message="No class sessions are available to record attendance for." />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '380px minmax(0, 1fr)', gap: 18, alignItems: 'start' }}>
           {/* Class list */}
@@ -127,7 +127,7 @@ export default function AttendancePage() {
                       <div style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 600, marginTop: 2 }}>{c.time} · {c.teacher}</div>
                       <div style={{ display: 'flex', gap: 5, marginTop: 6 }}>
                         <Badge variant="primary">S{c.session}</Badge>
-                        {flagged && <Badge variant="danger">🚩 {c.flagSessions.length}</Badge>}
+                        {flagged && <Badge variant="danger">Flagged {c.flagSessions.length}</Badge>}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -158,7 +158,7 @@ export default function AttendancePage() {
                       <Badge variant="primary">
                         {selected.flagSessions?.length > 1 ? `Sessions ${selected.flagSessions.join(', ')}` : `Session ${selected.session}`}
                       </Badge>
-                      {selected.flagSessions?.length > 1 && <Badge variant="danger">🚩 Flagged · multi-session</Badge>}
+                      {selected.flagSessions?.length > 1 && <Badge variant="danger">Flagged · multi-session</Badge>}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>

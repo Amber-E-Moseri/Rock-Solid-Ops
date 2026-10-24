@@ -1,4 +1,5 @@
 import { useLocation } from 'react-router-dom';
+import NamedIcon from '../../components/ui/NamedIcon.jsx';
 
 export default function PlaceholderPage() {
   const location = useLocation();
@@ -12,7 +13,7 @@ export default function PlaceholderPage() {
       gap: 16,
       textAlign: 'center',
     }}>
-      <div style={{ fontSize: 40 }}>🚧</div>
+      <div style={{ color: 'var(--muted)' }}><NamedIcon name="construction" size={40} /></div>
       <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>Coming soon</h2>
       <p style={{ color: 'var(--muted)', margin: 0, maxWidth: 340, fontSize: 14, lineHeight: 1.6 }}>
         This portal is being migrated to the new SPA. The legacy version is still available at{' '}

@@ -167,7 +167,7 @@ export default function AuditLogPage() {
       {isLoading ? (
         <Skeleton variant="row" count={8} />
       ) : rows.length === 0 ? (
-        <EmptyState icon="📋" title="No audit records" message="Try adjusting your filters or date range." />
+        <EmptyState icon="clipboard" title="No audit records" message="Try adjusting your filters or date range." />
       ) : (
         <>
           {/* Desktop table */}

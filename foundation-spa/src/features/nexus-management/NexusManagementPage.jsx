@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { PageHeader, Card, Badge, Button, Skeleton, SearchInput, Modal } from '../../components/ui/index.js';
 import { useToast } from '../../context/ToastContext.jsx';
+import NamedIcon from '../../components/ui/NamedIcon.jsx';
 import { fetchMappings, saveMapping, toggleMappingActive, filterMappings } from './lib/nexusManagement.js';
 
 export default function NexusManagementPage() {
@@ -98,7 +99,7 @@ export default function NexusManagementPage() {
 
         {loading ? <Skeleton style={{ height: 300 }} /> : filtered.length === 0 ? (
           <div style={{ padding: 42, textAlign: 'center', color: 'var(--muted)' }}>
-            <div style={{ fontSize: 34, marginBottom: 8 }}>📭</div>
+            <div style={{ marginBottom: 8 }}><NamedIcon name="inbox" size={34} /></div>
             <div style={{ fontWeight: 700, fontSize: 14 }}>No mappings found.</div>
             <div style={{ fontSize: 13, marginTop: 4 }}>{search ? 'No records matched your search.' : 'Add a mapping to get started.'}</div>
           </div>

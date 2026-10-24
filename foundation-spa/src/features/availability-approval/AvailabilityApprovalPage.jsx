@@ -121,14 +121,14 @@ export default function AvailabilityApprovalPage() {
           // Read access to slot rows is limited to approver roles (RLS). For other roles an empty list
           // means "not visible to this account", not "no teacher has submitted".
           <EmptyState
-            icon="📭"
+            icon="inbox"
             title="No availability slots"
             subtitle={APPROVER_ROLES.includes(role)
               ? 'No teacher has submitted availability yet.'
               : 'Slot data is limited to approvers and to each teacher’s own records, so none is visible to this account.'}
           />
         ) : groups.length === 0 ? (
-          <EmptyState icon="🔍" title="No slots match" subtitle="Try a different search or status." />
+          <EmptyState icon="search" title="No slots match" subtitle="Try a different search or status." />
         ) : (
           <div style={{ display: 'grid', gap: 12 }}>
             {groups.map((group) => (

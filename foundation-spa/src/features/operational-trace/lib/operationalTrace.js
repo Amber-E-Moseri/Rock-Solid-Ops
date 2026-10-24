@@ -1,15 +1,15 @@
 import { supabase } from '../../../supabase.js';
 
 export const EVENT_STYLES = {
-  registration: { icon: '✏️', color: '#4C2A92', label: 'Registration' },
-  assignment:   { icon: '✅', color: '#16a34a', label: 'Assignment' },
-  email:        { icon: '📧', color: '#7c3aed', label: 'Email' },
-  moodle:       { icon: '🔄', color: '#0891b2', label: 'Moodle Sync' },
-  error:        { icon: '⚠️', color: '#C8102E', label: 'Error' },
-  manual:       { icon: '👤', color: '#6b7280', label: 'Manual Action' },
-  attendance:   { icon: '📊', color: '#d97706', label: 'Attendance' },
-  milestone:    { icon: '🏆', color: '#ca8a04', label: 'Milestone' },
-  notification: { icon: '🔔', color: '#0ea5e9', label: 'Notification' },
+  registration: { icon: 'pencil', color: '#4C2A92', label: 'Registration' },
+  assignment:   { icon: 'check', color: '#16a34a', label: 'Assignment' },
+  email:        { icon: 'mail', color: '#7c3aed', label: 'Email' },
+  moodle:       { icon: 'refresh', color: '#0891b2', label: 'Moodle Sync' },
+  error:        { icon: 'alert', color: '#C8102E', label: 'Error' },
+  manual:       { icon: 'user', color: '#6b7280', label: 'Manual Action' },
+  attendance:   { icon: 'chart', color: '#d97706', label: 'Attendance' },
+  milestone:    { icon: 'trophy', color: '#ca8a04', label: 'Milestone' },
+  notification: { icon: 'bell', color: '#0ea5e9', label: 'Notification' },
 };
 
 export const FILTER_CHIPS = [

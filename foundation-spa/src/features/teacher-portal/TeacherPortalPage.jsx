@@ -10,6 +10,7 @@ import {
 } from './lib/teacherPortal.js';
 import { SLOTS, to24h, getActiveBatchId } from '../teacher-schedule/lib/teacherSchedule.js';
 import { PageHeader, Skeleton, EmptyState, Badge, Button, Select, ErrorBanner } from '../../components/ui/index.js';
+import NamedIcon from '../../components/ui/NamedIcon.jsx';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const MILESTONES = ['milestone_1', 'milestone_2', 'milestone_3', 'milestone_4'];
@@ -68,7 +69,7 @@ export default function TeacherPortalPage() {
 
       {teacher.isLoading ? <Skeleton variant="rows" rows={3} /> :
         teacher.isError ? <ErrorBanner message={loadFailureMessage('Your teacher profile', teacher.error)} onRetry={() => teacher.refetch()} /> :
-        !teacherId ? <EmptyState icon="👤" title="Teacher not found" subtitle="No teacher profile linked to your account" /> :
+        !teacherId ? <EmptyState icon="user" title="Teacher not found" subtitle="No teacher profile linked to your account" /> :
         tab === 0 ? <MyClassesTab teacherId={teacherId} /> :
         tab === 1 ? <AvailabilityTab teacherId={teacherId} teacherEmail={teacher.data?.email} addToast={addToast} /> :
         <ProgressTab teacherId={teacherId} />}
@@ -86,7 +87,7 @@ function MyClassesTab({ teacherId }) {
   if (isLoading) return <Skeleton variant="rows" rows={3} />;
   if (isError) return <ErrorBanner message={loadFailureMessage('Your classes', error)} onRetry={() => refetch()} />;
   const classes = data ?? [];
-  if (!classes.length) return <EmptyState icon="📚" title="No classes" subtitle="You have no active class assignments" />;
+  if (!classes.length) return <EmptyState icon="book" title="No classes" subtitle="You have no active class assignments" />;
 
   return (
     <>
@@ -167,7 +168,7 @@ function AvailabilityTab({ teacherId, teacherEmail, addToast }) {
   return (
     <div>
       {!slots.length ? (
-        <EmptyState icon="📅" title="No availability yet" subtitle="Pick your free time slots below and submit them for approval" />
+        <EmptyState icon="calendar" title="No availability yet" subtitle="Pick your free time slots below and submit them for approval" />
       ) : (
         <>
           <div className="rso-tp-toolbar">
@@ -299,7 +300,7 @@ function ProgressTab({ teacherId }) {
   if (isLoading) return <Skeleton variant="rows" rows={5} />;
   if (isError) return <ErrorBanner message={loadFailureMessage('Student progress', error)} onRetry={() => refetch()} />;
   const { classes = [], students = [], milestones = [], attendance = [] } = data || {};
-  if (!students.length) return <EmptyState icon="📊" title="No students" subtitle="No students enrolled in your classes" />;
+  if (!students.length) return <EmptyState icon="chart" title="No students" subtitle="No students enrolled in your classes" />;
 
   const filtered = classFilter ? students.filter((s) => s.class_option_id === classFilter) : students;
 
@@ -340,7 +341,7 @@ function ProgressTab({ teacherId }) {
               <tr key={s.student_id}>
                 <td className="rso-tp-cell-strong">{s.full_name}</td>
                 {s.done.map((d, i) => (
-                  <td key={MILESTONES[i]} className="rso-tp-cell-center">{d ? '✅' : '⬜'}</td>
+                  <td key={MILESTONES[i]} className="rso-tp-cell-center"><NamedIcon name={d ? 'check' : 'square'} size={16} role="img" aria-label={d ? 'Done' : 'Not done'} aria-hidden={undefined} /></td>
                 ))}
                 <td>{rateBar(s.rate)}</td>
               </tr>
@@ -356,7 +357,7 @@ function ProgressTab({ teacherId }) {
               <span className="rso-table-card-label">Milestones</span>
               <span className="rso-tp-milestones">
                 {s.done.map((d, i) => (
-                  <span key={MILESTONES[i]} title={MILESTONE_LABELS[i]} aria-label={`${MILESTONE_LABELS[i]}: ${d ? 'done' : 'not done'}`}>{d ? '✅' : '⬜'}</span>
+                  <span key={MILESTONES[i]} title={MILESTONE_LABELS[i]} aria-label={`${MILESTONE_LABELS[i]}: ${d ? 'done' : 'not done'}`}><NamedIcon name={d ? 'check' : 'square'} size={16} /></span>
                 ))}
               </span>
             </div>

@@ -90,7 +90,7 @@ export default function ReportsPage() {
         <>
           <div className="rso-reports-split">
           {/* Generate form */}
-          <Card icon="📊" title="Generate Report">
+          <Card icon="chart" title="Generate Report">
             <div style={{ display: 'grid', gap: '0.75rem' }}>
               <label className="rso-field"><span>Report Type</span>
                 <select className="rso-select" value={reportType} onChange={(e) => setReportType(e.target.value)}>
@@ -192,7 +192,7 @@ export default function ReportsPage() {
           <div className="rso-reports-archive">
             <h3 className="rso-section-title">Recent Reports</h3>
             {archive.isLoading ? <Skeleton variant="rows" rows={3} /> : (archive.data ?? []).length === 0 ? (
-              <EmptyState icon="📂" title="No archived reports" />
+              <EmptyState icon="folder" title="No archived reports" />
             ) : (
               <div className="rso-table-wrap">
                 <table className="rso-table">

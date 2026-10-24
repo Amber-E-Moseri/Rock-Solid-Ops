@@ -7,6 +7,7 @@ import {
   submitAttendance, submitOutcomes, fetchAttendanceHistory, SESSIONS, initials,
 } from './lib/teacherAttendance.js';
 import { Button, Skeleton, EmptyState, Badge, Modal, SearchInput } from '../../components/ui/index.js';
+import NamedIcon from '../../components/ui/NamedIcon.jsx';
 
 const STEPS = ['Teacher', 'Class', 'Action', 'Session', 'Attendance'];
 function stepIdx(step) { return { teacher: 0, class: 1, action: 2, session: 3, attendance: 4, review: 4, saved: 4, outcomes: 4 }[step] ?? 0; }
@@ -283,7 +284,7 @@ export default function TeacherAttendancePage() {
                 <Badge variant="info">{c.enrolledCount} enrolled</Badge>
               </button>
             ))}
-            {classOptions.length === 0 && <EmptyState icon="📭" title="No active classes" subtitle="This teacher has no active class options." />}
+            {classOptions.length === 0 && <EmptyState icon="inbox" title="No active classes" subtitle="This teacher has no active class options." />}
           </div>
           <div className="rso-tp-actions">
             <Button variant="ghost" onClick={() => setStep('teacher')}>Back</Button>
@@ -298,11 +299,11 @@ export default function TeacherAttendancePage() {
           <h2 className="rso-tp-heading">Choose Action</h2>
           <div className="rso-tp-grid-2">
             <button type="button" className="rso-card rso-tp-choice" onClick={() => setStep('session')}>
-              <span className="rso-tp-choice-icon rso-tp-line" aria-hidden="true">✅</span>
+              <span className="rso-tp-choice-icon rso-tp-line" aria-hidden="true"><NamedIcon name="check" size={20} /></span>
               <span className="rso-tp-name rso-tp-line">Mark Attendance</span>
             </button>
             <button type="button" className="rso-card rso-tp-choice" disabled>
-              <span className="rso-tp-choice-icon rso-tp-line" aria-hidden="true">📊</span>
+              <span className="rso-tp-choice-icon rso-tp-line" aria-hidden="true"><NamedIcon name="chart" size={20} /></span>
               <span className="rso-tp-name rso-tp-line">View Student Progress</span>
               <span className="rso-tp-meta rso-tp-line">Coming soon</span>
             </button>
@@ -347,7 +348,7 @@ export default function TeacherAttendancePage() {
           )}
           {alreadySubmitted && (
             <div className="rso-tp-warning">
-              ⚠️ Attendance has already been submitted for this session.
+              <NamedIcon name="alert" size={16} /> Attendance has already been submitted for this session.
             </div>
           )}
           <div className="rso-tp-actions">

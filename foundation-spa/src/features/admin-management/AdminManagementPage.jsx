@@ -84,7 +84,7 @@ export default function AdminManagementPage() {
   }
 
   if (tabs.length === 0) {
-    return <EmptyState icon="🚫" title="Access Denied" subtitle="You don't have permission to view this page." />;
+    return <EmptyState icon="ban" title="Access Denied" subtitle="You don't have permission to view this page." />;
   }
 
   // isPending (not isLoading) so a paused offline query with no data shows the skeleton, not an empty list.
@@ -166,7 +166,7 @@ export default function AdminManagementPage() {
       {activeQuery.isError ? (
         <ErrorBanner message={`Could not load ${tab === 'staff' ? 'staff' : 'teachers'}. ${activeQuery.error?.message || ''}`.trim()} onRetry={() => activeQuery.refetch()} />
       ) : isPending ? <Skeleton variant="rows" rows={6} /> : tab === 'staff' ? (
-        filteredStaff.length === 0 ? <EmptyState icon="📭" title="No staff" subtitle={search ? 'No records matched your search' : 'Add a record to get started'} /> : (
+        filteredStaff.length === 0 ? <EmptyState icon="inbox" title="No staff" subtitle={search ? 'No records matched your search' : 'Add a record to get started'} /> : (
           <>
           <div className="rso-table-wrap">
             <table className="rso-table rso-table--sticky-actions">
@@ -208,7 +208,7 @@ export default function AdminManagementPage() {
           </>
         )
       ) : (
-        filteredTeachers.length === 0 ? <EmptyState icon="📭" title="No teachers" subtitle={search ? 'No records matched your search' : 'Add a record to get started'} /> : (
+        filteredTeachers.length === 0 ? <EmptyState icon="inbox" title="No teachers" subtitle={search ? 'No records matched your search' : 'Add a record to get started'} /> : (
           <>
           <div className="rso-table-wrap">
             <table className="rso-table rso-table--sticky-actions">

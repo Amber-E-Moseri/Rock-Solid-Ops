@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import NamedIcon from './NamedIcon.jsx';
 
 export default function Table({
   columns,
@@ -40,7 +41,7 @@ export default function Table({
       <div className={`rso-table-wrap${className ? ` ${className}` : ''}`}>
         {sorted.length === 0 ? (
           <div className="rso-empty">
-            <div className="rso-empty-icon">📋</div>
+            <div className="rso-empty-icon"><NamedIcon name="clipboard" size={34} /></div>
             <div className="rso-empty-sub">{emptyMessage}</div>
           </div>
         ) : (

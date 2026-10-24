@@ -389,7 +389,7 @@
     function renderTable() {
       const rows = currentRows();
       if (!rows.length) {
-        els.tableHost.innerHTML = `<div class="fs-table-empty"><div class="emoji">📭</div><h3 style="margin:0 0 6px">${esc(tabMeta[state.activeTab].empty)}</h3><p style="margin:0">${state.search ? "No records matched your search." : "Add a record to get started."}</p></div>`;
+        els.tableHost.innerHTML = `<div class="fs-table-empty"><h3 style="margin:0 0 6px">${esc(tabMeta[state.activeTab].empty)}</h3><p style="margin:0">${state.search ? "No records matched your search." : "Add a record to get started."}</p></div>`;
         return;
       }
       if (state.activeTab === "staff") return renderStaffTable(rows);

@@ -139,9 +139,9 @@ export default function MilestonesAdminPage() {
       </Toolbar>
 
       {!defs.length ? (
-        <EmptyState icon="🧭" title="No milestone definitions" message="No milestone definitions are active yet." />
+        <EmptyState icon="compass" title="No milestone definitions" message="No milestone definitions are active yet." />
       ) : !rows.length ? (
-        <EmptyState icon="🔍" title="No students" message="No students match the selected filters." />
+        <EmptyState icon="search" title="No students" message="No students match the selected filters." />
       ) : (
         <div className="rso-table-wrap" style={{ marginTop: 12 }}>
           <table className="rso-table">

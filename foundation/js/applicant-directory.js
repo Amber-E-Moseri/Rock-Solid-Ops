@@ -695,7 +695,7 @@ function renderReviewWorkspace(rows) {
     </div>
     <div class="review-actions-bar">
       <button id="reviewKeepBtn" class="review-primary-btn">${isDuplicateGroup ? "✓ Keep selected & resolve" : "✓ Mark reviewed"}</button>
-      <button id="reviewNotDuplicateBtn" class="review-secondary-btn">✕ Not a duplicate</button>
+      <button id="reviewNotDuplicateBtn" class="review-secondary-btn">Not a duplicate</button>
       <button id="reviewRequestInfoBtn" class="review-warn-btn">▢ Request info</button>
     </div>
   `;
@@ -758,7 +758,7 @@ function renderMobileCards(rows) {
         </div>
         <div style="margin-top:10px">${renderActionButtons(app)}</div>
       </article>`;
-  }).join("") || `<div class="table-empty"><div style="font-size:34px">🔍</div><h4>No students match these filters</h4><p>Try removing a filter, or start fresh.</p><button class="fs-btn fs-btn-secondary" data-mobile-clear>Clear all filters</button></div>`) +
+  }).join("") || `<div class="table-empty"><div style="font-size:34px"></div><h4>No students match these filters</h4><p>Try removing a filter, or start fresh.</p><button class="fs-btn fs-btn-secondary" data-mobile-clear>Clear all filters</button></div>`) +
   (moreCount > 0 ? `<button class="fs-btn fs-btn-secondary" data-mobile-more style="width:100%">Show 50 more (${moreCount.toLocaleString()} remaining)</button>` : "");
 
   cards.querySelector("[data-mobile-more]")?.addEventListener("click", () => { state.rowLimit += 50; renderAll(); });
@@ -848,7 +848,7 @@ function renderFilterChips() {
   if (!chips.length) { wrap.innerHTML = ""; wrap.style.display = "none"; return; }
   wrap.style.display = "flex";
   // "ghost" exempts these buttons from premium-theme's global primary-button rule.
-  wrap.innerHTML = chips.map((c, i) => `<button type="button" class="filter-chip ghost" data-chip="${i}" title="Remove this filter">${esc(c.label)} <span aria-hidden="true">✕</span></button>`).join("") + `<button type="button" class="filter-chip filter-chip-clear ghost" data-chip-clear>Clear all</button>`;
+  wrap.innerHTML = chips.map((c, i) => `<button type="button" class="filter-chip ghost" data-chip="${i}" title="Remove this filter">${esc(c.label)} <span aria-hidden="true"></span></button>`).join("") + `<button type="button" class="filter-chip filter-chip-clear ghost" data-chip-clear>Clear all</button>`;
   wrap.querySelectorAll("[data-chip]").forEach((btn) => btn.addEventListener("click", () => { chips[Number(btn.dataset.chip)].clear(); renderAll(); }));
   wrap.querySelector("[data-chip-clear]")?.addEventListener("click", resetAllFilters);
 }
@@ -869,7 +869,7 @@ function renderTable(rows) {
     const duplicateBadge = `<div class="duplicate-cell"><span class="pill ${duplicateMeta.pillClass}">${esc(duplicateMeta.label)}</span>${duplicateMeta.meta ? `<span class="duplicate-meta">${esc(duplicateMeta.meta)}</span>` : ""}</div>`;
     const x = { summary, milestone, cls, rowStatus, duplicateBadge };
     return `<tr><td style="width:36px;padding:8px"><input type="checkbox" class="row-chk" data-id="${esc(app.id)}" ${checked} style="cursor:pointer;width:16px;height:16px" /></td><td class="student-cell" data-row-open="${esc(app.id)}" title="Open student drawer" style="cursor:pointer"><div class="name">${duplicateWarning}${esc(app.full_name || "-")}</div><div class="sub">${esc(app.email || "-")} · ${esc(app.phone || app.phone_number || "-")}</div></td>${cols.map((c) => `<td>${c.cell(app, x)}</td>`).join("")}<td>${renderActionButtons(app)}</td></tr>`;
-  }).join("") || `<tr><td colspan="${colCount}"><div class="table-empty"><div style="font-size:34px">🔍</div><h4>No students match these filters</h4><p>Try removing a filter or two — or start fresh.</p><button class="fs-btn fs-btn-secondary" data-empty-clear>Clear all filters</button></div></td></tr>`;
+  }).join("") || `<tr><td colspan="${colCount}"><div class="table-empty"><div style="font-size:34px"></div><h4>No students match these filters</h4><p>Try removing a filter or two — or start fresh.</p><button class="fs-btn fs-btn-secondary" data-empty-clear>Clear all filters</button></div></td></tr>`;
   const foot = rows.length > visible.length
     ? `<div class="table-foot"><span>Showing first ${visible.length.toLocaleString()} of ${rows.length.toLocaleString()} students</span><span style="display:flex;gap:8px"><button class="fs-btn fs-btn-secondary" data-show-more>Show 50 more</button><button class="fs-btn fs-btn-secondary" data-show-all>Show all</button></span></div>`
     : "";

@@ -138,7 +138,7 @@ export default function NeedsAttentionPage() {
           <div role="tabpanel" id="attention-tabpanel" aria-labelledby={`attention-tab-${section}`}>
             {section === 'students' && (
               studentFlags.length === 0 ? (
-                <EmptyState icon="✅" title="No student flags" message="All clear." />
+                <EmptyState icon="check" title="No student flags" message="All clear." />
               ) : isRegSec ? (
                 <SummaryCards flags={studentFlags} />
               ) : (
@@ -215,7 +215,7 @@ export default function NeedsAttentionPage() {
 
             {section === 'teachers' && (
               teacherFlags.length === 0 ? (
-                <EmptyState icon="✅" title="No teacher flags" message="All clear." />
+                <EmptyState icon="check" title="No teacher flags" message="All clear." />
               ) : (
                 <>
                   <div className="rso-table-wrap">
@@ -286,7 +286,7 @@ export default function NeedsAttentionPage() {
 
             {section === 'system' && (
               systemFlags.length === 0 ? (
-                <EmptyState icon="✅" title="No system flags" message="All systems nominal." />
+                <EmptyState icon="check" title="No system flags" message="All systems nominal." />
               ) : (
                 <div className="rso-quick-grid">
                   {systemFlags.map((f) => {

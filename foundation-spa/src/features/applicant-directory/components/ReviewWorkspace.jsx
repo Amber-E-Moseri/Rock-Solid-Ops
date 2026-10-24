@@ -66,7 +66,7 @@ export default function ReviewWorkspace({ model, rows, canDecide, onResolveDupli
   const selected = reviewRows.find((app) => String(app.id) === String(selectedId)) || reviewRows[0] || null;
 
   if (!reviewRows.length) {
-    return <EmptyState icon="✅" title="Review queue is empty" message="No applicants match the current review filters." />;
+    return <EmptyState icon="check" title="Review queue is empty" message="No applicants match the current review filters." />;
   }
 
   const compareGroup = selected ? reviewComparisonGroup(model, selected) : [];
@@ -180,7 +180,7 @@ export default function ReviewWorkspace({ model, rows, canDecide, onResolveDupli
           )}
         </div>
       ) : (
-        <EmptyState icon="👈" title="Select an applicant" message="Pick someone from the queue to review." />
+        <EmptyState icon="pointer" title="Select an applicant" message="Pick someone from the queue to review." />
       )}
     </div>
   );

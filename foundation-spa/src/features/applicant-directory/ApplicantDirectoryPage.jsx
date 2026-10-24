@@ -175,7 +175,7 @@ export default function ApplicantDirectoryPage() {
   }
 
   if (!model) {
-    return <EmptyState icon="⚠️" title="Failed to load" message="Could not load the applicant directory. Try refreshing." />;
+    return <EmptyState icon="alert" title="Failed to load" message="Could not load the applicant directory. Try refreshing." />;
   }
 
   const totalCount = model.applicants.length;
@@ -312,7 +312,7 @@ export default function ApplicantDirectoryPage() {
 
           {/* Table */}
           {rows.length === 0 ? (
-            <EmptyState icon="🔍" title="No students match these filters" message="Try removing a filter or two — or start fresh." />
+            <EmptyState icon="search" title="No students match these filters" message="Try removing a filter or two — or start fresh." />
           ) : (
             <>
               <div className="rso-table-wrap">

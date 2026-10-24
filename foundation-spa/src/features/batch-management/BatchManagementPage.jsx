@@ -90,7 +90,7 @@ export default function BatchManagementPage() {
       </Toolbar>
 
       {isLoading ? <Skeleton variant="rows" rows={5} /> : filtered.length === 0 ? (
-        <EmptyState icon="📅" title="No batches" subtitle={search ? 'No batches matched your filters' : 'Create a batch to get started'} />
+        <EmptyState icon="calendar" title="No batches" subtitle={search ? 'No batches matched your filters' : 'Create a batch to get started'} />
       ) : (
         <div className="rso-table-wrap">
           <table className="rso-table">

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { PageHeader, Button, Badge, SearchInput } from '../../components/ui/index.js';
+import NamedIcon from '../../components/ui/NamedIcon.jsx';
 import { useAuth } from '../../hooks/useAuth.js';
 import {
   ROLES, TABS, TROUBLE, STATUS, MILESTONES, CONTACTS,
@@ -112,7 +113,7 @@ export default function HelpGuidePage() {
                 return (
                   <details key={taskId} style={{ border: '1px solid var(--border)', borderRadius: 10, marginBottom: 8, background: 'var(--surface)' }}>
                     <summary style={{ cursor: 'pointer', padding: '10px 14px', fontWeight: 700, fontSize: 13.5 }}>
-                      {done ? '✅' : '⬜'} {title}
+                      <NamedIcon name={done ? 'check' : 'square'} size={14} role="img" aria-label={done ? 'Done' : 'Not done'} aria-hidden={undefined} /> {title}
                     </summary>
                     <ul style={{ listStyle: 'none', margin: 0, padding: '4px 14px 12px' }}>
                       {steps.map((s, i) => {
