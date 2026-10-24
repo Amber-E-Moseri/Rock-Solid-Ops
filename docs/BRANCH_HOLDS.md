@@ -86,8 +86,8 @@ Local branch in worktree `../rso-teacher-onboarding-experience`, based on
 
 Holds that stay in force:
 
-- Teacher applications review screen is not wired into `App.jsx`, `Shell.jsx` or `routeRoles.js` on this
-  branch. Agent 1 wires it after PR #22 is deployed to staging (see `docs/TEACHER_APPLICATION_REVIEW_UI.md`).
+- Teacher applications review route and nav item are registered but gated by `TEACHER_ONBOARDING_CERTIFIED`
+  (false). They stay invisible until PR #22 is deployed to staging and the hold is lifted by its owner.
 - Approve control is held disabled (`APPROVAL_CONTRACT_AVAILABLE = false` in
   `src/features/teacher-applications/lib/reviewApi.js`). Release requires the P1 teacher-link contract.
 - Public account forms require a Turnstile site key in production (`VITE_TURNSTILE_SITE_KEY`), and Turnstile

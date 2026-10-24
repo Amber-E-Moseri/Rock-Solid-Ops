@@ -4,7 +4,7 @@ Branch: `feature/teacher-onboarding-experience`, local only, based on `origin/in
 Depends on PR #22 (`feature/teacher-onboarding-foundation`, `a67e950`) for the database contract. This branch does not contain PR #22's files.
 Not pushed. No PR opened. No migration, edge function or Auth setting changed. Nothing sent.
 
-Not touched, by design: `App.jsx`, `AuthContext.jsx`, `releaseHolds.js`, `components/layout/Shell.jsx`, `routing/routeRoles.js`, PR #20, PR #22, PR #14, PR #19, the integration branch.
+Stacked on PR #23 head `28bd91d` (`integration/teacher-onboarding-candidate`). Wired here: `App.jsx`, `components/layout/Shell.jsx`, `routing/routeRoles.js`, `features/auth/LoginPage.jsx`. Not touched: `AuthContext.jsx`, `releaseHolds.js`, PR #20, PR #22, PR #14, PR #19, PR #23 itself.
 
 ## 1. What this branch delivers
 
@@ -26,20 +26,14 @@ Not touched, by design: `App.jsx`, `AuthContext.jsx`, `releaseHolds.js`, `compon
 | New tests | `teacherApplicationsLib.test.js`, `teacherApplicationsPage.test.jsx`, `teacherApplicationsRoute.test.jsx`, `teacherOnboardingTurnstile.test.jsx`, `teacherRecoveryAndCopy.test.jsx` |
 | Hold record | `docs/BRANCH_HOLDS.md` (new section above "Resolved") |
 
-## 2. Integration instructions for Agent 1
+## 2. Integration (applied on this branch)
 
-Do these after PR #22 is merged or deployed to staging. They are not on this branch because they edit shared files.
-
-1. **Route.** In `foundation-spa/src/App.jsx`, add
-   `import { teacherApplicationsRoute } from './features/teacher-applications/routes.jsx';`
-   and insert `{teacherApplicationsRoute}` inside `<Routes>`, directly after `{TEACHER_ONBOARDING_CERTIFIED && teacherOnboardingRoutes}`.
-   Verified: this exact edit builds, and the lazy chunk `TeacherApplicationsPage-*.js` is produced. It was then reverted.
-2. **Navigation.** In `foundation-spa/src/components/layout/Shell.jsx`, add `UserCheck` to the lucide import, and add to the System group:
-   `{ key: 'teacherapps', label: 'Teacher Applications', path: '/staff/teacher-applications', Icon: UserCheck, roles: ['admin', 'superadmin'] }`.
-3. **Access matrix.** In `foundation-spa/src/routing/routeRoles.js`, add `'/staff/teacher-applications': Object.freeze(['admin', 'superadmin']),` under System. This is a permission entry, so review it as one.
-4. **Environment.** Set `VITE_TURNSTILE_SITE_KEY` for the production build only after Turnstile is enabled in Supabase Auth (section 5). Leaving it empty keeps public account forms unavailable in production.
-5. **Merge order and conflicts.** This branch must merge after PR #22, or be rebased onto it. Expected conflict: `docs/BRANCH_HOLDS.md`, because PR #22 also edits that file. Keep both sections.
-6. **Keep the holds.** Do not change `TEACHER_ONBOARDING_CERTIFIED`, `APPROVAL_CERTIFIED`, `MOODLE_RETRY_CERTIFIED` or `ATTENDANCE_SUBMIT_CERTIFIED`.
+1. **Route.** `App.jsx` registers `teacherApplicationsRoute` (admin and superadmin via `ProtectedRoute`) only while `TEACHER_ONBOARDING_CERTIFIED` is true.
+2. **Navigation.** `Shell.jsx` shows the "Teacher Applications" System item only under the same hold, for admin and superadmin.
+3. **Access matrix.** `routeRoles.js`: `'/staff/teacher-applications': ['admin', 'superadmin']`.
+4. **Recovery entry.** `forgotPasswordRoute` is registered outside the onboarding gate. The login page's "Forgot password?" navigates to `/auth/forgot-password`. The login page has no call to `resetPasswordForEmail`. In production the protected form refuses to send until `VITE_TURNSTILE_SITE_KEY` is set.
+5. **Environment.** Set `VITE_TURNSTILE_SITE_KEY` for production only after Turnstile is enabled in Supabase Auth (section 5).
+6. **Keep the holds.** `TEACHER_ONBOARDING_CERTIFIED`, `APPROVAL_CERTIFIED`, `MOODLE_RETRY_CERTIFIED` and `ATTENDANCE_SUBMIT_CERTIFIED` stay `false`.
 
 ## 3. Review screen behaviour
 

@@ -29,12 +29,17 @@ describe('teacher onboarding gate: off (shipped default)', () => {
     ['/auth/teacher/check-email'],
     ['/auth/teacher/confirm'],
     ['/auth/teacher/application'],
-    ['/auth/forgot-password'],
   ])('%s is not registered and falls through to the login screen', async (path) => {
     renderAt(path);
     expect(await screen.findByText('Sign in to your account')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Apply to teach' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Reset your password' })).not.toBeInTheDocument();
+  });
+
+  it('serves the protected forgot-password screen while onboarding is off, so recovery never uses the login page', async () => {
+    renderAt('/auth/forgot-password');
+    expect(await screen.findByRole('heading', { name: 'Reset your password' })).toBeInTheDocument();
+    expect(screen.queryByText('Sign in to your account')).not.toBeInTheDocument();
   });
 
   it('keeps the login page free of onboarding entry points', async () => {
