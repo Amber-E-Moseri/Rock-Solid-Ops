@@ -125,8 +125,11 @@ Status: one isolated candidate combining the legacy authorization security fix a
 integration PR only. Not merged, not deployed, no migrations applied, no live Auth settings changed.
 
 Dependency chain (each is a PR against the one above it):
-- PR #20 `brief/spa-cutover-integration` (head `9391cf0`), the base of PR #23.
+- PR #20 `brief/spa-cutover-integration` (head `f2cf8c7`), the base of PR #23. PR #23 is still based on the older PR #20
+  commit `9391cf0`, and `f2cf8c7` is not in PR #23's history. PR #23 is not rebased or changed by this candidate.
 - PR #23 `integration/teacher-onboarding-candidate` (head `28bd91d`). The candidate branches from this head.
+- PR #20's `f2cf8c7` (Moodle retry release hold across retry actions) is incorporated into the candidate by cherry-pick,
+  as `9c20761`. It is not a git ancestor of the candidate, so check it by content, not by ancestry. Its tests are in the candidate.
 - PR #24 `security/legacy-metadata-authorization` (head `6782183`) is merged into the candidate. CI 3/3 PASS on its head.
 - PR #25 `feature/teacher-onboarding-experience-p2` (head `1cf3db3`) is merged into the candidate. CI 3/3 PASS on its head.
 - The merge of PR #24 and PR #25 duplicates their commits. When PR #24 and PR #25 are closed, this candidate must be the only path,
