@@ -1,0 +1,23 @@
+.turnstile-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2, 8px);
+  justify-items: start;
+  min-width: 0;
+}
+
+.turnstile-widget {
+  min-height: 65px;
+  max-width: 100%;
+}
+
+.turnstile-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-meta, 13px);
+  overflow-wrap: anywhere;
+}
+
+.turnstile-note-error {
+  color: var(--danger-text, var(--danger));
+}
