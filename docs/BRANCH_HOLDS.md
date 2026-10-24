@@ -172,6 +172,23 @@ Lift conditions: Moodle retry contract certified against the live endpoint, both
 deployed retry-worker confirmed to match this source. Legacy reset may return only after the protected SPA route is verified
 at the deployed origin and the Auth redirect allow-list is confirmed.
 
+**Authorization hardening (2026-10-24).** `retry-worker` now authorizes every request before any body read, retry,
+resolve, sweep, Moodle call, escalation or audit write. The request needs a Bearer token that verifies as an active admin
+(`_shared/retry-authorization.ts`). A missing or invalid Authorization header is refused with 401. A non-admin is refused
+with 403. A missing header is never treated as a trusted scheduler.
+
+**Scheduled sweep: unavailable.** `SCHEDULED_SWEEP_ENABLED = false` in `retry-worker/index.ts`. No request reaches the sweep.
+The scheduler authentication contract is unverified: the repository has no scheduler secret, no pg_cron definition and no
+documented invocation identity. Enabling the sweep needs a verified contract, owner approval and a recorded change here.
+
+**Staging check required before any deployment:** confirm the effective `verify_jwt` for `retry-worker` on the deployed
+project. The root `supabase/config.toml` sets `true`, and `supabase/functions/retry-worker/config.toml` sets `false`. The
+repository cannot show which one the platform applies. With the authorization gate in place, either setting fails closed
+for unauthenticated callers, but the check must still be recorded.
+
+Release flags, all `false`: `APPROVAL_CERTIFIED`, `MOODLE_RETRY_CERTIFIED` (SPA and server constant),
+`ATTENDANCE_SUBMIT_CERTIFIED`, `TEACHER_ONBOARDING_CERTIFIED`, `APPROVAL_CONTRACT_AVAILABLE`.
+
 
 ## Resolved (moot — already merged)
 
