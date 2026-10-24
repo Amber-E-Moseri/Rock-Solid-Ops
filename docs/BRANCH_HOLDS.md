@@ -95,3 +95,13 @@ The separate open follow-up noted below was NOT re-verified and remains unaddres
 4 data-integrity rows were found with `sync_status = 'SYNCED'` and `synced_at IS NULL`,
 including duplicate emails with differing `moodle_user_id` values. That issue must not be
 silently dropped — it needs its own brief if picked up.
+
+### `brief/security-authz-audit-provenance` — HOLD on staging and production application (2026-10-24)
+
+Scope: `supabase/migrations/20261024120000_audit_provenance_guard.sql` (audit_logs privileges, policies and
+TEACHER_AUTH_* provenance guard) plus its regression test and recovery runbook (`docs/AUDIT_LOGS_GUARD_RECOVERY.md`).
+Owner decision 2026-10-24: GO for the isolated remediation PR; NO-GO for any staging or production application.
+Before any application: reconcile the nine staging-only versions (202609231000 to 202610030004) against lineage,
+use a targeted apply method (not `supabase db push`), and get owner approval for the exact SQL. Do not
+modify migration-history records. Version `20261022140000` is claimed by `brief/phase-a-security-candidate`
+and must not be reused; this PR uses `20261024120000`.
