@@ -37,8 +37,15 @@ export function safeNextPath(raw) {
 // teachers land on their portal and everyone else on their role landing. Roles
 // with no landing fall back to the staff dashboard, where ProtectedRoute shows the
 // pending, inactive or unauthorized notice.
-export function postLoginPath({ role, next }) {
+export const TEACHER_APPLICATION_PATH = '/auth/teacher/application';
+
+// `teacherOnboardingEnabled` is the release gate. While it is off, pending accounts keep the
+// existing behaviour: they reach the staff landing, and ProtectedRoute shows the pending notice.
+export function postLoginPath({ role, next, teacherOnboardingEnabled = false }) {
   const canonical = String(role ?? '').trim().toLowerCase();
+  // A pending account is an applicant. When onboarding is released it belongs on its application,
+  // whatever `next` says, so it never bounces off a portal route.
+  if (canonical === 'pending' && teacherOnboardingEnabled) return TEACHER_APPLICATION_PATH;
   const safe = safeNextPath(next);
   if (safe) return safe;
   if (canonical === 'teacher') return TEACHER_LANDING;

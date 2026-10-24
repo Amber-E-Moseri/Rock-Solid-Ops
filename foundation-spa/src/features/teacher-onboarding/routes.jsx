@@ -1,14 +1,17 @@
-// Route integration for the teacher onboarding screens. The SPA shell (App.jsx) imports this module
-// and places the routes above its "/auth/*" catch-all. See docs/TEACHER_ONBOARDING_UI.md for the exact
-// integration steps. This module does not modify any existing route.
+// Route definitions for the teacher onboarding screens. App.jsx registers the public onboarding routes
+// only while TEACHER_ONBOARDING_CERTIFIED is true (src/releaseHolds.js). The reset-password route is an
+// existing public path, so it always uses the hardened page. Pages load lazily, so an unreleased
+// feature costs nothing on the first load.
+import { lazy, Suspense } from 'react';
 import { Route } from 'react-router-dom';
-import ApplicationPage from './pages/ApplicationPage.jsx';
-import CheckEmailPage from './pages/CheckEmailPage.jsx';
-import ConfirmEmailPage from './pages/ConfirmEmailPage.jsx';
-import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx';
-import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
-import TeacherRegisterPage from './pages/TeacherRegisterPage.jsx';
 import './teacherOnboarding.css';
+
+const TeacherRegisterPage = lazy(() => import('./pages/TeacherRegisterPage.jsx'));
+const CheckEmailPage = lazy(() => import('./pages/CheckEmailPage.jsx'));
+const ConfirmEmailPage = lazy(() => import('./pages/ConfirmEmailPage.jsx'));
+const ApplicationPage = lazy(() => import('./pages/ApplicationPage.jsx'));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage.jsx'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage.jsx'));
 
 export const TEACHER_ONBOARDING_PATHS = Object.freeze({
   register: '/auth/teacher/register',
@@ -19,14 +22,20 @@ export const TEACHER_ONBOARDING_PATHS = Object.freeze({
   resetPassword: '/auth/reset-password',
 });
 
-// Public routes: none of these sits under /teacher or /staff, so ProtectedRoute does not apply.
+function Lazy({ children }) {
+  return <Suspense fallback={null}>{children}</Suspense>;
+}
+
+// New public entry points. Registered by App.jsx only when the feature is certified.
 export const teacherOnboardingRoutes = [
-  <Route key="teacher-register" path={TEACHER_ONBOARDING_PATHS.register} element={<TeacherRegisterPage />} />,
-  <Route key="teacher-check-email" path={TEACHER_ONBOARDING_PATHS.checkEmail} element={<CheckEmailPage />} />,
-  <Route key="teacher-confirm" path={TEACHER_ONBOARDING_PATHS.confirm} element={<ConfirmEmailPage />} />,
-  <Route key="teacher-application" path={TEACHER_ONBOARDING_PATHS.application} element={<ApplicationPage />} />,
-  <Route key="forgot-password" path={TEACHER_ONBOARDING_PATHS.forgotPassword} element={<ForgotPasswordPage />} />,
+  <Route key="teacher-register" path={TEACHER_ONBOARDING_PATHS.register} element={<Lazy><TeacherRegisterPage /></Lazy>} />,
+  <Route key="teacher-check-email" path={TEACHER_ONBOARDING_PATHS.checkEmail} element={<Lazy><CheckEmailPage /></Lazy>} />,
+  <Route key="teacher-confirm" path={TEACHER_ONBOARDING_PATHS.confirm} element={<Lazy><ConfirmEmailPage /></Lazy>} />,
+  <Route key="teacher-application" path={TEACHER_ONBOARDING_PATHS.application} element={<Lazy><ApplicationPage /></Lazy>} />,
+  <Route key="forgot-password" path={TEACHER_ONBOARDING_PATHS.forgotPassword} element={<Lazy><ForgotPasswordPage /></Lazy>} />,
 ];
 
-// Replaces the element on the existing "/auth/reset-password" route.
-export { ResetPasswordPage };
+// Element for the existing "/auth/reset-password" route.
+export function ResetPasswordRoute() {
+  return <Lazy><ResetPasswordPage /></Lazy>;
+}

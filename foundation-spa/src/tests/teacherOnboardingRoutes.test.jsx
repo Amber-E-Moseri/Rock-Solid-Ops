@@ -8,7 +8,7 @@ import { makeClient } from './teacherOnboardingHarness.js';
 const mock = vi.hoisted(() => ({ client: null }));
 vi.mock('../supabase.js', () => ({ get supabase() { return mock.client; } }));
 
-import { teacherOnboardingRoutes, TEACHER_ONBOARDING_PATHS, ResetPasswordPage } from '../features/teacher-onboarding/routes.jsx';
+import { teacherOnboardingRoutes, TEACHER_ONBOARDING_PATHS, ResetPasswordRoute } from '../features/teacher-onboarding/routes.jsx';
 import { AUTH_REDIRECT_PATHS } from '../features/teacher-onboarding/lib/redirects.js';
 
 function mountAt(path) {
@@ -17,7 +17,7 @@ function mountAt(path) {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         {teacherOnboardingRoutes}
-        <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/auth/reset-password" element={<ResetPasswordRoute />} />
       </Routes>
     </MemoryRouter>
   );
