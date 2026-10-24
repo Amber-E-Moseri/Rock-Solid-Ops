@@ -1,4 +1,5 @@
 import { supabase } from '../../../supabase.js';
+import { isMoodleRetryHeld, MOODLE_RETRY_CERTIFIED, MOODLE_RETRY_HOLD_MESSAGE } from '../../../releaseHolds.js';
 
 function isMissingTable(error) {
   const msg = String(error?.message || '').toLowerCase();
@@ -121,6 +122,7 @@ export function filterJobs(rows, { status, type, dateFrom, dateTo, search }) {
 }
 
 export async function invokeRetryAction(action, source, id) {
+  if (isMoodleRetryHeld(action, source, MOODLE_RETRY_CERTIFIED)) throw new Error(MOODLE_RETRY_HOLD_MESSAGE);
   const { data, error } = await supabase.functions.invoke('retry-worker', { body: { action, source, id } });
   if (error) throw error;
   if (!data?.ok) throw new Error(data?.error || 'Retry worker failed');

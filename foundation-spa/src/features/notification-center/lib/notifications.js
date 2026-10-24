@@ -1,4 +1,5 @@
 import { supabase } from '../../../supabase.js';
+import { isMoodleRetryHeld, MOODLE_RETRY_CERTIFIED, MOODLE_RETRY_HOLD_MESSAGE } from '../../../releaseHolds.js';
 
 async function selectSafe(table, query) {
   try {
@@ -94,6 +95,7 @@ export function filterRows(rows, { status, type, search, date }) {
 }
 
 export async function invokeRetryWorker(action, source, id) {
+  if (isMoodleRetryHeld(action, source, MOODLE_RETRY_CERTIFIED)) throw new Error(MOODLE_RETRY_HOLD_MESSAGE);
   const { data, error } = await supabase.functions.invoke('retry-worker', { body: { action, source, id } });
   if (error) throw error;
   if (!data?.ok) throw new Error(data?.error || 'Retry worker failed');

@@ -17,6 +17,19 @@ export const APPROVAL_HOLD_MESSAGE =
 export const MOODLE_RETRY_HOLD_MESSAGE =
   'Moodle retry is on hold pending endpoint and authorization certification.';
 
+// retry-worker's retry branch invokes live Moodle synchronization for these
+// sources. The server canonicalises moodle_sync to moodle_enrollment_sync, so
+// both identifiers are held.
+export const MOODLE_RETRY_SOURCES = Object.freeze(['moodle_enrollment_sync', 'moodle_sync']);
+
+// True when a retry-worker request would invoke live Moodle sync while the hold
+// is in force. Resolve and every non-Moodle source are not affected.
+export function isMoodleRetryHeld(action, source, certified = MOODLE_RETRY_CERTIFIED) {
+  if (certified) return false;
+  if (String(action || '').trim() !== 'retry') return false;
+  return MOODLE_RETRY_SOURCES.includes(String(source || '').trim());
+}
+
 // Teacher attendance and outcome submission write to the live roster. Keep this
 // false until the submit path is certified against the staging contract. While
 // false the teacher page disables Submit and Submit Outcomes, and the save
