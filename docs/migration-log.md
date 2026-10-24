@@ -2910,3 +2910,13 @@ Scope: limited frontend rollout with uncertified workflows disabled. Not a full 
 ### Follow-up required before the next staging run
 
 - **The staging harness must refresh authentication after sign-out.** The sign-out test performs a global `supabase.auth.signOut()` (`foundation-spa/src/context/AuthContext.jsx`). That revokes the teacher session saved for later tests. A fresh-session probe then returned `200`, which is consistent with a stale saved session causing the earlier `401` from `teacher-portal-api`.
+
+## 2026-10-23 — Teacher application foundation (branch `feature/teacher-onboarding-foundation`, local only)
+
+Scope: additive application data model, applicant and reviewer views, lifecycle functions, three email templates and an authorization harness. Approval and account linking are deliberately not implemented; they depend on the teacher-link contract, which is not verified deployed in production (`docs/SCHEMA_DRIFT_INVENTORY_2026-10-22.md`).
+
+- Migrations: `202610230100_teacher_applications_foundation.sql`, `202610230200_teacher_application_email_templates.sql`. No existing policy, grant or function was changed. The legacy anon self-registration policy remains.
+- Tests: `supabase/tests/teacher-applications/run.sh`. 83 of 83 checks pass on PostgreSQL 16.15 against Supabase-shaped stubs. Mutation checks confirmed the reviewer gate and the verification gate fail when weakened.
+- Not verified: the CI migration gate (needs Docker and the Supabase CLI); live Supabase Auth behaviour; production definitions listed in section 9 of the foundation document.
+- Gate: security boundary (RLS, grants, role gate). Draft PR permitted; merge held. See `docs/BRANCH_HOLDS.md`.
+- Decisions outstanding: D1 to D11 in `docs/TEACHER_APPLICATION_FOUNDATION.md`.
