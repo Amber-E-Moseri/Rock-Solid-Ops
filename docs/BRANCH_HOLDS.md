@@ -95,3 +95,10 @@ The separate open follow-up noted below was NOT re-verified and remains unaddres
 4 data-integrity rows were found with `sync_status = 'SYNCED'` and `synced_at IS NULL`,
 including duplicate emails with differing `moodle_user_id` values. That issue must not be
 silently dropped — it needs its own brief if picked up.
+
+### `brief/attendance-rls-containment` — HOLD on staging and production application (2026-10-24)
+
+Scope: `supabase/migrations/20261024130000_attendance_rls_containment.sql` (attendance_records and attendance_log policies only), its regression test, and `docs/ATTENDANCE_RLS_CONTAINMENT.md`.
+Version `20261024130000` is reserved for this branch in the release ledger (this entry). Version coordination with Agent 4 was NOT performed from the containment session; owner or coordinator must confirm it.
+Owner decisions required before any application: subgroup_admin and pastor read scope, migration ownership confirmation, the at-risk trigger defect on staging, and the production application window. See section 5 of the containment document.
+No live application has occurred. Production verification was SELECT-only.
