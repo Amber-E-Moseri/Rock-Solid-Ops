@@ -27,15 +27,21 @@ Application states: apply, pending (SUBMITTED), information requested (INFO_REQU
 - Server error text is never shown. Only known codes map to copy; anything else becomes generic copy.
 - A failed profile check shows an error state, not the applicant form.
 
-## Integration with Agent 1 (exact steps; these files are not edited on this branch)
+## Integration status
 
-1. **`src/App.jsx`** (PR #20 touches this file). Add:
+Applied in the integration candidate (`integration/teacher-onboarding-candidate`, on top of PR #20). The
+onboarding routes are registered only when `TEACHER_ONBOARDING_CERTIFIED` (`src/releaseHolds.js`) is `true`,
+and it is `false` in this build. The steps below are what the integration does.
+
+## Integration steps (applied)
+
+1. **`src/App.jsx`** (applied). Add:
    - Import: `import { teacherOnboardingRoutes, ResetPasswordPage as OnboardingResetPasswordPage } from './features/teacher-onboarding/routes.jsx';`
    - Replace `<Route path="/auth/reset-password" element={<ResetPasswordPage />} />` with `element={<OnboardingResetPasswordPage />}`.
    - Insert `{teacherOnboardingRoutes}` immediately before `<Route path="/auth/*" element={<Navigate to="/auth/login" replace />} />`.
    - Verified: this exact edit builds (`vite build`), then was reverted; the branch leaves App.jsx untouched.
-2. **`src/features/auth/LoginPage.jsx`** (PR #20 touches this file). Replace the inline "Forgot password?" request with a link to `/auth/forgot-password`. Add a "Apply to teach" link to `/auth/teacher/register`. The existing inline flow still works with the new reset page, but it does not add the hardening.
-3. **`src/context/AuthContext.jsx`** (PR #20 touches this file). **Blocking.** `normalizeProfileRecord` falls back to `user_metadata.role` and `app_metadata.role`. Users can write `user_metadata`. Remove that fallback so the role comes only from the `profiles` row, otherwise the signup path is a privilege-escalation route if a profile read fails.
+2. **`src/features/auth/LoginPage.jsx`** (applied, gated). Replace the inline "Forgot password?" request with a link to `/auth/forgot-password`. Add a "Apply to teach" link to `/auth/teacher/register`. The existing inline flow still works with the new reset page, but it does not add the hardening.
+3. **`src/context/AuthContext.jsx`** (applied: role and active state come only from the profiles row; see the security commit). Previously `normalizeProfileRecord` falls back to `user_metadata.role` and `app_metadata.role`. Users can write `user_metadata`. Remove that fallback so the role comes only from the `profiles` row, otherwise the signup path is a privilege-escalation route if a profile read fails.
 4. **Post-login routing** (`postLoginPath.js` in PR #20). Pending accounts with no portal role should land on `/auth/teacher/application`, not on a portal route.
 5. **Release holds** (`releaseHolds.js`, PR #20). Not touched. The three flags stay as they are.
 
