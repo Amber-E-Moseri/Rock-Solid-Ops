@@ -117,6 +117,7 @@
   <script src="../js/config-helper.js"></script>
   <script type="module">
     import { supabase, getCurrentProfile, TEACHER_LANDING_PATH, ADMIN_LANDING_PATH } from "./auth-client.js";
+    import { safeNextPath } from "./safe-next.js";
 
     // If a recovery token is in the hash, this is a reset-password link â€”
     // hand it off immediately before auth-client.js can process it as a login.
@@ -134,11 +135,10 @@
       const p = window.location.pathname || "";
       return p.includes("/foundation/") ? `/foundation/${clean}` : `/${clean}`;
     };
+    // Only same-origin app paths are followed. See auth/safe-next.js.
     const safeNext = () => {
       const raw = new URLSearchParams(window.location.search).get("next") || "";
-      if (!raw.startsWith("/")) return appPath("staff/admin-dashboard.html");
-      if (raw.startsWith("//")) return appPath("staff/admin-dashboard.html");
-      return raw;
+      return safeNextPath(raw) || appPath("staff/admin-dashboard.html");
     };
 
     const form = document.getElementById("loginForm");
