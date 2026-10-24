@@ -203,6 +203,11 @@ test("requireAuth ends the session on a failed lookup and denies missing or inac
   assert.match(authClientSrc, /if \(!profile \|\| profile\.is_active !== true\) \{\s*redirectToLoginWithError\("inactive"\)/);
 });
 
+test("isTeacher is true only for the teacher role, never for staff or admin roles", () => {
+  assert.match(authClientSrc, /export function isTeacher\(role\) \{\s*return canonicalRole\(role\) === ROLES\.TEACHER;\s*\}/);
+  assert.doesNotMatch(authClientSrc, /export function isTeacher\(role\) \{\s*return STAFF_ROLES/);
+});
+
 test("index.html reads no user_metadata or app_metadata and has no metadata fast path", () => {
   assert.doesNotMatch(indexSrc, /user_metadata|app_metadata/);
   assert.doesNotMatch(indexSrc, /resolveRoleFromSession/);

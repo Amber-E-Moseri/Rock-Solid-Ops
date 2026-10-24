@@ -175,7 +175,7 @@ export function isStaff(role) {
 }
 
 export function isTeacher(role) {
-  return STAFF_ROLES.has(canonicalRole(role));
+  return canonicalRole(role) === ROLES.TEACHER;
 }
 
 export function isRegionalSecretary(role) {
