@@ -151,6 +151,28 @@ Live certification gates, none verified by CI or local tests:
 Staging blockers: the staging site and its database are not yet deployed from this candidate. Staging remains on hold per
 `rocksolid-staging` above.
 
+### `security/limited-release-remediation` — server-side Moodle retry hold and legacy reset hold (2026-10-24)
+
+Two narrow fixes on top of PR #26 (`9db8a96`). Not merged, not deployed.
+
+- **Moodle retry (server-side).** `supabase/functions/_shared/moodle-retry-hold.ts` sets `MOODLE_RETRY_CERTIFIED = false`
+  and is used by `retry-worker`. A direct retry of `moodle_enrollment_sync` or `moodle_sync` is refused (409
+  `MOODLE_RETRY_HELD`) before any write. The automated sweep is skipped while held. Every retry-driven call to
+  `moodle-sync` goes through a guard that rejects before any request. Non-Moodle retries and all resolves are unchanged.
+  The hold is a code constant, not an environment variable, so it cannot be flipped by configuration. Lifting it needs
+  a code change, a tested contract and an owner decision recorded here.
+- **Legacy password reset.** `foundation/auth/login.html` no longer calls `resetPasswordForEmail`. `LEGACY_PASSWORD_RESET_HOLD`
+  is `true`, and the reset link shows a held message. The protected SPA recovery route has not been verified at the deployed
+  origin, so no redirect is introduced. Sign-in and `safe-next` are unchanged.
+
+Not verified: the deployed `retry-worker` (repo source only; the deployed function must be inspected or redeployed under
+owner authorization); the deployed legacy login page; live Moodle behaviour.
+
+Lift conditions: Moodle retry contract certified against the live endpoint, both identifiers covered by tests, and the
+deployed retry-worker confirmed to match this source. Legacy reset may return only after the protected SPA route is verified
+at the deployed origin and the Auth redirect allow-list is confirmed.
+
+
 ## Resolved (moot — already merged)
 
 ### `brief/moodle-credential-safety` — RESOLVED 2026-07-23

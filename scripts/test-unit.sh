@@ -19,6 +19,7 @@ DENO_UNIT_TESTS=(
   "supabase/functions/_shared/lib/assign-applicant.test.ts"
   "supabase/functions/_shared/push-notify.test.ts"
   "supabase/functions/_shared/webpush.test.ts"
+  "supabase/functions/_shared/moodle-retry-hold.test.ts"
   "supabase/functions/admin-api/create-staff-direct.test.ts"
   "supabase/functions/admin-api/role-boundary-matrix.test.ts"
   "supabase/functions/teacher-portal-api/class-ownership.test.ts"
