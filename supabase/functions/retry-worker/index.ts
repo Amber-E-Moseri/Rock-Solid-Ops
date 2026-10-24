@@ -16,6 +16,7 @@ import {
   planSweep,
 } from "../_shared/moodle-retry-hold.ts";
 import { authorizeRetryRequest } from "../_shared/retry-authorization.ts";
+import { resolveRetryAdmin } from "../_shared/retry-admin-lookup.ts";
 
 // The scheduled sweep is unavailable. retry-worker has no verified scheduler-authentication contract,
 // so no request can be recognised as the scheduler. Enable only with a verified contract (see
@@ -101,53 +102,6 @@ async function triggerClickupEscalation(
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(String(data?.error || `clickup-sync failed (${res.status})`));
   return data as Record<string, unknown>;
-}
-
-async function isAdmin(serviceDb: ReturnType<typeof createClient>, userId: string, email?: string) {
-  try {
-    const profile = await serviceDb
-      .from("profiles")
-      .select("role,is_active")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (profile.error) return false;
-
-    if (profile.data) {
-      const role = String(profile.data?.role || "").toLowerCase();
-      const active = profile.data?.is_active !== false;
-
-      if (
-        active &&
-        ["admin", "superadmin", "subgroup_admin", "pastor", "principal"].includes(role)
-      ) {
-        return true;
-      }
-      return false;
-    }
-
-    const legacy = await serviceDb
-      .from("admin_users")
-      .select("role,status,active")
-      .or(`auth_user_id.eq.${userId}${email ? `,email.eq.${email}` : ""}`)
-      .maybeSingle();
-    if (legacy.error) return false;
-
-    const legacyRole = String(legacy.data?.role || "").toLowerCase();
-    const active =
-      legacy.data?.active !== false &&
-      legacy.data?.status !== "suspended";
-
-    if (
-      active &&
-      ["admin", "superadmin", "subgroup_admin", "pastor", "principal"].includes(legacyRole)
-    ) {
-      return true;
-    }
-
-    return false;
-  } catch (_) {
-    return false;
-  }
 }
 
 async function logAudit(
@@ -425,7 +379,7 @@ Deno.serve(async (req) => {
         if (userErr || !userData?.user) return null;
         return { id: userData.user.id, email: userData.user.email };
       },
-      isAdmin: (user) => isAdmin(serviceDb, user.id, user.email ?? undefined),
+      isAdmin: (user) => resolveRetryAdmin(serviceDb, user.id, user.email),
     });
     if (!authDecision.ok) {
       return json({ ok: false, error: authDecision.error, code: authDecision.code }, authDecision.status);
