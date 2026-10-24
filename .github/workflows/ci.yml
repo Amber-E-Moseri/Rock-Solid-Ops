@@ -49,6 +49,10 @@ jobs:
         # PR #21's validator for the legacy /foundation login redirect. Root tests/ is not run by test-unit.sh.
         run: node --test tests/safe-next.test.mjs
 
+      - name: Run legacy profile-trust authorization test
+        # Legacy /foundation auth: roles come only from the profiles row, and lookups fail closed.
+        run: node --test tests/legacy-profile-trust.test.mjs
+
   # ──────────────────────────────────────────────────────────────
   # Job 2: Migration gate — db reset + schema invariant check.
   # Verifies the full migration chain replays cleanly from zero
