@@ -280,25 +280,17 @@
       window.location.href = safeNext();
     });
 
-    forgotPasswordBtn.addEventListener("click", async (e) => {
+    // Password reset is on hold for this page. The protected SPA recovery route is not verified at the
+    // deployed origin, and this page must not send Auth reset requests until it is. Lift the hold only
+    // after that route is verified and recorded in docs/BRANCH_HOLDS.md.
+    const LEGACY_PASSWORD_RESET_HOLD = true;
+    forgotPasswordBtn.addEventListener("click", (e) => {
       e.preventDefault();
-      const email = emailInput.value.trim();
-      if (!email) {
-        msg.textContent = "Enter your email address first.";
-        emailInput.focus();
+      if (LEGACY_PASSWORD_RESET_HOLD) {
+        msg.textContent = "Password reset is unavailable right now.";
+        setSupportLine(true);
         return;
       }
-
-      msg.textContent = "Sending reset link...";
-      setSupportLine(false);
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}${appPath("auth/reset-password.html")}`,
-      });
-      if (error) {
-        msg.textContent = "Could not send reset link. Please try again or contact support.";
-        return;
-      }
-      msg.textContent = "Check your email for a reset link.";
     });
   </script>
   <script src="../ui/premium-shell.js"></script>

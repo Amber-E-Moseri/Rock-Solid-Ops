@@ -9,6 +9,18 @@ import {
   isValidString,
   safeLogAudit,
 } from "../_shared/http.ts";
+import {
+  MOODLE_RETRY_HELD_CODE,
+  invokeMoodleRetrySync,
+  planDirectRetry,
+  planSweep,
+} from "../_shared/moodle-retry-hold.ts";
+import { authorizeRetryRequest } from "../_shared/retry-authorization.ts";
+
+// The scheduled sweep is unavailable. retry-worker has no verified scheduler-authentication contract,
+// so no request can be recognised as the scheduler. Enable only with a verified contract (see
+// docs/BRANCH_HOLDS.md), and never on a missing Authorization header.
+const SCHEDULED_SWEEP_ENABLED = false;
 
 type RetryAction = "retry" | "resolve";
 type RetrySource = "email_queue" | "scheduled_notifications" | "moodle_sync" | "moodle_enrollment_sync" | "failed_syncs";
@@ -54,7 +66,7 @@ async function triggerMoodleSync(
   serviceKey: string,
   id: string,
 ) {
-  const res = await fetch(`${supabaseUrl}/functions/v1/moodle-sync`, {
+  const res = await invokeMoodleRetrySync(fetch, `${supabaseUrl}/functions/v1/moodle-sync`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${serviceKey}`,
@@ -404,17 +416,21 @@ Deno.serve(async (req) => {
     if (!SUPABASE_URL || !SERVICE_KEY) return json({ ok: false, error: "Missing Supabase env" }, 500);
 
     const serviceDb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
-    const authHeader = req.headers.get("Authorization") || "";
-    const isCronCall = !authHeader.startsWith("Bearer ");
-    let actorEmail = "retry-worker@system";
-    if (!isCronCall) {
-      const jwt = authHeader.slice("Bearer ".length).trim();
-      const { data: userData, error: userErr } = await serviceDb.auth.getUser(jwt);
-      if (userErr || !userData?.user) return json({ ok: false, error: "Invalid session" }, 401);
-      const allowed = await isAdmin(serviceDb, userData.user.id, userData.user.email);
-      if (!allowed) return json({ ok: false, error: "Admin access required" }, 403);
-      actorEmail = userData.user.email || actorEmail;
+    // Every request must present a Bearer token that verifies as an active admin, before any body is
+    // read, retry, resolve, sweep, Moodle call or escalation. A missing header is not a trusted scheduler.
+    const authDecision = await authorizeRetryRequest({
+      authHeader: req.headers.get("Authorization"),
+      verifyUser: async (jwt) => {
+        const { data: userData, error: userErr } = await serviceDb.auth.getUser(jwt);
+        if (userErr || !userData?.user) return null;
+        return { id: userData.user.id, email: userData.user.email };
+      },
+      isAdmin: (user) => isAdmin(serviceDb, user.id, user.email ?? undefined),
+    });
+    if (!authDecision.ok) {
+      return json({ ok: false, error: authDecision.error, code: authDecision.code }, authDecision.status);
     }
+    const actorEmail = authDecision.actorEmail;
 
     const body = (await req.json().catch(() => ({}))) as RetryRequest;
     
@@ -442,7 +458,19 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: idErr.message, code: "INVALID_ID" }, 400);
     }
 
-    if (isCronCall && !id) {
+    if (SCHEDULED_SWEEP_ENABLED && !id) {
+      if (planSweep() === "skip_held") {
+        await logAudit(
+          serviceDb,
+          actorEmail,
+          "MOODLE_RETRY_SWEEP_HELD",
+          "moodle_enrollment_sync",
+          "batch",
+          "SKIPPED",
+          { source: "moodle_enrollment_sync", limit, code: MOODLE_RETRY_HELD_CODE },
+        );
+        return json({ ok: true, mode: "auto_sweep", source: "moodle_enrollment_sync", skipped: MOODLE_RETRY_HELD_CODE, selected: 0, attempted: 0, escalated: 0, limit });
+      }
       const sweep = await sweepMoodleEnrollmentRetries(serviceDb, limit);
       let escalated = 0;
       for (const row of sweep.candidates || []) {
@@ -465,7 +493,7 @@ Deno.serve(async (req) => {
       // Trigger Moodle sync once after sweep to process newly marked RETRYING rows.
       if (sweep.attempted > 0) {
         try {
-          await fetch(`${SUPABASE_URL}/functions/v1/moodle-sync`, {
+          await invokeMoodleRetrySync(fetch, `${SUPABASE_URL}/functions/v1/moodle-sync`, {
             method: "POST",
             headers: {
               Authorization: `Bearer ${SERVICE_KEY}`,
@@ -482,6 +510,19 @@ Deno.serve(async (req) => {
     }
 
     if (!id) return json({ ok: false, error: "id is required", code: "MISSING_ID" }, 400);
+
+    if (planDirectRetry(action, source) === "refuse_held") {
+      await logAudit(
+        serviceDb,
+        actorEmail,
+        "MOODLE_RETRY_HELD",
+        source,
+        id,
+        "SKIPPED",
+        { action, source, id, code: MOODLE_RETRY_HELD_CODE },
+      );
+      return json({ ok: false, error: "Moodle retry is on hold.", code: MOODLE_RETRY_HELD_CODE }, 409);
+    }
 
     if (action === "retry") {
       if (source === "moodle_enrollment_sync") {
