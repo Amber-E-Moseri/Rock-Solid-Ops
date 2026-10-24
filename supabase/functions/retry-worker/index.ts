@@ -9,6 +9,12 @@ import {
   isValidString,
   safeLogAudit,
 } from "../_shared/http.ts";
+import { authorizeRetryRequest } from "../_shared/retry-authorization.ts";
+import { MOODLE_RETRY_HELD_CODE, planDirectRetry } from "../_shared/moodle-retry-hold.ts";
+
+// The hourly scheduled Moodle sweep is off. It would start live Moodle synchronization with no operator
+// present. Re-enable only with a certified scheduler authentication contract (see docs/BRANCH_HOLDS.md).
+const SCHEDULED_SWEEP_ENABLED = false;
 
 type RetryAction = "retry" | "resolve";
 type RetrySource = "email_queue" | "scheduled_notifications" | "moodle_sync" | "moodle_enrollment_sync" | "failed_syncs";
@@ -404,17 +410,21 @@ Deno.serve(async (req) => {
     if (!SUPABASE_URL || !SERVICE_KEY) return json({ ok: false, error: "Missing Supabase env" }, 500);
 
     const serviceDb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
-    const authHeader = req.headers.get("Authorization") || "";
-    const isCronCall = !authHeader.startsWith("Bearer ");
-    let actorEmail = "retry-worker@system";
-    if (!isCronCall) {
-      const jwt = authHeader.slice("Bearer ".length).trim();
-      const { data: userData, error: userErr } = await serviceDb.auth.getUser(jwt);
-      if (userErr || !userData?.user) return json({ ok: false, error: "Invalid session" }, 401);
-      const allowed = await isAdmin(serviceDb, userData.user.id, userData.user.email);
-      if (!allowed) return json({ ok: false, error: "Admin access required" }, 403);
-      actorEmail = userData.user.email || actorEmail;
+    // Every request must present a bearer that verifies as an active admin, before any body is read or any
+    // write happens. A missing Authorization header is refused, never treated as a scheduler.
+    const authDecision = await authorizeRetryRequest({
+      authHeader: req.headers.get("Authorization"),
+      verifyUser: async (jwt) => {
+        const { data: userData, error: userErr } = await serviceDb.auth.getUser(jwt);
+        if (userErr || !userData?.user) return null;
+        return { id: userData.user.id, email: userData.user.email };
+      },
+      isAdmin: (user) => isAdmin(serviceDb, user.id, user.email ?? undefined),
+    });
+    if (!authDecision.ok) {
+      return json({ ok: false, error: authDecision.error, code: authDecision.code }, authDecision.status);
     }
+    const actorEmail = authDecision.actorEmail;
 
     const body = (await req.json().catch(() => ({}))) as RetryRequest;
     
@@ -442,7 +452,7 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: idErr.message, code: "INVALID_ID" }, 400);
     }
 
-    if (isCronCall && !id) {
+    if (SCHEDULED_SWEEP_ENABLED && !id) {
       const sweep = await sweepMoodleEnrollmentRetries(serviceDb, limit);
       let escalated = 0;
       for (const row of sweep.candidates || []) {
@@ -482,6 +492,12 @@ Deno.serve(async (req) => {
     }
 
     if (!id) return json({ ok: false, error: "id is required", code: "MISSING_ID" }, 400);
+
+    // Server-side Moodle hold: a retry for a Moodle source starts live Moodle synchronization. Refuse before
+    // any write while certification is pending. Resolve and non-Moodle sources are unaffected.
+    if (planDirectRetry(action, source) === "refuse_held") {
+      return json({ ok: false, error: "Moodle retry is on hold pending endpoint and authorization certification.", code: MOODLE_RETRY_HELD_CODE }, 409);
+    }
 
     if (action === "retry") {
       if (source === "moodle_enrollment_sync") {
