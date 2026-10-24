@@ -80,6 +80,21 @@ Known limitation: the staging harness must refresh authentication after sign-out
 revokes the teacher session that later tests reuse.
 
 
+### `integration/teacher-onboarding-candidate` (PR #23, stacked on PR #20) — HOLD on merge and launch (2026-10-24)
+
+Status: draft candidate. Teacher onboarding gate `TEACHER_ONBOARDING_CERTIFIED` is false. The three other release holds are false.
+
+Dependencies:
+- PR #20 (`brief/spa-cutover-integration`, head `9391cf0`) is the base.
+- PR #21 (`brief/legacy-login-safe-next`, head `026d88d`) is cherry-picked here as `489911e`. Its validator was not in PR #20's head, and the legacy `/foundation` login had the old open-redirect check.
+- PR #22 (`feature/teacher-onboarding-foundation`, head `a67e950`) supplies the applicant API at runtime. It is not in this branch's history.
+
+Holds (each must clear before launch):
+1. `/auth/reset-password` now serves the hardened page on an existing public route, while onboarding is held. Live recovery-link verification is required: a real recovery email, its redirect allow-list, the recovery `amr` claim, and expired and reused links.
+2. Legacy metadata-role fallback. `foundation/auth/auth-client.js` (lines 137 and 326–335) and `foundation/index.html` (lines 99–100) still read `user_metadata` and `app_metadata` when the profile is empty or missing. The SPA `AuthContext` is fixed; the legacy pages are not. Fixing them changes 49 legacy pages and needs owner approval.
+3. CI coverage. `ci.yml` now also runs `pull_request` for base `brief/spa-cutover-integration`, and the unit job runs the PR #21 test. Owner approval is required for this workflow change to stay.
+4. Live sign-in and token-refresh test, to confirm the fail-closed refresh does not cause an unintended sign-out loop. Not verified.
+
 ## Resolved (moot — already merged)
 
 ### `brief/moodle-credential-safety` — RESOLVED 2026-07-23
