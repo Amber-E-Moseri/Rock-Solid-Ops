@@ -5,6 +5,7 @@ export type ApiErrorCode =
   | "UNAUTHORIZED_CLASS_ACCESS"
   | "INVALID_PAYLOAD"
   | "REQUEST_TIMEOUT"
+  | "ACTION_HELD"
   | "INTERNAL_ERROR";
 
 export interface TeacherContext {
