@@ -9,8 +9,12 @@ import { useToast } from '../../context/ToastContext.jsx';
 import {
   fetchAllNotifications, computeSummary, filterRows, invokeRetryWorker, statusVariant, fmtDate,
 } from './lib/notifications.js';
+import { isMoodleRetryHeld, MOODLE_RETRY_CERTIFIED, MOODLE_RETRY_HOLD_MESSAGE } from '../../releaseHolds.js';
 
 const PAGE_SIZE = 25;
+
+// Held while MOODLE_RETRY_CERTIFIED is false: Retry is disabled and skipped in bulk.
+const isHeldRetry = (row) => isMoodleRetryHeld('retry', row.source, MOODLE_RETRY_CERTIFIED);
 
 export default function NotificationCenterPage() {
   const { profile } = useAuth();
@@ -50,10 +54,12 @@ export default function NotificationCenterPage() {
   }, []);
 
   const handleAction = useCallback(async (action, rows) => {
+    const runnable = action === 'retry' ? rows.filter((r) => !isHeldRetry(r)) : rows;
+    const held = rows.length - runnable.length;
     setBusy(true);
     try {
-      for (const row of rows) await invokeRetryWorker(action, row.source, row.id);
-      toast(`${action === 'retry' ? 'Retried' : 'Resolved'} ${rows.length} item(s)`, 'success');
+      for (const row of runnable) await invokeRetryWorker(action, row.source, row.id);
+      toast(`${action === 'retry' ? 'Retried' : 'Resolved'} ${runnable.length} item(s)${held ? `; ${held} Moodle retry on hold` : ''}`, 'success');
       setSelected(new Set());
       refresh();
     } catch (e) {
@@ -164,7 +170,7 @@ export default function NotificationCenterPage() {
                       {!isReadOnly && (
                         <td onClick={(e) => e.stopPropagation()}>
                           <div style={{ display: 'flex', gap: 6 }}>
-                            <Button size="sm" variant="secondary" disabled={busy} onClick={() => handleAction('retry', [r])}>Retry</Button>
+                            <Button size="sm" variant="secondary" disabled={busy || isHeldRetry(r)} title={isHeldRetry(r) ? MOODLE_RETRY_HOLD_MESSAGE : undefined} onClick={() => handleAction('retry', [r])}>Retry</Button>
                             <Button size="sm" variant="secondary" disabled={busy} onClick={() => handleAction('resolve', [r])}>Resolve</Button>
                           </div>
                         </td>
