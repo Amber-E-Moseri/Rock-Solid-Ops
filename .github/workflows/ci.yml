@@ -5,8 +5,9 @@ on:
     branches: [main]
   pull_request:
     # brief/spa-cutover-integration is the stacked base for the SPA integration candidate (PR #23).
-    # Only pull requests into that branch are added. Pushes to it do not run CI, and nothing here deploys.
-    branches: [main, brief/spa-cutover-integration]
+    # integration/teacher-onboarding-candidate is the stacked base for the legacy auth fix (PR #24).
+    # Only pull requests into these branches are added. Pushes to them do not run CI, and nothing here deploys.
+    branches: [main, brief/spa-cutover-integration, integration/teacher-onboarding-candidate]
 
 # Only one CI run per branch at a time; newer pushes cancel in-flight runs.
 concurrency:
