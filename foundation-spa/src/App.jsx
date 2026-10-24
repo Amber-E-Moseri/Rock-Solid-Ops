@@ -6,6 +6,8 @@ import { ToastProvider } from './context/ToastContext.jsx';
 import ProtectedRoute from './components/layout/ProtectedRoute.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { landingPathForRole } from './routing/routeRoles.js';
+import { teacherOnboardingRoutes, ResetPasswordRoute } from './features/teacher-onboarding/routes.jsx';
+import { TEACHER_ONBOARDING_CERTIFIED } from './releaseHolds.js';
 import Shell from './components/layout/Shell.jsx';
 import { PWAInstallPrompt } from './components/pwa/PWAInstallPrompt.jsx';
 import { OfflineIndicator } from './components/pwa/OfflineIndicator.jsx';
@@ -18,7 +20,6 @@ const queryClient = new QueryClient({
 
 // Lazy page imports — expand as portals are migrated
 const LoginPage          = lazy(() => import('./features/auth/LoginPage.jsx'));
-const ResetPasswordPage  = lazy(() => import('./features/auth/ResetPasswordPage.jsx'));
 const AuditLogPage       = lazy(() => import('./features/audit-log/AuditLogPage.jsx'));
 const AdminActivityPage  = lazy(() => import('./features/admin-activity/AdminActivityPage.jsx'));
 const RoleAuditPage      = lazy(() => import('./features/role-audit/RoleAuditPage.jsx'));
@@ -100,7 +101,8 @@ export default function App() {
             <Routes>
               {/* Public */}
               <Route path="/auth/login" element={<LoginPage />} />
-              <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/auth/reset-password" element={<ResetPasswordRoute />} />
+              {TEACHER_ONBOARDING_CERTIFIED && teacherOnboardingRoutes}
               <Route path="/auth/*" element={<Navigate to="/auth/login" replace />} />
 
               {/* Design system showcase: registered in development builds only */}

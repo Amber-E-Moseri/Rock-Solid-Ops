@@ -4,7 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    # brief/spa-cutover-integration is the stacked base for the SPA integration candidate (PR #23).
+    # Only pull requests into that branch are added. Pushes to it do not run CI, and nothing here deploys.
+    branches: [main, brief/spa-cutover-integration]
 
 # Only one CI run per branch at a time; newer pushes cancel in-flight runs.
 concurrency:
@@ -42,6 +44,10 @@ jobs:
 
       - name: Run unit tests
         run: bash scripts/test-unit.sh
+
+      - name: Run static login safe-next test
+        # PR #21's validator for the legacy /foundation login redirect. Root tests/ is not run by test-unit.sh.
+        run: node --test tests/safe-next.test.mjs
 
   # ──────────────────────────────────────────────────────────────
   # Job 2: Migration gate — db reset + schema invariant check.

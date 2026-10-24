@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../supabase.js';
 import { postLoginPath } from './postLoginPath.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { TEACHER_ONBOARDING_CERTIFIED } from '../../releaseHolds.js';
 
 const ERROR_MESSAGES = {
   inactive:     'Your account is inactive. Please contact your administrator.',
@@ -33,7 +34,14 @@ export default function LoginPage() {
     if (!pendingNext || sessionLoading) return;
     if (user && profile) {
       setPendingNext(null);
-      navigate(postLoginPath({ role: profile.role, next: pendingNext.next }), { replace: true });
+      navigate(
+        postLoginPath({
+          role: profile.role,
+          next: pendingNext.next,
+          teacherOnboardingEnabled: TEACHER_ONBOARDING_CERTIFIED,
+        }),
+        { replace: true },
+      );
       return;
     }
     setPendingNext(null);
@@ -165,13 +173,23 @@ export default function LoginPage() {
           </button>
           <button
             type="button"
-            onClick={handleForgotPassword}
+            onClick={TEACHER_ONBOARDING_CERTIFIED ? () => navigate('/auth/forgot-password') : handleForgotPassword}
             disabled={resetPending}
             style={forgotButtonStyle}
           >
             Forgot password?
           </button>
         </form>
+
+        {TEACHER_ONBOARDING_CERTIFIED && (
+          <button
+            type="button"
+            onClick={() => navigate('/auth/teacher/register')}
+            style={forgotButtonStyle}
+          >
+            New teacher? Apply to teach
+          </button>
+        )}
 
         {resetMsg && (
           <p style={{ color: 'var(--muted)', fontSize: 13, margin: '12px 0 0', lineHeight: 1.5 }}>

@@ -25,3 +25,13 @@ export const ATTENDANCE_SUBMIT_CERTIFIED = false;
 
 export const ATTENDANCE_SUBMIT_HOLD_MESSAGE =
   'Attendance submission is on hold pending certification. Nothing has been saved.';
+
+// Teacher onboarding is an unreleased feature. Its new public routes (registration,
+// email confirmation, application status and forgot-password) are registered only
+// when this is true. Set it only after the backend dependencies are certified in
+// staging: PR #22 deployed, Auth email confirmation and redirect settings, the
+// applicant-readable fellowship policy, and Turnstile on signup, resend and recovery.
+export const TEACHER_ONBOARDING_CERTIFIED = false;
+
+export const TEACHER_ONBOARDING_HOLD_MESSAGE =
+  'Teacher onboarding is not yet released.';
