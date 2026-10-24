@@ -26,12 +26,18 @@ DENO_UNIT_TESTS=(
   "supabase/functions/waitlist-processor/waitlist-dedup.test.ts"
   "supabase/functions/registration-processor/registration-processor.test.ts"
   "supabase/functions/nexus-users-search/nexus-cors.test.ts"
+  # Caller authorization: shared helper, per-function policy and a static wiring guard that reads index.ts.
+  "supabase/functions/_shared/function-auth.test.ts"
+  "supabase/functions/_shared/auth-wiring.test.ts"
+  "supabase/functions/waitlist-processor/auth-policy.test.ts"
+  "supabase/functions/moodle-sync/auth-policy.test.ts"
   # moodle-sync/moodle-sync.test.ts excluded: pre-existing type errors +
   # top-level Deno.serve() in index.ts prevents import (tracked separately)
 )
 
 cd "$ROOT"
-deno test --allow-env --no-prompt --no-check --node-modules-dir=auto "${DENO_UNIT_TESTS[@]}"
+# --allow-read is needed only by the static wiring guard (auth-wiring.test.ts).
+deno test --allow-env --allow-read --no-prompt --no-check --node-modules-dir=auto "${DENO_UNIT_TESTS[@]}"
 DENO_EXIT=$?
 
 echo ""

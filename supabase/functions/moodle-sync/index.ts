@@ -14,6 +14,13 @@ import {
   isValidString,
   safeLogAudit,
 } from "../_shared/http.ts";
+import { authorizeCaller, denialResponse, supabaseCallerDeps } from "../_shared/function-auth.ts";
+import {
+  MOODLE_SYNC_STAFF_ROLES,
+  SELECTABLE_SYNC_STATUSES,
+  isSelectableSyncRow,
+  moodleSiteUrl,
+} from "./auth-policy.ts";
 
 type SyncStatus = "PENDING" | "PROCESSING" | "SYNCED" | "FAILED" | "RETRYING" | "SKIPPED" | "PERMANENTLY_FAILED";
 type MoodleFailureCode = "MOODLE_WAF_BLOCK" | "MOODLE_REST_DISABLED" | "MOODLE_PERMISSION_DENIED" | "MOODLE_403_UNKNOWN";
@@ -329,6 +336,20 @@ async function resolveCourseId(db: ReturnType<typeof createClient>, row: Record<
   return "";
 }
 
+// Atomically moves a selectable row to PROCESSING. Returns false when the row is no longer selectable,
+// for example because another request already claimed it or it is SYNCED.
+async function claimSyncRow(db: ReturnType<typeof createClient>, id: string): Promise<boolean> {
+  const { data, error } = await db
+    .from("moodle_enrollment_sync")
+    .update({ sync_status: "PROCESSING", updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("registration_status", "ASSIGNED")
+    .in("sync_status", SELECTABLE_SYNC_STATUSES)
+    .select("id");
+  if (error) throw error;
+  return Array.isArray(data) && data.length > 0;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
@@ -344,6 +365,16 @@ Deno.serve(async (req) => {
     }
 
     const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+
+    // Authorize every request, including action=test, before the body is read, the stuck-row reset runs
+    // or Moodle is reached. Service-role callers (registration-processor, retry-worker) pass; anonymous
+    // and non-admin callers are refused.
+    const decision = await authorizeCaller(
+      req.headers.get("Authorization"),
+      supabaseCallerDeps(db, { serviceKey: SERVICE_KEY, allowedRoles: MOODLE_SYNC_STAFF_ROLES }),
+    );
+    if (!decision.ok) return denialResponse(decision, corsHeaders);
+
     const payload = await req.json().catch(() => ({}));
 
     // Recovery: reset rows stuck in PROCESSING for more than 30 minutes.
@@ -397,7 +428,7 @@ Deno.serve(async (req) => {
     const baseQuery = db
       .from("moodle_enrollment_sync")
       .select("*")
-      .in("sync_status", ["PENDING", "RETRYING", "FAILED"])
+      .in("sync_status", SELECTABLE_SYNC_STATUSES)
       .eq("registration_status", "ASSIGNED")
       .order("updated_at", { ascending: true })
       .limit(limit);
@@ -407,6 +438,8 @@ Deno.serve(async (req) => {
           .from("moodle_enrollment_sync")
           .select("*")
           .eq("id", forceId)
+          .eq("registration_status", "ASSIGNED")
+          .in("sync_status", SELECTABLE_SYNC_STATUSES)
           .limit(1)
       : await baseQuery;
 
@@ -437,6 +470,11 @@ Deno.serve(async (req) => {
       summary.processed += 1;
 
       if (!id) continue;
+      // The query already filters, but a SYNCED row must never reach a Moodle call or a password reset.
+      if (!isSelectableSyncRow(row)) {
+        summary.skipped += 1;
+        continue;
+      }
 
       // Validate input before processing
       const emailErr = validateEmail(email, "email");
@@ -487,6 +525,13 @@ Deno.serve(async (req) => {
           retry_count: retryCount,
           ...(traceId ? { trace_id: traceId } : {}),
         });
+        continue;
+      }
+
+      // Claim the row before any Moodle call. A repeated or concurrent request that finds it already claimed
+      // or SYNCED skips it, so a student's Moodle password is not reset twice.
+      if (!(await claimSyncRow(db, id))) {
+        summary.skipped += 1;
         continue;
       }
 
@@ -574,7 +619,7 @@ Deno.serve(async (req) => {
           first_name: firstName,
           full_name: fullName,
           email,
-          moodle_url: "https://rocksolid.lwcanada.org/",
+          moodle_url: moodleSiteUrl(MOODLE_URL),
           moodle_username: String(usernameUsed || ""),
           moodle_temp_password: String(tempPassword || ""),
           class_label: classLabel,
