@@ -1,4 +1,5 @@
 import { supabase } from '../../../supabase.js';
+import { isMoodleRetryHeld, MOODLE_RETRY_CERTIFIED, MOODLE_RETRY_HOLD_MESSAGE } from '../../../releaseHolds.js';
 
 // All writes mirror foundation/js/applicant-directory.js exactly:
 // same tables, same patches, same audit_logs action names and details.
@@ -195,6 +196,7 @@ export async function bulkClassChange({ apps, classId, cls, actorEmail, onProgre
 }
 
 export async function retryFailedNotification({ target, source }) {
+  if (isMoodleRetryHeld('retry', source, MOODLE_RETRY_CERTIFIED)) throw new Error(MOODLE_RETRY_HOLD_MESSAGE);
   return supabase.functions.invoke('retry-worker', {
     body: { action: 'retry', source, id: String(target.id) },
   });

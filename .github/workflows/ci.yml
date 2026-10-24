@@ -43,6 +43,10 @@ jobs:
       - name: Run unit tests
         run: bash scripts/test-unit.sh
 
+      - name: Run static login safe-next test
+        # PR #21's validator for the legacy /foundation login redirect. Root tests/ is not run by test-unit.sh.
+        run: node --test tests/safe-next.test.mjs
+
   # ──────────────────────────────────────────────────────────────
   # Job 2: Migration gate — db reset + schema invariant check.
   # Verifies the full migration chain replays cleanly from zero

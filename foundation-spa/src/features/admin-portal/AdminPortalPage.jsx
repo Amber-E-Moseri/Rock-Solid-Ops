@@ -19,8 +19,8 @@ export default function AdminPortalPage() {
   const kpis = useMemo(() => [
     { label: 'Enrolled', value: stats.data?.enrolled ?? '—' },
     { label: 'Active Batches', value: stats.data?.activeBatches ?? '—' },
-    { label: 'Pending Review', value: stats.data?.pending ?? '—' },
-    { label: 'Teachers', value: stats.data?.teachers ?? '—' },
+    { label: 'Pending Review', value: stats.data?.pending ?? '—', accent: true },
+    { label: 'Active Teachers', value: stats.data?.teachers ?? '—' },
   ], [stats.data]);
 
   const regCards = [

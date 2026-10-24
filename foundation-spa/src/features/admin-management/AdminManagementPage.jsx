@@ -3,7 +3,7 @@ import { useStaff, useTeachers, useToggleStaffActive, useSaveStaff, useToggleTea
 import { isStaffActive, isTeacherActive, isTeacherLinked } from './lib/adminManagement.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useToast } from '../../context/ToastContext.jsx';
-import { PageHeader, Toolbar, SearchInput, Skeleton, EmptyState, Badge, Button, Modal } from '../../components/ui/index.js';
+import { PageHeader, Toolbar, SearchInput, Skeleton, EmptyState, Badge, Button, Modal, ErrorBanner } from '../../components/ui/index.js';
 
 const VALID_ROLES_SUPERADMIN = ['pending', 'teacher', 'principal', 'admin', 'superadmin', 'subgroup_admin', 'pastor'];
 const VALID_ROLES_ADMIN = ['teacher', 'principal'];
@@ -22,7 +22,7 @@ function tabsForRole(role) {
 
 export default function AdminManagementPage() {
   const { profile, user } = useAuth();
-  const { addToast } = useToast();
+  const addToast = useToast();
   const role = profile?.role;
   const tabs = tabsForRole(role);
   const canManageStaff = role === 'admin' || role === 'superadmin';
@@ -87,7 +87,38 @@ export default function AdminManagementPage() {
     return <EmptyState icon="🚫" title="Access Denied" subtitle="You don't have permission to view this page." />;
   }
 
-  const isLoading = tab === 'staff' ? staff.isLoading : teachers.isLoading;
+  // isPending (not isLoading) so a paused offline query with no data shows the skeleton, not an empty list.
+  const isPending = tab === 'staff' ? staff.isPending : teachers.isPending;
+  const activeQuery = tab === 'staff' ? staff : teachers;
+
+  // Row actions are shared by the table cell and the mobile card view.
+  const staffActions = (r) => (
+    <div className="rso-row-actions">
+      {canManageStaff && <Button variant="ghost" size="sm" onClick={() => setEditModal({ type: 'staff', row: r })}>Edit Role</Button>}
+      {canManageStaff && (
+        <Button variant={isStaffActive(r) ? 'danger' : 'ghost'} size="sm" onClick={() => handleToggleStaff(r)} disabled={isSelf(r)}>
+          {isStaffActive(r) ? 'Deactivate' : 'Reactivate'}
+        </Button>
+      )}
+    </div>
+  );
+
+  const teacherActions = (r) => {
+    const active = isTeacherActive(r);
+    const linked = isTeacherLinked(r);
+    return (
+      <div className="rso-row-actions">
+        <Button variant="ghost" size="sm" onClick={() => setEditModal({ type: 'teacher', row: r })}>Edit</Button>
+        <Button variant={active ? 'danger' : 'ghost'} size="sm" onClick={() => handleToggleTeacher(r)}>
+          {active ? 'Deactivate' : 'Reactivate'}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setLinkModal(r)}>
+          {linked ? 'Relink' : 'Link Auth'}
+        </Button>
+        {linked && <Button variant="ghost" size="sm" onClick={() => handleUnlink(r)}>Unlink</Button>}
+      </div>
+    );
+  };
 
   return (
     <div className="page-content">
@@ -132,10 +163,13 @@ export default function AdminManagementPage() {
         {search && <Button variant="ghost" size="sm" onClick={() => setSearch('')}>Clear</Button>}
       </Toolbar>
 
-      {isLoading ? <Skeleton variant="rows" rows={6} /> : tab === 'staff' ? (
+      {activeQuery.isError ? (
+        <ErrorBanner message={`Could not load ${tab === 'staff' ? 'staff' : 'teachers'}. ${activeQuery.error?.message || ''}`.trim()} onRetry={() => activeQuery.refetch()} />
+      ) : isPending ? <Skeleton variant="rows" rows={6} /> : tab === 'staff' ? (
         filteredStaff.length === 0 ? <EmptyState icon="📭" title="No staff" subtitle={search ? 'No records matched your search' : 'Add a record to get started'} /> : (
+          <>
           <div className="rso-table-wrap">
-            <table className="rso-table">
+            <table className="rso-table rso-table--sticky-actions">
               <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Active</th><th>Actions</th></tr></thead>
               <tbody>
                 {filteredStaff.map((r) => {
@@ -143,29 +177,41 @@ export default function AdminManagementPage() {
                   const elevated = ['superadmin', 'admin', 'pastor', 'principal', 'subgroup_admin'].includes(r.role);
                   return (
                     <tr key={r[staff.data.idKey] || r.id}>
-                      <td style={{ fontWeight: 600 }}>{r.full_name || '—'}</td>
+                      <td className="rso-cell-strong">{r.full_name || '—'}</td>
                       <td>{r.email}</td>
                       <td><Badge variant={elevated ? 'info' : 'neutral'}>{r.role}</Badge></td>
                       <td><Badge variant={active ? 'success' : 'neutral'}>{active ? 'Active' : 'Inactive'}</Badge></td>
-                      <td style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-                        {canManageStaff && <Button variant="ghost" size="sm" onClick={() => setEditModal({ type: 'staff', row: r })}>Edit Role</Button>}
-                        {canManageStaff && (
-                          <Button variant={active ? 'danger' : 'ghost'} size="sm" onClick={() => handleToggleStaff(r)} disabled={isSelf(r)}>
-                            {active ? 'Deactivate' : 'Reactivate'}
-                          </Button>
-                        )}
-                      </td>
+                      <td>{staffActions(r)}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
+          <div className="rso-table-cards">
+            {filteredStaff.map((r) => {
+              const active = isStaffActive(r);
+              const elevated = ['superadmin', 'admin', 'pastor', 'principal', 'subgroup_admin'].includes(r.role);
+              return (
+                <div className="rso-table-card" key={r[staff.data.idKey] || r.id}>
+                  <div className="rso-table-card-head">
+                    <span className="rso-table-card-title">{r.full_name || '—'}</span>
+                    <Badge variant={active ? 'success' : 'neutral'}>{active ? 'Active' : 'Inactive'}</Badge>
+                  </div>
+                  <div className="rso-table-card-row"><span className="rso-table-card-label">Email</span><span>{r.email}</span></div>
+                  <div className="rso-table-card-row"><span className="rso-table-card-label">Role</span><Badge variant={elevated ? 'info' : 'neutral'}>{r.role}</Badge></div>
+                  {staffActions(r)}
+                </div>
+              );
+            })}
+          </div>
+          </>
         )
       ) : (
         filteredTeachers.length === 0 ? <EmptyState icon="📭" title="No teachers" subtitle={search ? 'No records matched your search' : 'Add a record to get started'} /> : (
+          <>
           <div className="rso-table-wrap">
-            <table className="rso-table">
+            <table className="rso-table rso-table--sticky-actions">
               <thead><tr><th>Name</th><th>Email</th><th>Group</th><th>Subgroup</th><th>Active</th><th>Auth</th><th>Actions</th></tr></thead>
               <tbody>
                 {filteredTeachers.map((r) => {
@@ -174,28 +220,39 @@ export default function AdminManagementPage() {
                   const tid = r[teachers.data.idKey];
                   return (
                     <tr key={tid}>
-                      <td style={{ fontWeight: 600 }}>{r[teachers.data.nameKey] || r.full_name || '—'}</td>
+                      <td className="rso-cell-strong">{r[teachers.data.nameKey] || r.full_name || '—'}</td>
                       <td>{r.email}</td>
                       <td>{r.group_id || '—'}</td>
                       <td>{r.subgroup_id || '—'}</td>
                       <td><Badge variant={active ? 'success' : 'neutral'}>{active ? 'Active' : 'Inactive'}</Badge></td>
                       <td><Badge variant={linked ? 'info' : 'warning'}>{linked ? 'Linked' : 'Unlinked'}</Badge></td>
-                      <td style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-                        <Button variant="ghost" size="sm" onClick={() => setEditModal({ type: 'teacher', row: r })}>Edit</Button>
-                        <Button variant={active ? 'danger' : 'ghost'} size="sm" onClick={() => handleToggleTeacher(r)}>
-                          {active ? 'Deactivate' : 'Reactivate'}
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setLinkModal(r)}>
-                          {linked ? 'Relink' : 'Link Auth'}
-                        </Button>
-                        {linked && <Button variant="ghost" size="sm" onClick={() => handleUnlink(r)}>Unlink</Button>}
-                      </td>
+                      <td>{teacherActions(r)}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
+          <div className="rso-table-cards">
+            {filteredTeachers.map((r) => {
+              const active = isTeacherActive(r);
+              const linked = isTeacherLinked(r);
+              return (
+                <div className="rso-table-card" key={r[teachers.data.idKey]}>
+                  <div className="rso-table-card-head">
+                    <span className="rso-table-card-title">{r[teachers.data.nameKey] || r.full_name || '—'}</span>
+                    <Badge variant={active ? 'success' : 'neutral'}>{active ? 'Active' : 'Inactive'}</Badge>
+                  </div>
+                  <div className="rso-table-card-row"><span className="rso-table-card-label">Email</span><span>{r.email}</span></div>
+                  <div className="rso-table-card-row"><span className="rso-table-card-label">Group</span><span>{r.group_id || '—'}</span></div>
+                  <div className="rso-table-card-row"><span className="rso-table-card-label">Subgroup</span><span>{r.subgroup_id || '—'}</span></div>
+                  <div className="rso-table-card-row"><span className="rso-table-card-label">Auth</span><Badge variant={linked ? 'info' : 'warning'}>{linked ? 'Linked' : 'Unlinked'}</Badge></div>
+                  {teacherActions(r)}
+                </div>
+              );
+            })}
+          </div>
+          </>
         )
       )}
 
@@ -296,7 +353,7 @@ function StaffModal({ row, roleOptions, isSelf, onClose, onSave, saving }) {
           </select>
         </label>
         {!row && <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>To create a brand-new staff account, use “Add Staff” — it provisions the login for you. This form only edits an existing profile.</p>}
-        {isSelf && <p style={{ fontSize: 'var(--fs-xs)', color: '#b91c1c' }}>You cannot demote or deactivate yourself.</p>}
+        {isSelf && <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--color-danger)' }}>You cannot demote or deactivate yourself.</p>}
       </div>
     </Modal>
   );
@@ -427,7 +484,7 @@ function CreateStaffModal({ roleOptions, onClose, onCreate, onError, creating })
               <input className="rso-input" type={showPassword ? 'text' : 'password'} value={values.temp_password} onChange={(e) => set('temp_password', e.target.value)} style={{ flex: 1 }} required />
               <Button variant="ghost" size="sm" onClick={() => setShowPassword((s) => !s)}>{showPassword ? 'Hide' : 'Show'}</Button>
             </div>
-            {values.temp_password && !passwordValid && <span style={{ fontSize: 'var(--fs-xs)', color: '#b91c1c' }}>Must be 8–72 characters.</span>}
+            {values.temp_password && !passwordValid && <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--color-danger)' }}>Must be 8–72 characters.</span>}
           </label>
           <label className="rso-field"><span>Role</span>
             <select className="rso-select" value={values.role} onChange={(e) => set('role', e.target.value)}>

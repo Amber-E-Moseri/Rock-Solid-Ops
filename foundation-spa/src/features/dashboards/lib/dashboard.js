@@ -1,4 +1,5 @@
 import { supabase } from '../../../supabase.js';
+import { MOODLE_RETRY_CERTIFIED, MOODLE_RETRY_HOLD_MESSAGE } from '../../../releaseHolds.js';
 
 // ── Scope resolution ────────────────────────────────────────────────────────
 
@@ -31,22 +32,27 @@ export async function fetchBatches() {
     .order('created_at', { ascending: false })
     .limit(30);
 
+  // A failed count read is unknown (null), not zero students.
   let countsByBatch = {};
+  let countsFailed = false;
   try {
-    const { data: counts } = await supabase
+    const { data: counts, error: countsError } = await supabase
       .from('students')
       .select('batch_id')
       .eq('status', 'Active');
+    if (countsError) countsFailed = true;
     (counts || []).forEach((r) => {
       const k = r.batch_id || '';
       countsByBatch[k] = (countsByBatch[k] || 0) + 1;
     });
-  } catch {}
+  } catch {
+    countsFailed = true;
+  }
 
   return (data || []).map((b) => ({
     ...b,
     displayName: b.name || b.batch_name || b.batch_id,
-    studentCount: countsByBatch[b.batch_id] || 0,
+    studentCount: countsFailed ? null : (countsByBatch[b.batch_id] || 0),
   }));
 }
 
@@ -145,7 +151,8 @@ async function fetchCapacity(params) {
 
 async function fetchStaleQueue(params) {
   const { data, error } = await supabase.rpc('get_stale_queue_items', params);
-  if (error) return { count: 0 };
+  // A failed query is unknown (null), not a count of zero.
+  if (error) return null;
   return { count: Number(data?.[0]?.cnt || 0) };
 }
 
@@ -217,19 +224,23 @@ async function fetchDuplicateSummary(batchId) {
     .limit(200);
   if (batchId) query = query.eq('batch_id', batchId);
   const { data, error } = await query;
-  if (error) return { count: 0, newestDate: null };
+  // A failed query is unknown (count null), not a count of zero.
+  if (error) return { count: null, newestDate: null };
   const rows = data || [];
   return { count: rows.length, newestDate: rows[0]?.created_at || null };
 }
 
+// "Active" teachers follow the lifecycle column, teachers.status = 'ACTIVE', the same definition as the admin
+// portal and teacher management. The tracked schema has no verified certification field, so no "certified"
+// count is produced. A failed query is unknown (null), not zero.
 async function fetchTeacherKpis(batchId) {
-  const [a, b] = await Promise.all([
-    supabase.rpc('get_active_certified_teachers_count'),
+  const [active, teaching] = await Promise.all([
+    supabase.from('teachers').select('teacher_id', { count: 'exact', head: true }).eq('status', 'ACTIVE'),
     supabase.rpc('get_currently_teaching_count', { p_batch_id: batchId || null }),
   ]);
   return {
-    activeCertified: Number(a?.data?.[0]?.count ?? a?.data ?? 0),
-    currentlyTeaching: Number(b?.data?.[0]?.count ?? b?.data ?? 0),
+    activeTeachers: active.error ? null : (active.count ?? 0),
+    currentlyTeaching: teaching.error ? null : Number(teaching.data?.[0]?.count ?? teaching.data ?? 0),
   };
 }
 
@@ -262,20 +273,26 @@ async function fetchActivityFeed() {
 // ── Retry action ────────────────────────────────────────────────────────────
 
 export async function retryAllFailedMoodleSyncs() {
+  // Held: the endpoint and authorization contract are unverified, so no request is sent.
+  if (!MOODLE_RETRY_CERTIFIED) throw new Error(MOODLE_RETRY_HOLD_MESSAGE);
   const { data: sess } = await supabase.auth.getSession();
   const token = sess?.session?.access_token;
-  const { data: failedRows } = await supabase
+  const { data: failedRows, error } = await supabase
     .from('moodle_enrollment_sync')
     .select('id')
     .in('sync_status', ['FAILED', 'RETRYING'])
     .limit(100);
+  if (error) throw error;
+  let failed = 0;
   for (const row of (failedRows || [])) {
-    await fetch(`${window.location.origin}/functions/v1/moodle-sync`, {
+    const res = await fetch(`${window.location.origin}/functions/v1/moodle-sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify({ id: row.id, limit: 1 }),
     });
+    if (!res.ok) failed += 1;
   }
+  if (failed > 0) throw new Error(`${failed} Moodle sync retr${failed === 1 ? 'y' : 'ies'} failed`);
 }
 
 // ── CSV export ──────────────────────────────────────────────────────────────

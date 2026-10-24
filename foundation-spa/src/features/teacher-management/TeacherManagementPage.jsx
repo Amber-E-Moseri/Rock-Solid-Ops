@@ -5,9 +5,16 @@ import { useAuth } from '../../hooks/useAuth.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { PageHeader, Toolbar, SearchInput, Skeleton, EmptyState, Badge, Button, Modal, ErrorBanner } from '../../components/ui/index.js';
 
+function statusTone(status) {
+  if (status === 'ACTIVE') return 'active';
+  if (status === 'PENDING') return 'pending';
+  if (status === 'SUSPENDED') return 'warning';
+  return 'inactive';
+}
+
 export default function TeacherManagementPage() {
   const { profile } = useAuth();
-  const { addToast } = useToast();
+  const addToast = useToast();
   const qc = useQueryClient();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin';
 
@@ -20,7 +27,7 @@ export default function TeacherManagementPage() {
   const [linkModal, setLinkModal] = useState(null);
   const [unlinkModal, setUnlinkModal] = useState(null);
 
-  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['teacher-mgmt'], queryFn: fetchTeachers, staleTime: 60_000 });
+  const { data, isPending, isError, refetch } = useQuery({ queryKey: ['teacher-mgmt'], queryFn: fetchTeachers, staleTime: 60_000 });
   const teachers = data?.teachers ?? [];
   const classMap = data?.classMap ?? new Map();
 
@@ -88,25 +95,29 @@ export default function TeacherManagementPage() {
         <input className="rso-input" placeholder="Subgroup" value={subgroup} onChange={(e) => setSubgroup(e.target.value)} />
       </Toolbar>
 
-      <p style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '0.5rem' }}>{filtered.length} teachers</p>
+      {/* No count while loading or after a failed query: "0 teachers" would read as a successful empty result. */}
+      {!isPending && !isError && (
+        <p style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '0.5rem' }}>{filtered.length} teachers</p>
+      )}
 
-      {isLoading ? <Skeleton variant="rows" rows={6} /> : isError ? (
+      {isPending ? <Skeleton variant="rows" rows={6} /> : isError ? (
         <ErrorBanner message="Could not load teachers." onRetry={refetch} />
       ) : filtered.length === 0 ? (
         <EmptyState icon="📭" title="No teachers" subtitle={search ? 'No records matched your search' : 'No teachers in this status'} />
       ) : (
+        <>
         <div className="rso-table-wrap">
-          <table className="rso-table">
+          <table className="rso-table rso-table--sticky-actions">
             <thead><tr><th>Name</th><th>Email</th><th>Fellowship</th><th>Subgroup</th><th>Status</th><th>Class</th><th>Created</th><th>Actions</th></tr></thead>
             <tbody>
               {filtered.map((t) => (
                 <tr key={t.teacher_id}>
-                  <td style={{ fontWeight: 600 }}>{t.full_name}</td>
+                  <td className="rso-cell-strong">{t.full_name}</td>
                   <td>{t.email}</td>
                   <td>{t.fellowship_code || t.group_id || '—'}</td>
                   <td>{t.subgroup_id || '—'}</td>
-                  <td><Badge status={t.status === 'ACTIVE' ? 'active' : t.status === 'PENDING' ? 'pending' : t.status === 'SUSPENDED' ? 'warning' : 'inactive'}>{t.status}</Badge></td>
-                  <td style={{ fontSize: '11px', color: 'var(--muted)' }}>{classMap.get(t.teacher_id) || '—'}</td>
+                  <td><Badge status={statusTone(t.status)}>{t.status}</Badge></td>
+                  <td className="rso-cell-meta">{classMap.get(t.teacher_id) || '—'}</td>
                   <td>{fmtDate(t.created_at)}</td>
                   <td>{statusActions(t)}</td>
                 </tr>
@@ -114,6 +125,23 @@ export default function TeacherManagementPage() {
             </tbody>
           </table>
         </div>
+        <div className="rso-table-cards">
+          {filtered.map((t) => (
+            <div className="rso-table-card" key={t.teacher_id}>
+              <div className="rso-table-card-head">
+                <span className="rso-table-card-title">{t.full_name}</span>
+                <Badge status={statusTone(t.status)}>{t.status}</Badge>
+              </div>
+              <div className="rso-table-card-row"><span className="rso-table-card-label">Email</span><span>{t.email}</span></div>
+              <div className="rso-table-card-row"><span className="rso-table-card-label">Fellowship</span><span>{t.fellowship_code || t.group_id || '—'}</span></div>
+              <div className="rso-table-card-row"><span className="rso-table-card-label">Subgroup</span><span>{t.subgroup_id || '—'}</span></div>
+              <div className="rso-table-card-row"><span className="rso-table-card-label">Class</span><span className="rso-cell-meta">{classMap.get(t.teacher_id) || '—'}</span></div>
+              <div className="rso-table-card-row"><span className="rso-table-card-label">Created</span><span>{fmtDate(t.created_at)}</span></div>
+              <div className="rso-row-actions">{statusActions(t)}</div>
+            </div>
+          ))}
+        </div>
+        </>
       )}
 
       {/* Action reason modal */}

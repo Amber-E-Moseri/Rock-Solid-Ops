@@ -7,7 +7,7 @@ import { PageHeader, Toolbar, SearchInput, Skeleton, EmptyState, Badge, Button, 
 
 export default function FellowshipManagementPage() {
   const { profile } = useAuth();
-  const { addToast } = useToast();
+  const addToast = useToast();
   const qc = useQueryClient();
 
   const [search, setSearch] = useState('');

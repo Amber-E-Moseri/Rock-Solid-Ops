@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import ProtectedRoute from './components/layout/ProtectedRoute.jsx';
+import { useAuth } from './context/AuthContext.jsx';
+import { landingPathForRole } from './routing/routeRoles.js';
 import Shell from './components/layout/Shell.jsx';
 import { PWAInstallPrompt } from './components/pwa/PWAInstallPrompt.jsx';
 import { OfflineIndicator } from './components/pwa/OfflineIndicator.jsx';
@@ -74,6 +76,17 @@ function PageLoader() {
 
 function StaffShell({ title, children }) {
   return <Shell pageTitle={title}>{children}</Shell>;
+}
+
+// Role-aware landing for "/" and unknown paths. Teachers go to /teacher/index,
+// operational roles to /staff/dashboards. Roles with no landing see the login
+// screen with an unauthorized notice, not a redirect loop.
+function HomeRedirect() {
+  const { user, profile, loading } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/auth/login" replace />;
+  const landing = landingPathForRole(String(profile?.role ?? '').trim().toLowerCase());
+  return <Navigate to={landing ?? '/auth/login?error=unauthorized'} replace />;
 }
 
 export default function App() {
@@ -242,7 +255,7 @@ export default function App() {
               <Route
                 path="/teacher/attendance"
                 element={
-                  <ProtectedRoute roles={[...OPERATIONAL_ROLES, 'teacher']}>
+                  <ProtectedRoute roles={['teacher']}>
                     <StaffShell title="Teacher Attendance">
                       <TeacherAttendancePage />
                     </StaffShell>
@@ -559,8 +572,8 @@ export default function App() {
               />
 
               {/* Root redirect */}
-              <Route path="/" element={<Navigate to="/staff/dashboards" replace />} />
-              <Route path="*" element={<Navigate to="/staff/dashboards" replace />} />
+              <Route path="/" element={<HomeRedirect />} />
+              <Route path="*" element={<HomeRedirect />} />
             </Routes>
           </Suspense>
         </ToastProvider>

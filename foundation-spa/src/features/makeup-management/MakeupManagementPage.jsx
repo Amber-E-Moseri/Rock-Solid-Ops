@@ -9,7 +9,7 @@ const ADMIN_ROLES = ['admin', 'superadmin', 'principal', 'subgroup_admin', 'past
 
 export default function MakeupManagementPage() {
   const { profile } = useAuth();
-  const { addToast } = useToast();
+  const addToast = useToast();
   const isAdmin = ADMIN_ROLES.includes(profile?.role);
 
   const [batchId, setBatchId] = useState('');

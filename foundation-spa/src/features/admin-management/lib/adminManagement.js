@@ -1,6 +1,10 @@
 import { supabase } from '../../../supabase.js';
 
+// profiles is keyed by user_id (auth.users id) in the authoritative schema (202605060900_auth_rbac.sql).
+// It has no `id` column, so the authoritative projection goes first and the legacy `id` variants
+// remain only as fallbacks for older environments.
 const STAFF_PROJECTIONS = [
+  'user_id, full_name, email, role, is_active, created_at, updated_at',
   'id, user_id, full_name, email, role, is_active, active, created_at, updated_at',
   'id, full_name, email, role, is_active, active, created_at, updated_at',
   'id, full_name, email, role, active, created_at, updated_at',
@@ -15,7 +19,16 @@ const TEACHER_PROJECTIONS = [
   'teacher_id, full_name, email, group_id, subgroup_id, active, teacher_user_id',
 ];
 
+// Keep the first database error (the authoritative projection's) so the UI can show why the read failed.
+// Only PostgREST's message and code are surfaced: schema names, never row data.
+function describeDbError(table, error) {
+  if (!error) return `Could not read ${table}: no data returned`;
+  const msg = String(error.message || 'unknown database error').slice(0, 200);
+  return `${table}: ${msg}${error.code ? ` (${error.code})` : ''}`;
+}
+
 async function trySelect(table, projections) {
+  let firstError = null;
   for (const proj of projections) {
     const { data, error } = await supabase.from(table).select(proj).limit(4000);
     if (!error && data) {
@@ -23,8 +36,9 @@ async function trySelect(table, projections) {
       return { data, cols };
     }
     if (error?.code === '42P01') throw new Error(`Table "${table}" does not exist`);
+    firstError ??= error;
   }
-  throw new Error(`All projections failed for "${table}"`);
+  throw new Error(describeDbError(table, firstError));
 }
 
 export async function fetchStaff() {
