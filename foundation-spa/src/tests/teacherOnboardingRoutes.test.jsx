@@ -8,7 +8,7 @@ import { makeClient } from './teacherOnboardingHarness.js';
 const mock = vi.hoisted(() => ({ client: null }));
 vi.mock('../supabase.js', () => ({ get supabase() { return mock.client; } }));
 
-import { teacherOnboardingRoutes, TEACHER_ONBOARDING_PATHS, ResetPasswordRoute } from '../features/teacher-onboarding/routes.jsx';
+import { teacherOnboardingRoutes, forgotPasswordRoute, TEACHER_ONBOARDING_PATHS, ResetPasswordRoute } from '../features/teacher-onboarding/routes.jsx';
 import { AUTH_REDIRECT_PATHS } from '../features/teacher-onboarding/lib/redirects.js';
 
 function mountAt(path) {
@@ -17,6 +17,7 @@ function mountAt(path) {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         {teacherOnboardingRoutes}
+        {forgotPasswordRoute}
         <Route path="/auth/reset-password" element={<ResetPasswordRoute />} />
       </Routes>
     </MemoryRouter>
@@ -46,8 +47,13 @@ describe('teacher onboarding routes', () => {
   });
 
   it('exports the same route count as the integration document expects', () => {
-    expect(teacherOnboardingRoutes).toHaveLength(5);
+    expect(teacherOnboardingRoutes).toHaveLength(4);
     expect(teacherOnboardingRoutes.every((element) => element.type === Route)).toBe(true);
+  });
+
+  it('keeps forgot-password outside the onboarding gate, so it is registered exactly once', () => {
+    expect(teacherOnboardingRoutes.map((element) => element.props.path)).not.toContain(TEACHER_ONBOARDING_PATHS.forgotPassword);
+    expect(forgotPasswordRoute.props.path).toBe(TEACHER_ONBOARDING_PATHS.forgotPassword);
   });
 });
 

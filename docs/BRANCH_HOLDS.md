@@ -79,6 +79,24 @@ that keeps `/foundation/auth/login.html` live. Verify its status before the next
 Known limitation: the staging harness must refresh authentication after sign-out, because the sign-out test
 revokes the teacher session that later tests reuse.
 
+### `feature/teacher-onboarding-experience` — P2 candidate, HOLD: do not merge or deploy (2026-10-24)
+
+Local branch in worktree `../rso-teacher-onboarding-experience`, based on
+`origin/integration/teacher-onboarding-candidate` (`773eb69`). Not pushed. Not a PR.
+
+Holds that stay in force:
+
+- Teacher applications review route and nav item are registered but gated by `TEACHER_ONBOARDING_CERTIFIED`
+  (false). They stay invisible until PR #22 is deployed to staging and the hold is lifted by its owner.
+- Approve control is held disabled (`APPROVAL_CONTRACT_AVAILABLE = false` in
+  `src/features/teacher-applications/lib/reviewApi.js`). Release requires the P1 teacher-link contract.
+- Public account forms require a Turnstile site key in production (`VITE_TURNSTILE_SITE_KEY`), and Turnstile
+  CAPTCHA protection must be enabled and verified in Supabase Auth. The widget alone is not enforcement.
+- `TEACHER_ONBOARDING_CERTIFIED` stays `false`. The three existing release holds are unchanged.
+
+Release condition: PR #22 deployed to staging and verified; Supabase Auth CAPTCHA, redirect and rate-limit
+settings confirmed; recovery-link verification done in staging; P1 approval and activation contract certified.
+
 
 ### `integration/teacher-onboarding-candidate` (PR #23, stacked on PR #20) — HOLD on merge and launch (2026-10-24)
 
