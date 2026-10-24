@@ -421,7 +421,7 @@
       if (!display) return;
 
       if (state.selectedNexusUser) {
-        display.innerHTML = `<div class="selected-user">${esc(state.selectedNexusUser.name)} (${esc(state.selectedNexusUser.email)}) <span class="selected-user-remove" data-action="clear-user"></span></div>`;
+        display.innerHTML = `<div class="selected-user">${esc(state.selectedNexusUser.name)} (${esc(state.selectedNexusUser.email)}) <span class="selected-user-remove" data-action="clear-user"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18M6 6l12 12"/></svg></span></div>`;
         $("[data-action=clear-user]")?.addEventListener("click", () => {
           state.selectedNexusUser = null;
           $("userPickerInput").value = "";
