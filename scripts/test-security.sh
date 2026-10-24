@@ -52,8 +52,18 @@ deno run \
 NEXUS_EXIT=$?
 
 echo ""
-if [ $SECURITY_EXIT -ne 0 ] || [ $NEXUS_EXIT -ne 0 ]; then
-  echo "RESULT: FAIL (security=$SECURITY_EXIT nexus=$NEXUS_EXIT)"
+echo "========================================"
+echo "TEST:SECURITY — waitlist-processor and moodle-sync caller authorization"
+echo "========================================"
+deno run \
+  --allow-net \
+  --allow-env \
+  supabase/tests/security/function-auth-regression.ts
+AUTH_EXIT=$?
+
+echo ""
+if [ $SECURITY_EXIT -ne 0 ] || [ $NEXUS_EXIT -ne 0 ] || [ $AUTH_EXIT -ne 0 ]; then
+  echo "RESULT: FAIL (security=$SECURITY_EXIT nexus=$NEXUS_EXIT function-auth=$AUTH_EXIT)"
   exit 1
 fi
 echo "RESULT: ALL PASS"

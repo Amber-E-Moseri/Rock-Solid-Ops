@@ -47,6 +47,10 @@ jobs:
         # PR #21's validator for the legacy /foundation login redirect. Root tests/ is not run by test-unit.sh.
         run: node --test tests/safe-next.test.mjs
 
+      - name: Run legacy caller authorization test
+        # Legacy waitlist and system-health must send the session token to the authorization-enforced functions.
+        run: node --test tests/legacy-caller-auth.test.mjs
+
   # ──────────────────────────────────────────────────────────────
   # Job 2: Migration gate — db reset + schema invariant check.
   # Verifies the full migration chain replays cleanly from zero

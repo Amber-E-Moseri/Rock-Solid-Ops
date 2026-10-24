@@ -469,9 +469,13 @@
         $("runCheckBtn").disabled = true;
         showFlash("Running class availability check…");
         try {
+          // Processing is a staff action. Send the signed-in session token; the anon key is refused.
+          const { data: sess } = await supabase.auth.getSession();
+          const token = sess?.session?.access_token || "";
+          if (!token) { showFlash("Your session has expired. Sign in again.", "error"); return; }
           const res = await fetch(WAITLIST_FN, {
             method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${ANON_KEY}` },
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
             body: JSON.stringify({}),
           });
           const data = await res.json().catch(() => null);

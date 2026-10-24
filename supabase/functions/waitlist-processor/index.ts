@@ -2,6 +2,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse, safeLogAudit, withTimeout } from "../_shared/http.ts";
 import { buildClassAvailableDedupeKey, CANONICAL_TEMPLATE_KEY } from "./dedupe.ts";
 import { notifyProfilesPush, resolveStaffRecipients } from "../_shared/push-notify.ts";
+import { authorizeCaller, denialResponse, supabaseCallerDeps } from "../_shared/function-auth.ts";
+import { WAITLIST_PROCESS_ROLES } from "./auth-policy.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -215,6 +217,14 @@ async function notifyClassNowAvailable(slot: Slot, classInfo: ClassInfo, results
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  // Authorize before the body is read or any query or mutation runs. Service-role callers
+  // (registration-processor, database cron) pass; anonymous and non-staff callers are refused.
+  const decision = await authorizeCaller(
+    req.headers.get("Authorization"),
+    supabaseCallerDeps(sb, { serviceKey: SUPABASE_SERVICE, allowedRoles: WAITLIST_PROCESS_ROLES }),
+  );
+  if (!decision.ok) return denialResponse(decision, corsHeaders);
 
   try {
     const body = await req.json().catch(() => ({})) as {
