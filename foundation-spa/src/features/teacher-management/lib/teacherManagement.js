@@ -1,4 +1,5 @@
 import { supabase } from '../../../supabase.js';
+import { isTeacherActivationHeld, TEACHER_ACTIVATION_HOLD_MESSAGE } from '../../../releaseHolds.js';
 
 export const STATUS_TABS = ['PENDING', 'ACTIVE', 'SUSPENDED', 'INACTIVE', 'ALL'];
 
@@ -41,6 +42,8 @@ export function filterTeachers(teachers, { tab, search, group, subgroup }) {
 }
 
 export async function performAction(teacherId, action, reason, actorEmail, teacherUserId) {
+  // Fail closed before any browser-side write. Activation stays held until certified.
+  if (isTeacherActivationHeld(action)) throw new Error(TEACHER_ACTIVATION_HOLD_MESSAGE);
   const now = new Date().toISOString();
   const patches = {
     activate:   { status: 'ACTIVE', active: true, activated_at: now, activated_by: actorEmail, rejected_at: null, suspended_at: null, suspended_reason: null, updated_at: now },

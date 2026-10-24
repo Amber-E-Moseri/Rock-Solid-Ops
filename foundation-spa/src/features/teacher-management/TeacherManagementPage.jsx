@@ -4,6 +4,7 @@ import { fetchTeachers, filterTeachers, performAction, createTeacherDirect, link
 import { useAuth } from '../../hooks/useAuth.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { PageHeader, Toolbar, SearchInput, Skeleton, EmptyState, Badge, Button, Modal, ErrorBanner } from '../../components/ui/index.js';
+import { TEACHER_ACTIVATION_HELD, TEACHER_ACTIVATION_HOLD_MESSAGE } from '../../releaseHolds.js';
 
 function statusTone(status) {
   if (status === 'ACTIVE') return 'active';
@@ -59,7 +60,9 @@ export default function TeacherManagementPage() {
     const s = t.status;
     return (
       <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-        {(s === 'PENDING' || s === 'SUSPENDED' || s === 'INACTIVE') && <Button variant="success" size="sm" onClick={() => quickAction(t, 'activate')}>Approve</Button>}
+        {(s === 'PENDING' || s === 'SUSPENDED' || s === 'INACTIVE') && (
+          <Button variant="success" size="sm" onClick={() => quickAction(t, 'activate')} disabled={TEACHER_ACTIVATION_HELD} title={TEACHER_ACTIVATION_HELD ? TEACHER_ACTIVATION_HOLD_MESSAGE : undefined}>Approve</Button>
+        )}
         {s === 'PENDING' && <Button variant="danger" size="sm" onClick={() => quickAction(t, 'reject')}>Reject</Button>}
         {(s === 'ACTIVE' || s === 'INACTIVE') && <Button variant="ghost" size="sm" onClick={() => quickAction(t, 'suspend')}>Suspend</Button>}
         {(s === 'ACTIVE' || s === 'SUSPENDED') && <Button variant="danger" size="sm" onClick={() => quickAction(t, 'inactivate')}>Inactivate</Button>}

@@ -65,7 +65,8 @@ describe('performAction suspend uses the teacher lifecycle only', () => {
   });
 
   it('leaves availability alone for other actions', async () => {
-    await performAction('T-1', 'activate', '', 'admin@test.com', null);
+    // Activation is held (see teacherActivationHold.test.js), so use an unheld action here.
+    await performAction('T-1', 'inactivate', 'reason', 'admin@test.com', null);
     expect(writesTo('teacher_availability')).toHaveLength(0);
   });
 });
