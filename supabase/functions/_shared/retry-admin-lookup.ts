@@ -1,16 +1,13 @@
 // Admin lookup for retry-worker. Profiles are the authoritative source. The legacy admin_users table is
 // consulted only when no profiles row exists for the verified user.
 //
+// Manual retry and resolve are limited to admin and superadmin. This matches the Failed Sync Retry Center
+// route (SYSTEM_ADMIN in foundation-spa/src/routing/routeRoles.js), and any change here must change both.
+//
 // Every missing value, missing table, query error and unexpected shape denies access. No input other
 // than the verified user id and verified email is used, and never user_metadata or app_metadata.
 
-export const RETRY_ADMIN_ROLES: readonly string[] = Object.freeze([
-  "admin",
-  "superadmin",
-  "subgroup_admin",
-  "pastor",
-  "principal",
-]);
+export const RETRY_ADMIN_ROLES: readonly string[] = Object.freeze(["admin", "superadmin"]);
 
 const INACTIVE_LEGACY_STATUSES: readonly string[] = Object.freeze(["suspended", "inactive", "disabled"]);
 

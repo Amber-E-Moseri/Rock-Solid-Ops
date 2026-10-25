@@ -11,6 +11,14 @@ export const OPERATIONAL_ROLES = Object.freeze([...ADMIN_ROLES, 'regional_secret
 const OPERATIONAL_AND_TEACHER = Object.freeze([...OPERATIONAL_ROLES, 'teacher']);
 const SYSTEM_ADMIN = Object.freeze(['admin', 'superadmin']);
 
+// Manual retry and resolve of Failed Sync items. Must match RETRY_ADMIN_ROLES in
+// supabase/functions/_shared/retry-admin-lookup.ts, which is the backend gate.
+export const SYSTEM_ADMIN_ROLES = SYSTEM_ADMIN;
+
+export function canManualRetry(role) {
+  return SYSTEM_ADMIN.includes(String(role || '').trim().toLowerCase());
+}
+
 export const ROUTE_ACCESS = Object.freeze({
   // Overview
   '/staff/dashboards': OPERATIONAL_ROLES,
@@ -47,7 +55,7 @@ export const ROUTE_ACCESS = Object.freeze({
   '/staff/fellowship-management': SYSTEM_ADMIN,
   '/staff/teacher-applications': SYSTEM_ADMIN,
   '/staff/nexus-management': SYSTEM_ADMIN,
-  '/staff/failed-sync-retry-center': ADMIN_ROLES,
+  '/staff/failed-sync-retry-center': SYSTEM_ADMIN,
   '/staff/system-health': ADMIN_ROLES,
   '/staff/moodle-settings': ADMIN_ROLES,
 
