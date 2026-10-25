@@ -80,6 +80,20 @@ Known limitation: the staging harness must refresh authentication after sign-out
 revokes the teacher session that later tests reuse.
 
 
+### `feature/teacher-onboarding-foundation` — HOLD on merge and on any staging or production apply (2026-10-23)
+
+Status: local branch from `origin/main` (`3ab00a2`). Application foundation only: additive migrations, read views, lifecycle functions, email templates and an 83-check authorization harness. Not pushed. Draft PR permitted; merge not permitted.
+
+Hold conditions before merge:
+1. CI migration gate (`scripts/test-migration.sh`, `db reset` from zero) passes on the PR head. It could not be run locally.
+2. Owner resolves decisions D2 (auth-first), D3 (reviewer scope) and D4 (teacher profile role) in `docs/TEACHER_APPLICATION_FOUNDATION.md`.
+3. Read-only production checks in section 9 of that document are recorded in `docs/migration-log.md`.
+4. Merge order with PR #14 (`brief/anon-privilege-hardening`, timestamp `20261022120000`) is decided. This branch uses `20261023…`.
+
+Staging apply additionally requires the owner's approval of the RLS and grant changes, and a decision on `rocksolid-staging`.
+
+Approval and account linking are not part of this branch. They require the teacher-link contract to be verified deployed in production first.
+
 ## Resolved (moot — already merged)
 
 ### `brief/moodle-credential-safety` — RESOLVED 2026-07-23

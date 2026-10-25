@@ -147,3 +147,17 @@ notification-retry-helper — RETRY HELPER ONLY
   Used by Retry Center only
   Must not be given a cron schedule
 # sender-worker deleted 2026-05-18 — reconcile-stuck.sql archived in git history.
+
+# TEACHER APPLICATION STATUSES
+
+Source: `supabase/migrations/202610230100_teacher_applications_foundation.sql`. Transitions are enforced by `teacher_application_transition_allowed`.
+
+```
+SUBMITTED        applicant submitted (or resubmitted); awaiting review
+INFO_REQUESTED   reviewer asked for information; applicant may respond
+APPROVED         reserved: set only by the teacher-link contract (not yet wired)
+REJECTED         terminal; internal reason; re-application blocked pending owner decision
+WITHDRAWN        terminal; applicant withdrew; a new application may follow
+```
+
+Email template keys added for this flow: `teacher_application_received`, `teacher_application_info_requested`, `teacher_application_rejected`.
