@@ -334,14 +334,20 @@ async function resolveCourseId(db: ReturnType<typeof createClient>, row: Record<
 const ADMIN_PROFILE_ROLES = ["superadmin", "admin", "subgroup_admin", "pastor", "principal", "regional_secretary"];
 
 // Verifies a user bearer as an active admin profile. Read-only: auth lookup and one profile select.
-async function verifyAdminBearer(db: ReturnType<typeof createClient>, jwt: string) {
+// Narrow structural view of the client, so this helper does not depend on the untyped generic client.
+type AdminLookupClient = {
+  auth: { getUser: (jwt: string) => Promise<{ data: { user: { id: string; email?: string } | null }; error: unknown }> };
+  from: (table: string) => any;
+};
+
+async function verifyAdminBearer(db: AdminLookupClient, jwt: string) {
   const { data: userData, error: userErr } = await db.auth.getUser(jwt);
   if (userErr || !userData?.user) return null;
-  const { data: profile, error: profileErr } = await db
+  const { data: profile, error: profileErr } = (await db
     .from("profiles")
     .select("role,is_active")
     .eq("user_id", userData.user.id)
-    .maybeSingle();
+    .maybeSingle()) as { data: { role?: string; is_active?: boolean } | null; error: unknown };
   if (profileErr || !profile) return null;
   if (profile.is_active !== true) return null;
   if (!ADMIN_PROFILE_ROLES.includes(String(profile.role || ""))) return null;
