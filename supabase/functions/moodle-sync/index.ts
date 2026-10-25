@@ -15,6 +15,7 @@ import {
   safeLogAudit,
 } from "../_shared/http.ts";
 import { authorizeMoodleSyncCaller } from "../_shared/moodle-sync-auth.ts";
+import { withRequestOrigin } from "../_shared/request-origin.ts";
 
 type SyncStatus = "PENDING" | "PROCESSING" | "SYNCED" | "FAILED" | "RETRYING" | "SKIPPED" | "PERMANENTLY_FAILED";
 type MoodleFailureCode = "MOODLE_WAF_BLOCK" | "MOODLE_REST_DISABLED" | "MOODLE_PERMISSION_DENIED" | "MOODLE_403_UNKNOWN";
@@ -354,7 +355,25 @@ async function verifyAdminBearer(db: AdminLookupClient, jwt: string) {
   return { id: userData.user.id, email: userData.user.email };
 }
 
+// Preflight is answered before the body is read, before authorization, and before any database or Moodle call.
+// Every response, including authorization failures, gets the per-request origin header.
 Deno.serve(async (req) => {
+  const allowed = Deno.env.get("ALLOWED_ORIGINS") || "";
+  if (req.method === "OPTIONS") {
+    return withRequestOrigin(new Response("ok", { headers: corsHeaders }), req, allowed);
+  }
+  try {
+    return withRequestOrigin(await handleRequest(req), req, allowed);
+  } catch {
+    const failure = new Response(JSON.stringify({ ok: false, error: "Internal error" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+    return withRequestOrigin(failure, req, allowed);
+  }
+});
+
+async function handleRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
 
@@ -796,5 +815,5 @@ Deno.serve(async (req) => {
     const c = classifyError(error);
     return json({ ok: false, error: c.message, code: c.code }, c.statusCode);
   }
-});
+}
 
