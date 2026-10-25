@@ -31,12 +31,12 @@ Status categories:
 | Item | Note |
 |---|---|
 | PR #32 staging apply (A1) | Authorized. **No execution has been reported.** Staging only. A3 remains held. |
-| PR #35: attendance RLS containment | Draft, head `79baba8b`. Live application held. |
 
 ## Blocked pending certification or decision
 
 | Item | Blocker |
 |---|---|
+| PR #35: attendance RLS containment | Draft, head `d94ea44` (ledger previously listed `79baba8b`, an earlier commit). Migration `20261024130000` reserved for PR #35 after a collision check on 2026-10-25; Agent 4 confirmation pending. Preceded by PR #32 (`20261024120000`). Application gates, the pending atomic history procedure and separate staging and production approvals are in `docs/BRANCH_HOLDS.md`. No live application, history record or merge authorized. |
 | PR #29: legacy reset removal, Moodle hold cleanup | Draft, head `74d595bc`. Merge state DIRTY against the candidate. Needs rebase and reconciliation with the existing shared hold module. |
 | PR #32 A3 | Held. |
 | `202610220100` staging-history discrepancy | Recorded in production, not in staging. Columns present in both. Needs a separately approved reconciliation procedure. Not to be recorded or applied without it. |

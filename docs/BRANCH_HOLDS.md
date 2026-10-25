@@ -96,20 +96,35 @@ The separate open follow-up noted below was NOT re-verified and remains unaddres
 including duplicate emails with differing `moodle_user_id` values. That issue must not be
 silently dropped — it needs its own brief if picked up.
 
-### `brief/attendance-rls-containment` (PR #35, head `d94ea44`) — HOLD on staging and production application, and on merge (2026-10-25)
+### `brief/attendance-rls-containment` (PR #35, head `d94ea44`) — RESERVATION RECORDED; HOLD on staging and production application (2026-10-25)
 
-Status: owner accepted the containment design at `d94ea44` for review only. Do not apply, do not merge, do not deploy.
+Status: draft, not merged. Owner accepted the containment design at `d94ea44` for review. Do not apply, do not merge, do not deploy, do not record migration history.
 Scope: `supabase/migrations/20261024130000_attendance_rls_containment.sql` (attendance policies and grant hardening), its security regression test, `docs/ATTENDANCE_RLS_PRODUCTION_RUNBOOK.md`, and the production-shaped fixture under `supabase/tests/`.
 CI on `d94ea44`: Unit tests, Migration gate and Security regression passed. Netlify "Pages changed" is neutral.
+Note: `docs/RELEASE_LEDGER.md` recorded head `79baba8b`, which is an earlier commit on this branch. The current head is `d94ea44`.
 
-Hold conditions before any application:
-1. Version `20261024130000` reservation is recorded here and confirmed by Agent 4. Not yet confirmed. The containment session could not reach Agent 4.
-2. Owner accepts the grant-inclusive authorization matrix as the intended containment behavior. Not yet accepted.
-3. Owner accepts or rejects the production read loss: pastors and subgroup_admins lose `attendance_records` reads, and teachers lose reads on rows with a null `class_option_id`. Runbook §11 marks this as an owner decision.
-4. PR #32 (`20261024120000`, `brief/security-authz-audit-provenance`) is rebased onto current main and applied first. Applying `20261024130000` before it leaves the migration order broken. Runbook §2.
-5. The history-recording step (`supabase migration repair --status applied 20261024130000 --linked`) has its own approval, given as an exact command and version. The apply and the history row must not be separated by an unplanned gap. Runbook §4–§6.
-6. Staging and production each get a separate preflight, application window and postcheck (runbook §3, §5). The production preflight must match the 2026-10-24 captured state.
+Migration reservation:
+- Version `20261024130000` is reserved for PR #35 (`brief/attendance-rls-containment`).
+- Collision check on 2026-10-25 across all local and remote refs: the version appears only on this branch. No other branch, main, or open PR head carries a `20261024…` or later migration file that collides with it.
+- Preceding migration: `20261024120000_audit_provenance_guard.sql` (PR #32, `brief/security-authz-audit-provenance`, head `9b9b7046`). PR #32 has not been rebased in this step. Rebase is a gate, not done here.
 
-Distinct follow-up issues, not in this change: the production pastor/subgroup_admin attendance_log breadth (runbook §11), and the staging at-risk trigger defect (`count_consecutive_misses()` reads a non-existent column).
+Owner-accepted temporary permission changes (containment behavior, all in the migration):
+- No direct authenticated writes to `attendance_records`. Authenticated keeps SELECT only.
+- Pastor and subgroup_admin `attendance_records` reads are denied.
+- Teacher rows without a verifiable assigned `class_option_id` remain inaccessible to teachers.
+- Service-role operations are preserved. The migration does not change service-role grants.
+- Accepted operational disruption: pastor and subgroup_admin lose `attendance_records` reads; teachers lose reads on rows with a null `class_option_id`.
+
+Outstanding application gates (all must clear before any live application):
+1. Agent 4 confirmation of the reservation above, recorded here.
+2. PR #32 applied first (`20261024120000`), after its rebase onto current main and its own approval. Applying `20261024130000` before it breaks migration order. Runbook §2.
+3. The atomic history procedure is pending. The apply is one file in one transaction. Recording history (`supabase migration repair --status applied 20261024130000 --linked`) needs its own exact-command approval. No unplanned gap between apply and history repair. Runbook §4–§6.
+4. Separate live approvals for staging and for production. Each needs its own preflight, application window and postcheck (runbook §3, §5). The production preflight must match the 2026-10-24 captured state.
+5. The staging `202610220100` history discrepancy (recorded in production, not in staging) needs its own approved reconciliation first.
+
+Distinct follow-up issues, not in this change:
+- Staging at-risk defect: `count_consecutive_misses()` reads a non-existent column.
+- Production attendance_log role-scope concern: pastor and subgroup_admin have broad `attendance_log` access via `is_admin_like()` (runbook §11).
+
 Recovery: policy-only rollback in runbook §8. The grant hardening stays in place; restoring grants is a separate owner decision.
 No live application has occurred. Production verification was SELECT-only. The fixture result (44/44) is not evidence about live JWT or PostgREST behavior.
