@@ -5,7 +5,7 @@ import { AuthProvider } from './context/AuthContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import ProtectedRoute from './components/layout/ProtectedRoute.jsx';
 import { useAuth } from './context/AuthContext.jsx';
-import { landingPathForRole } from './routing/routeRoles.js';
+import { landingPathForRole, SYSTEM_ADMIN_ROLES } from './routing/routeRoles.js';
 import { teacherOnboardingRoutes, ResetPasswordRoute, forgotPasswordRoute } from './features/teacher-onboarding/routes.jsx';
 import { teacherApplicationsRoute } from './features/teacher-applications/routes.jsx';
 import { TEACHER_ONBOARDING_CERTIFIED } from './releaseHolds.js';
@@ -335,7 +335,7 @@ export default function App() {
               <Route
                 path="/staff/failed-sync-retry-center"
                 element={
-                  <ProtectedRoute roles={ADMIN_ROLES}>
+                  <ProtectedRoute roles={SYSTEM_ADMIN_ROLES}>
                     <StaffShell title="Failed Sync Retry Center">
                       <FailedSyncRetryCenterPage />
                     </StaffShell>
