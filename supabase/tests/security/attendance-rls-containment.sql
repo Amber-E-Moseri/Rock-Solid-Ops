@@ -175,14 +175,14 @@ $$;
 
 -- ---- 1. anonymous denial ----------------------------------------------------------
 
-select pg_temp.expect('anon reads zero attendance_records rows',
-  pg_temp.visible('anon', null, 'attendance_records') = 0);
-select pg_temp.expect('anon reads zero attendance_log rows',
-  pg_temp.visible('anon', null, 'attendance_log') = 0);
+select pg_temp.expect('anon reads zero attendance_records rows (denied or zero)',
+  pg_temp.exec_as('anon', null, 'select 1 from public.attendance_records') ~ '(ROWS:0|permission denied)');
+select pg_temp.expect('anon reads zero attendance_log rows (denied or zero)',
+  pg_temp.exec_as('anon', null, 'select 1 from public.attendance_log') ~ '(ROWS:0|permission denied)');
 select pg_temp.expect('anon insert into attendance_log is refused by RLS',
   pg_temp.exec_as('anon', null,
     $sql$insert into public.attendance_log (student_id, group_id, subgroup_id, class_option_id, class_number, class_date)
-         values ('ATT-S-1', 'ATT-G-1', 'ATT-SG-1', 'ATT-CO-A', '9', date '2026-10-02')$sql$) like '%row-level security%');
+         values ('ATT-S-1', 'ATT-G-1', 'ATT-SG-1', 'ATT-CO-A', '9', date '2026-10-02')$sql$) ~ '(row-level security|permission denied)');
 
 -- ---- 2. ordinary authenticated users: no cross-teacher access ----------------------
 
@@ -200,66 +200,66 @@ select pg_temp.expect('pending user reads zero attendance_log rows',
 select pg_temp.expect('pending user cannot insert attendance_records',
   pg_temp.exec_as('authenticated', :'uidPending',
     $sql$insert into public.attendance_records (student_id, class_option_id, class_number, class_date, status, attendance_type)
-         values ('ATT-S-1', 'ATT-CO-A', 7, date '2026-10-03', 'present', 'roster')$sql$) like '%row-level security%');
+         values ('ATT-S-1', 'ATT-CO-A', 7, date '2026-10-03', 'present', 'roster')$sql$) ~ '(row-level security|permission denied)');
 select pg_temp.expect('pending user cannot insert attendance_log',
   pg_temp.exec_as('authenticated', :'uidPending',
     $sql$insert into public.attendance_log (student_id, group_id, subgroup_id, class_option_id, class_number, class_date)
-         values ('ATT-S-1', 'ATT-G-1', 'ATT-SG-1', 'ATT-CO-A', '7', date '2026-10-03')$sql$) like '%row-level security%');
+         values ('ATT-S-1', 'ATT-G-1', 'ATT-SG-1', 'ATT-CO-A', '7', date '2026-10-03')$sql$) ~ '(row-level security|permission denied)');
 select pg_temp.expect('pending user updates zero attendance_records rows',
   pg_temp.exec_as('authenticated', :'uidPending',
-    $sql$update public.attendance_records set notes = 'tamper'$sql$) = 'ROWS:0');
+    $sql$update public.attendance_records set notes = 'tamper'$sql$) ~ '(ROWS:0|permission denied)');
 select pg_temp.expect('pending user updates zero attendance_log rows',
   pg_temp.exec_as('authenticated', :'uidPending',
-    $sql$update public.attendance_log set present = false$sql$) = 'ROWS:0');
+    $sql$update public.attendance_log set present = false$sql$) ~ '(ROWS:0|permission denied)');
 select pg_temp.expect('pending user deletes zero attendance_records rows',
   pg_temp.exec_as('authenticated', :'uidPending',
-    $sql$delete from public.attendance_records$sql$) = 'ROWS:0');
+    $sql$delete from public.attendance_records$sql$) ~ '(ROWS:0|permission denied)');
 
 -- ---- 3. assigned teacher: permitted access retained, other classes refused ----------
 
-select pg_temp.expect('teacher A may insert attendance_records for own class',
+select pg_temp.expect('teacher A direct insert into attendance_records is denied (owner decision: writes are service-role only)',
   pg_temp.exec_as('authenticated', :'uidA',
     $sql$insert into public.attendance_records (student_id, class_option_id, class_number, class_date, status, attendance_type)
-         values ('ATT-S-1', 'ATT-CO-A', 2, date '2026-10-08', 'present', 'roster')$sql$) = 'ROWS:1');
+         values ('ATT-S-1', 'ATT-CO-A', 2, date '2026-10-08', 'present', 'roster')$sql$) ~ '(row-level security|permission denied)');
 select pg_temp.expect('teacher A may NOT insert attendance_records for teacher B class',
   pg_temp.exec_as('authenticated', :'uidA',
     $sql$insert into public.attendance_records (student_id, class_option_id, class_number, class_date, status, attendance_type)
-         values ('ATT-S-2', 'ATT-CO-B', 2, date '2026-10-08', 'present', 'roster')$sql$) like '%row-level security%');
+         values ('ATT-S-2', 'ATT-CO-B', 2, date '2026-10-08', 'present', 'roster')$sql$) ~ '(row-level security|permission denied)');
 select pg_temp.expect('teacher A updates zero attendance_records rows of teacher B',
   pg_temp.exec_as('authenticated', :'uidA',
-    $sql$update public.attendance_records set notes = 'x' where class_option_id = 'ATT-CO-B'$sql$) = 'ROWS:0');
+    $sql$update public.attendance_records set notes = 'x' where class_option_id = 'ATT-CO-B'$sql$) ~ '(ROWS:0|permission denied)');
 select pg_temp.expect('teacher A attendance_log write on own class is admitted by RLS',
   pg_temp.rls_admitted(pg_temp.exec_as('authenticated', :'uidA',
     $sql$update public.attendance_log set present = true where class_option_id = 'ATT-CO-A'$sql$)));
 select pg_temp.expect('teacher A updates zero attendance_log rows of teacher B',
   pg_temp.exec_as('authenticated', :'uidA',
-    $sql$update public.attendance_log set present = false where class_option_id = 'ATT-CO-B'$sql$) = 'ROWS:0');
+    $sql$update public.attendance_log set present = false where class_option_id = 'ATT-CO-B'$sql$) ~ '(ROWS:0|permission denied)');
 
 -- ---- 4. admin / superadmin -------------------------------------------------------------
 
-select pg_temp.expect('admin reads all attendance_records (3 after teacher A insert)',
-  pg_temp.visible('authenticated', :'uidAdmin', 'attendance_records') = 3);
-select pg_temp.expect('superadmin reads all attendance_records (3)',
-  pg_temp.visible('authenticated', :'uidSuper', 'attendance_records') = 3);
+select pg_temp.expect('admin reads all attendance_records (2)',
+  pg_temp.visible('authenticated', :'uidAdmin', 'attendance_records') = 2);
+select pg_temp.expect('superadmin reads all attendance_records (2)',
+  pg_temp.visible('authenticated', :'uidSuper', 'attendance_records') = 2);
 select pg_temp.expect('admin reads all attendance_log (2)',
   pg_temp.visible('authenticated', :'uidAdmin', 'attendance_log') = 2);
-select pg_temp.expect('admin may update attendance_records',
+select pg_temp.expect('admin direct update of attendance_records is denied (owner decision)',
   pg_temp.exec_as('authenticated', :'uidAdmin',
-    $sql$update public.attendance_records set notes = 'admin note' where class_option_id = 'ATT-CO-B'$sql$) = 'ROWS:1');
+    $sql$update public.attendance_records set notes = 'admin note' where class_option_id = 'ATT-CO-B'$sql$) ~ '(ROWS:0|permission denied)');
 select pg_temp.expect('superadmin attendance_log write is admitted by RLS',
   pg_temp.rls_admitted(pg_temp.exec_as('authenticated', :'uidSuper',
     $sql$update public.attendance_log set made_up = false where class_option_id = 'ATT-CO-B'$sql$)));
 
 -- ---- 5. role matrix --------------------------------------------------------------------
 
-select pg_temp.expect('principal reads all attendance_records (3)',
-  pg_temp.visible('authenticated', :'uidPrincipal', 'attendance_records') = 3);
-select pg_temp.expect('regional_secretary reads all attendance_records (3)',
-  pg_temp.visible('authenticated', :'uidRegSec', 'attendance_records') = 3);
+select pg_temp.expect('principal reads all attendance_records (2)',
+  pg_temp.visible('authenticated', :'uidPrincipal', 'attendance_records') = 2);
+select pg_temp.expect('regional_secretary reads all attendance_records (2)',
+  pg_temp.visible('authenticated', :'uidRegSec', 'attendance_records') = 2);
 select pg_temp.expect('regional_secretary cannot insert attendance_records',
   pg_temp.exec_as('authenticated', :'uidRegSec',
     $sql$insert into public.attendance_records (student_id, class_option_id, class_number, class_date, status, attendance_type)
-         values ('ATT-S-1', 'ATT-CO-A', 5, date '2026-10-09', 'present', 'roster')$sql$) like '%row-level security%');
+         values ('ATT-S-1', 'ATT-CO-A', 5, date '2026-10-09', 'present', 'roster')$sql$) ~ '(row-level security|permission denied)');
 -- Pastor: scope is the existing pastor_select_subgroup policy. The fixture gives the pastor no
 -- teacher row, so that policy returns nothing. The containment must not widen it.
 select pg_temp.expect('pastor attendance_records read is not widened (0 without subgroup link)',
@@ -294,8 +294,8 @@ select pg_temp.expect('attendance_forms policy untouched',
 
 -- ---- 7. service role: not blocked by RLS; trigger inventory ----------------------------
 
-select pg_temp.expect('service_role reads all attendance_records (3, bypasses RLS)',
-  pg_temp.visible('service_role', null, 'attendance_records') = 3);
+select pg_temp.expect('service_role reads all attendance_records (2, bypasses RLS)',
+  pg_temp.visible('service_role', null, 'attendance_records') = 2);
 select pg_temp.expect('service_role attendance_log write is not refused by RLS (reaches the trigger)',
   pg_temp.rls_admitted(pg_temp.exec_as('service_role', null,
     $sql$insert into public.attendance_log (student_id, group_id, subgroup_id, class_option_id, class_number, class_date, present, made_up)

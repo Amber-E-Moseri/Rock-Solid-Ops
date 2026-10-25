@@ -37,7 +37,9 @@
 -- attendance_records read policy after this migration; attendance_admin_all on staging already gives
 -- every is_admin() role full attendance_log access, which is unchanged.
 --
--- Idempotent: DROP POLICY IF EXISTS and drop-before-create for each new policy.
+-- Grant hardening (section 5): anon loses all privileges on both tables; authenticated loses direct
+-- writes to attendance_records and DELETE/TRUNCATE/REFERENCES/TRIGGER on both tables. Re-running REVOKE is a no-op.
+-- Idempotent: DROP POLICY IF EXISTS, drop-before-create, and REVOKE.
 -- =============================================================================
 
 begin;
@@ -75,5 +77,16 @@ using (
 drop policy if exists attendance_log_staff_select on public.attendance_log;
 drop policy if exists attendance_log_staff_insert on public.attendance_log;
 drop policy if exists attendance_log_staff_update on public.attendance_log;
+
+-- 5) Grant hardening (minimal). RLS does not filter TRUNCATE, and REFERENCES/TRIGGER are never needed
+--    by a browser role. Service-role grants are not touched.
+--    anon: no privilege on either attendance table (RLS already denied every row; grants are now also closed).
+revoke all on public.attendance_records from anon;
+revoke all on public.attendance_log from anon;
+--    authenticated: attendance_records is read-only (writes are service-role only).
+revoke insert, update, delete, truncate, references, trigger on public.attendance_records from authenticated;
+--    authenticated: attendance_log keeps SELECT, INSERT and UPDATE (used by RLS-governed admin and
+--    assigned-teacher paths). DELETE, TRUNCATE, REFERENCES and TRIGGER are removed.
+revoke delete, truncate, references, trigger on public.attendance_log from authenticated;
 
 commit;
