@@ -14,7 +14,7 @@ Status categories:
 
 | Item | Evidence |
 |---|---|
-| PR #21: legacy login safe-next redirect fix | **PUBLISHED-VERIFIED.** Merged to `main` at `8510e818` (merge commit; second parent is the certified head `431c602e`). Main CI passed, including the executed 9/9 safe-next tests (run `40141619791`). Published to production as Netlify deploy `6add3ad6da6e5fd93e892bdf` (source `8510e818`). Owner decision: accepted as production deployed and verified for its approved security patch scope. Publication is locked to the new deploy. |
+| PR #21: legacy login safe-next redirect fix | **PUBLISHED-VERIFIED.** Merged to `main` at `8510e818` (merge commit; second parent is the certified head `431c602e`). Main CI passed, including the executed 9/9 safe-next tests (run `40141619791`). Published to production as Netlify deploy `6add3ad6da6e5fd93e892bdf` (source `8510e818`). Owner decision: accepted as production deployed and verified for its approved security patch scope. Publication is locked to the new deploy. Closeout accepted by the owner at ledger commit `155f987c`; not repeated. |
 
 Post-publication live checks for PR #21:
 - Production `/foundation/auth/login.html` is byte-identical to the `8510e818` file (MD5 match).
@@ -35,7 +35,7 @@ Post-publication live checks for PR #21:
 
 | Item | Status |
 |---|---|
-| PR #41: Moodle emergency containment | Draft, head `f080515a`. CI green at this head: Unit tests, Migration gate, Security regression, deploy preview. Not merged, not deployed. |
+| PR #41: Moodle emergency containment | Draft, approved source SHA `f080515acbc3f099872bc1bf2cd80cf992be43c6`. CI run `40154029085` passed on that SHA. Not merged. **Not deployed:** neither `moodle-sync` (v84) nor `retry-worker` (v48) has been deployed from this hotfix. Conditional deployment authorization exists, but deployment is **held** until the owner confirms through a secure method that the exact staff origin `https://rocksolidsuite.netlify.app` is in production `ALLOWED_ORIGINS`. The secret's presence was confirmed; its contents were not. Keep separate from PR #26 and PR #29. |
 | PR #26: consolidated NEXT-release candidate | Draft, head `35a7ba48`, base `integration/teacher-onboarding-candidate`. CI green at prior check. **Pending updated certification at this head.** Not on `main`. |
 | PR #32: audit_logs privilege guard | Draft, head `9b9b7046`. Staging preflight and clone validation complete. Compatibility with both policy shapes confirmed. Not applied. |
 | PR #30: emoji cleanup | Draft, head `8d2146cd`. Not merged. |
@@ -44,18 +44,18 @@ Post-publication live checks for PR #21:
 
 | Item | Note |
 |---|---|
-| PR #32 staging apply (A1) | Authorized. **No execution has been reported.** Staging only. A3 remains held. |
-| PR #35: attendance RLS containment | Draft, head `79baba8b`. Live application held. |
+| PR #32 staging apply (A1) | Authorized. **Attempted, not executed:** the first `psql` attempt failed before connecting to staging. No migration was applied and no migration history changed. Staging only. A3 remains held. |
+| PR #35: attendance RLS containment | Draft, head `79baba8b`. **Grant-inclusive containment remains draft.** No live application is authorized. |
 
 ## Blocked pending certification or decision
 
 | Item | Blocker |
 |---|---|
-| PR #29: legacy reset removal, Moodle hold cleanup | Draft, head `74d595bc`. Merge state DIRTY against the candidate. Needs rebase and reconciliation with the existing shared hold module. |
+| PR #29: legacy reset removal, Moodle hold cleanup | Draft, head `74d595bc`. Merge state DIRTY against the candidate. Needs rebase and reconciliation with the existing shared hold module. **Do not merge as-is**, and keep separate from the PR #41 emergency Moodle patch. |
 | PR #32 A3 | Held. |
 | `202610220100` staging-history discrepancy | Recorded in production, not in staging. Columns present in both. Needs a separately approved reconciliation procedure. Not to be recorded or applied without it. |
 | Nexus C6 live round-trip certification | Outstanding. No live or staging round trip has been run. PR #2 open since 2026-09-25. |
-| Staging security remediation | No staging evidence recorded. |
+| Staging security remediation | Staging evidence exists for PR #32 preflight and clone validation only. No staging remediation has been applied, and the A1 attempt did not connect. |
 | Broader SPA authentication and feature-hold certification | Kept separate from PR #21. Attendance submit, availability approval and Moodle retry holds remain held. `ATTENDANCE_SUBMIT_CERTIFIED`, `APPROVAL_CERTIFIED`, `MOODLE_RETRY_CERTIFIED` are all `false`. |
 
 ## Unverified
@@ -65,12 +65,14 @@ Post-publication live checks for PR #21:
 | Preferred rollback for the current production SPA | Deploy `6adce108e6f2eaacb214b0f6`, per owner direction. Netlify deploy page showed it as "Published & locked" before the PR #21 publication. Pre-SPA deploy `6adb8d7d` (commit `3ab00a2`) is not the preferred rollback. |
 | PR #30 authenticated visual QA | Not done. |
 | Moodle retry server hold on `main` | Merged to the consolidated candidate (PR #28, `d5d6e71`), not to `main`. Equivalence to `main`'s `f2cf8c7` not checked. |
+| `ALLOWED_ORIGINS` membership for production `foundation-school` | Unverified. The secret is present, but its contents were not checked. Required staff origin `https://rocksolidsuite.netlify.app` must be confirmed through a secure method before PR #41 deployment. |
 | Legacy login password reset on `main` | `main` still sends an unprotected reset email from the legacy page. The hold is in PR #26, and the removal is in PR #29. Neither is on `main`. |
 
 ## Active security-release blockers
 
 1. PR #29 DIRTY against the candidate; rebase and reconcile with the shared hold module.
-2. PR #32 A3 held; A1 authorized but not executed.
+2. PR #32 A3 held; A1 authorized, first attempt failed before connecting, no migration applied.
+2a. PR #41 deployment held until the owner confirms the exact staff origin in production `ALLOWED_ORIGINS`. Neither function has been deployed from the hotfix.
 3. `202610220100` staging-history discrepancy needs an approved reconciliation procedure.
 4. Nexus C6 live round-trip certification outstanding.
 5. Staging security remediation: no staging evidence recorded.
