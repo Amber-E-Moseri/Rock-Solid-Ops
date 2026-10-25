@@ -17,7 +17,6 @@ import {
 } from "../_shared/moodle-retry-hold.ts";
 import { authorizeRetryRequest } from "../_shared/retry-authorization.ts";
 import { resolveRetryAdmin } from "../_shared/retry-admin-lookup.ts";
-import { buildEmailQueueRetryUpdate } from "../_shared/email-retry-payload.ts";
 
 // The scheduled sweep is unavailable. retry-worker has no verified scheduler-authentication contract,
 // so no request can be recognised as the scheduler. Enable only with a verified contract (see
@@ -244,7 +243,14 @@ async function applyRetry(
     }
     const { error } = await db
       .from("email_queue")
-      .update(buildEmailQueueRetryUpdate(row, now))
+      .update({
+        status: "Pending",
+        // email_queue has no last_error column. error_message is its only error field.
+        error_message: null,
+        retry_count: Number(row.retry_count || 0) + 1,
+        last_retry_at: now,
+        updated_at: now,
+      })
       .eq("id", id);
     if (error) throw error;
     return;
