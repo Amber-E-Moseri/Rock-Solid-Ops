@@ -103,7 +103,10 @@ Scope: `supabase/migrations/20261024130000_attendance_rls_containment.sql` (atte
 CI on `d94ea44`: Unit tests, Migration gate and Security regression passed. Netlify "Pages changed" is neutral.
 Note: `docs/RELEASE_LEDGER.md` recorded head `79baba8b`, which is an earlier commit on this branch. The current head is `d94ea44`.
 
-Migration reservation:
+Migration reservation: **OWNER CONFIRMED (2026-10-25).** Owner decision: APPROVED. Version `20261024130000` is formally reserved exclusively for PR #35.
+- Confirmed by the owner: no migration-version collisions across checked refs; PR #35 head `d94ea448`; PR #32 migration `20261024120000` must precede PR #35; existing owner-accepted attendance permission restrictions unchanged.
+- This approval reserves the migration number only. It does not authorize migration execution, production changes, database history repair, PR merge, or deployment.
+- PR #35 remains on HOLD until PR #32 is applied, the staging-history discrepancy is resolved, and a separately approved atomic application procedure is ready.
 - Version `20261024130000` is reserved for PR #35 (`brief/attendance-rls-containment`).
 - Collision check on 2026-10-25 across all local and remote refs: the version appears only on this branch. No other branch, main, or open PR head carries a `20261024…` or later migration file that collides with it.
 - Preceding migration: `20261024120000_audit_provenance_guard.sql` (PR #32, `brief/security-authz-audit-provenance`, head `9b9b7046`). PR #32 has not been rebased in this step. Rebase is a gate, not done here.
@@ -116,11 +119,18 @@ Owner-accepted temporary permission changes (containment behavior, all in the mi
 - Accepted operational disruption: pastor and subgroup_admin lose `attendance_records` reads; teachers lose reads on rows with a null `class_option_id`.
 
 Outstanding application gates (all must clear before any live application):
-1. Agent 4 confirmation of the reservation above, recorded here.
+1. Reservation confirmation: satisfied by the owner decision recorded above (2026-10-25). A separate Agent 4 confirmation has not been recorded; it is not required to hold the reservation, but the owner may still request it.
 2. PR #32 applied first (`20261024120000`), after its rebase onto current main and its own approval. Applying `20261024130000` before it breaks migration order. Runbook §2.
 3. The atomic history procedure is pending. The apply is one file in one transaction. Recording history (`supabase migration repair --status applied 20261024130000 --linked`) needs its own exact-command approval. No unplanned gap between apply and history repair. Runbook §4–§6.
 4. Separate live approvals for staging and for production. Each needs its own preflight, application window and postcheck (runbook §3, §5). The production preflight must match the 2026-10-24 captured state.
 5. The staging `202610220100` history discrepancy (recorded in production, not in staging) needs its own approved reconciliation first.
+
+Proposed single-transaction application-and-history plan (for separate review; NOT approved, NOT executed):
+- Replaces the two-step `psql -1 -f` apply followed by `supabase migration repair --status applied 20261024130000 --linked`. That two-step sequence is not to be executed.
+- Shape: one `psql -X -v ON_ERROR_STOP=1 -1` session containing the migration file body followed by a history insert into `supabase_migrations.schema_migrations` (version `20261024130000`, name `attendance_rls_containment`), so either both commit or neither does.
+- Reviewer items to settle before any approval: confirm the history row columns (`version`, `name`, `statements`) against the CLI's own writes; confirm the CLI accepts a row inserted this way; confirm the statements field content; confirm rollback behaviour if the history insert fails.
+- Preconditions: PR #32 (`20261024120000`) applied and recorded; `202610220100` staging discrepancy reconciled; exact target environment, window and preflight named per gate 4.
+- Status: prepared for review only. Gates 2–5 above still apply.
 
 Distinct follow-up issues, not in this change:
 - Staging at-risk defect: `count_consecutive_misses()` reads a non-existent column.
