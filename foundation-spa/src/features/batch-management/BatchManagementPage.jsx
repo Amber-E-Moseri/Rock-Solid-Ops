@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   fetchBatches, fetchFellowshipMap, fetchSubgroups, upsertBatch,
@@ -7,7 +7,24 @@ import {
 } from './lib/batchManagement.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useToast } from '../../context/ToastContext.jsx';
-import { PageHeader, Toolbar, SearchInput, Skeleton, EmptyState, Badge, Button, Modal, KpiGrid, Kpi } from '../../components/ui/index.js';
+import { PageHeader, SearchInput, Skeleton, EmptyState, Badge, Button, Modal } from '../../components/ui/index.js';
+import './batch-management.css';
+
+const PAGE_SIZE = 10;
+const TABS = [
+  { key: '', label: 'All' },
+  { key: 'Active', label: 'Active' },
+  { key: 'Upcoming', label: 'Upcoming' },
+  { key: 'Archived', label: 'Archived' },
+];
+
+const isArchivedStatus = (status) => ['archived', 'completed'].includes(String(status || '').toLowerCase());
+
+function matchesTab(batch, tab) {
+  if (!tab) return true;
+  if (tab === 'Archived') return isArchivedStatus(batch.status);
+  return String(batch.status || '').toLowerCase() === tab.toLowerCase();
+}
 
 export default function BatchManagementPage() {
   const { profile } = useAuth();
@@ -23,6 +40,9 @@ export default function BatchManagementPage() {
   const [rolloverModal, setRolloverModal] = useState(null);
   const [announceModal, setAnnounceModal] = useState(null);
   const [confirmModal, setConfirmModal] = useState(null);
+  const [tab, setTab] = useState('');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [openMenuId, setOpenMenuId] = useState(null);
 
   const { data, isLoading, refetch } = useQuery({ queryKey: ['batch-mgmt'], queryFn: fetchBatches, staleTime: 60_000 });
   const fellowships = useQuery({ queryKey: ['batch-fellowships'], queryFn: fetchFellowshipMap, staleTime: 5 * 60_000 });
@@ -33,16 +53,57 @@ export default function BatchManagementPage() {
   const moodleCourses = data?.moodleCourses ?? [];
 
   const filtered = useMemo(
-    () => filterBatches(batches, { search, status: statusFilter, fellowship: fellowshipFilter, sort }),
-    [batches, search, statusFilter, fellowshipFilter, sort],
+    () => filterBatches(batches.filter((b) => matchesTab(b, tab)), { search, status: statusFilter, fellowship: fellowshipFilter, sort }),
+    [batches, tab, search, statusFilter, fellowshipFilter, sort],
+  );
+  const visible = filtered.slice(0, visibleCount);
+
+  const tabCounts = useMemo(() => ({
+    '': batches.length,
+    Active: batches.filter((b) => matchesTab(b, 'Active')).length,
+    Upcoming: batches.filter((b) => matchesTab(b, 'Upcoming')).length,
+    Archived: batches.filter((b) => matchesTab(b, 'Archived')).length,
+  }), [batches]);
+
+  const fellowshipOptions = useMemo(
+    () => [...new Set(batches.map((b) => b.fellowship_group).filter(Boolean))].sort(),
+    [batches],
   );
 
-  const kpis = useMemo(() => ({
-    total: batches.length,
-    active: batches.filter((b) => b.status === 'Active').length,
-    upcoming: batches.filter((b) => b.status === 'Upcoming' || b.status === 'Draft').length,
-    openReg: batches.filter((b) => b.registration_open).length,
-  }), [batches]);
+  const campusByCode = useMemo(
+    () => new Map((fellowships.data ?? []).map((f) => [f.fellowship_code, f.campus_name])),
+    [fellowships.data],
+  );
+
+  const kpis = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const upcomingStarts = batches
+      .filter((b) => b.status === 'Upcoming' && b.start_date)
+      .map((b) => String(b.start_date).slice(0, 10))
+      .filter((d) => d >= today)
+      .sort();
+    const years = batches.map((b) => new Date(b.created_at).getFullYear()).filter(Number.isFinite);
+    return {
+      total: batches.length,
+      since: years.length ? Math.min(...years) : null,
+      active: batches.filter((b) => b.status === 'Active').length,
+      upcoming: batches.filter((b) => b.status === 'Upcoming').length,
+      nextStart: upcomingStarts[0] ? fmtMonthDay(upcomingStarts[0]) : null,
+      openReg: batches.filter((b) => b.registration_open).length,
+      campuses: new Set((fellowships.data ?? []).map((f) => f.campus_name).filter(Boolean)).size,
+    };
+  }, [batches, fellowships.data]);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [tab, search, statusFilter, fellowshipFilter, sort]);
+
+  useEffect(() => {
+    if (!openMenuId) return undefined;
+    const onPointerDown = (e) => { if (!e.target.closest('[data-menu]')) setOpenMenuId(null); };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [openMenuId]);
 
   const saveMut = useMutation({ mutationFn: upsertBatch, onSuccess: () => { refetch(); addToast('Saved', 'success'); }, onError: (e) => addToast(e.message, 'error') });
 
@@ -60,77 +121,174 @@ export default function BatchManagementPage() {
     setConfirmModal(null);
   }
 
+  function clearFilters() {
+    setSearch('');
+    setStatusFilter('');
+    setFellowshipFilter('');
+    setTab('');
+  }
+
+  // Row overflow menu. Entries and their permissions match the previous inline action buttons.
+  function menuItems(b) {
+    const status = String(b.status || '').toLowerCase();
+    const items = [
+      { label: 'Rollover', onSelect: () => setRolloverModal(b) },
+      { label: 'Announce', onSelect: () => setAnnounceModal(b) },
+    ];
+    if (isSuperadmin && (status === 'active' || status === 'upcoming')) {
+      items.push({ label: 'Close', danger: true, onSelect: () => setConfirmModal({ action: 'close', batch: b }) });
+    }
+    if (isArchivedStatus(status)) {
+      items.push({ label: 'Reopen', onSelect: () => setConfirmModal({ action: 'reopen', batch: b }) });
+    }
+    if (isSuperadmin) {
+      items.push({ label: 'Archive', onSelect: () => setConfirmModal({ action: 'archive', batch: b }) });
+      items.push({ label: 'Delete', danger: true, onSelect: () => setConfirmModal({ action: 'delete', batch: b }) });
+    }
+    return items;
+  }
+
   return (
-    <div className="page-content">
-      <PageHeader title="Batch Management" actions={
-        <>
-          <Button variant="primary" size="sm" onClick={() => setEditModal({ isNew: true })}>Create Batch</Button>
-          <Button variant="secondary" size="sm" onClick={refetch}>Refresh</Button>
-        </>
-      } />
+    <div className="page-content bm-page">
+      <PageHeader
+        title="Batch Management"
+        subtitle="Programme batches, campus registration and open classes."
+        actions={
+          <>
+            <Button variant="secondary" size="sm" onClick={refetch}>↺ Refresh</Button>
+            <Button variant="primary" size="sm" className="bm-btn-gold" onClick={() => setEditModal({ isNew: true })}>+ Create Batch</Button>
+          </>
+        }
+      />
 
-      <KpiGrid>
-        <Kpi label="Total Batches" value={kpis.total} />
-        <Kpi label="Active" value={kpis.active} />
-        <Kpi label="Upcoming" value={kpis.upcoming} />
-        <Kpi label="Open Registration" value={kpis.openReg} />
-      </KpiGrid>
-
-      <Toolbar>
-        <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search batches…" />
-        <select className="rso-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="">All statuses</option>
-          <option value="Draft">Draft</option><option value="Active">Active</option>
-          <option value="Archived">Archived</option><option value="Completed">Completed</option><option value="Upcoming">Upcoming</option>
-        </select>
-        <select className="rso-select" value={sort} onChange={(e) => setSort(e.target.value)}>
-          <option value="newest">Newest first</option><option value="oldest">Oldest first</option>
-        </select>
-        {(search || statusFilter || fellowshipFilter) && <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setStatusFilter(''); setFellowshipFilter(''); }}>Clear</Button>}
-      </Toolbar>
-
-      {isLoading ? <Skeleton variant="rows" rows={5} /> : filtered.length === 0 ? (
-        <EmptyState icon="📅" title="No batches" subtitle={search ? 'No batches matched your filters' : 'Create a batch to get started'} />
-      ) : (
-        <div className="rso-table-wrap">
-          <table className="rso-table">
-            <thead><tr><th>Batch</th><th>Fellowship</th><th>Subgroup</th><th>Dates</th><th>Capacity</th><th>Registered</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody>
-              {filtered.map((b) => (
-                <tr key={b.batch_id}>
-                  <td><div style={{ fontWeight: 600 }}>{b.batch_name || b.batch_id}</div><div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)' }}>{b.batch_id}</div></td>
-                  <td>{b.fellowship_group || '—'}</td>
-                  <td>{b.subgroup_id || b.subgroup || '—'}</td>
-                  <td style={{ fontSize: 'var(--fs-xs)' }}>{fmtDate(b.start_date)} — {fmtDate(b.end_date)}</td>
-                  <td>{b.capacity ?? '—'}</td>
-                  <td>{counts[b.batch_id] ?? 0}</td>
-                  <td><Badge status={b.status?.toLowerCase()}>{b.status}</Badge></td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '0.2rem', flexWrap: 'wrap' }}>
-                      <Button variant="ghost" size="sm" onClick={() => setEditModal({ isNew: false, batch: b })}>Edit</Button>
-                      <Button variant="ghost" size="sm" onClick={() => setRolloverModal(b)}>Rollover</Button>
-                      <Button variant="ghost" size="sm" onClick={() => setAnnounceModal(b)}>Announce</Button>
-                      {isSuperadmin && (b.status === 'Active' || b.status === 'Upcoming') && (
-                        <Button variant="danger" size="sm" onClick={() => setConfirmModal({ action: 'close', batch: b })}>Close</Button>
-                      )}
-                      {(b.status === 'Archived' || b.status === 'Completed') && (
-                        <Button variant="ghost" size="sm" onClick={() => setConfirmModal({ action: 'reopen', batch: b })}>Reopen</Button>
-                      )}
-                      {isSuperadmin && <Button variant="ghost" size="sm" onClick={() => setConfirmModal({ action: 'archive', batch: b })}>Archive</Button>}
-                      {isSuperadmin && <Button variant="danger" size="sm" onClick={() => setConfirmModal({ action: 'delete', batch: b })}>Delete</Button>}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="bm-kpis">
+        <div className="bm-kpi bm-kpi-primary">
+          <span className="bm-kpi-label">Total Batches</span>
+          <span className="bm-kpi-value">{kpis.total}</span>
+          <span className="bm-kpi-sub">{kpis.since ? `Since ${kpis.since}` : 'All time'}</span>
         </div>
-      )}
+        <div className="bm-kpi bm-kpi-ink">
+          <span className="bm-kpi-label">Active</span>
+          <span className="bm-kpi-value">{kpis.active}</span>
+          <span className="bm-kpi-sub">Running now</span>
+        </div>
+        <div className="bm-kpi bm-kpi-gold">
+          <span className="bm-kpi-label">Upcoming</span>
+          <span className="bm-kpi-value">{kpis.upcoming}</span>
+          <span className="bm-kpi-sub">{kpis.nextStart ? `Next: ${kpis.nextStart}` : 'None scheduled'}</span>
+        </div>
+        <div className="bm-kpi bm-kpi-rose">
+          <span className="bm-kpi-label">Open Registration</span>
+          <span className="bm-kpi-value">{kpis.openReg}</span>
+          <span className="bm-kpi-sub">Across {kpis.campuses} campus{kpis.campuses === 1 ? '' : 'es'}</span>
+        </div>
+      </div>
+
+      <section className="bm-card">
+        <div className="bm-tabs" role="tablist" aria-label="Batch status">
+          {TABS.map((t) => (
+            <button
+              key={t.key || 'all'}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.key}
+              className={`bm-tab${tab === t.key ? ' bm-tab-active' : ''}`}
+              onClick={() => setTab(t.key)}
+            >
+              {t.label}
+              <span className="bm-tab-count">{tabCounts[t.key]}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="bm-filters">
+          <div className="bm-search">
+            <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search batches…" />
+          </div>
+          <select className="rso-select" aria-label="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">Status: All</option>
+            <option value="Draft">Draft</option><option value="Active">Active</option>
+            <option value="Archived">Archived</option><option value="Completed">Completed</option><option value="Upcoming">Upcoming</option>
+          </select>
+          <select className="rso-select" aria-label="Fellowship" value={fellowshipFilter} onChange={(e) => setFellowshipFilter(e.target.value)}>
+            <option value="">Fellowship: All</option>
+            {fellowshipOptions.map((f) => <option key={f} value={f}>{f}</option>)}
+          </select>
+          <select className="rso-select" aria-label="Sort" value={sort} onChange={(e) => setSort(e.target.value)}>
+            <option value="newest">Newest first</option><option value="oldest">Oldest first</option>
+          </select>
+          {(search || statusFilter || fellowshipFilter || tab) && <Button variant="ghost" size="sm" onClick={clearFilters}>Clear</Button>}
+        </div>
+
+        {isLoading ? <Skeleton variant="rows" rows={5} /> : filtered.length === 0 ? (
+          <EmptyState icon="📅" title="No batches" subtitle={search || statusFilter || fellowshipFilter || tab ? 'No batches matched your filters' : 'Create a batch to get started'} />
+        ) : (
+          <div className="rso-table-wrap bm-table-wrap">
+            <table className="rso-table bm-table">
+              <thead><tr><th>Batch</th><th>Dates</th><th>Registered</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody>
+                {visible.map((b) => {
+                  const archived = isArchivedStatus(b.status);
+                  return (
+                    <tr key={b.batch_id}>
+                      <td>
+                        <div className="bm-batch-name">{b.batch_name || b.batch_id}</div>
+                        <div className="bm-batch-meta">{batchMeta(b, campusByCode)}</div>
+                      </td>
+                      <td className="bm-mono">{fmtShortDate(b.start_date)} → {fmtShortDate(b.end_date)}</td>
+                      <td className="bm-mono">{counts[b.batch_id] ?? 0} / {b.capacity ?? '—'}</td>
+                      <td><Badge status={b.status?.toLowerCase()}>{b.status}</Badge></td>
+                      <td>
+                        <div className="bm-actions">
+                          <Button
+                            variant={archived ? 'secondary' : 'primary'}
+                            size="sm"
+                            className={archived ? 'bm-btn-outline' : undefined}
+                            onClick={() => setEditModal({ isNew: false, batch: b })}
+                          >
+                            {archived ? 'View' : 'Edit'}
+                          </Button>
+                          <div className="bm-menu-wrap" data-menu>
+                            <button
+                              type="button"
+                              className="bm-menu-trigger"
+                              aria-label="More actions"
+                              aria-haspopup="menu"
+                              aria-expanded={openMenuId === b.batch_id}
+                              onClick={() => setOpenMenuId(openMenuId === b.batch_id ? null : b.batch_id)}
+                            >
+                              ⋯
+                            </button>
+                            {openMenuId === b.batch_id && (
+                              <div className="bm-menu" role="menu">
+                                {menuItems(b).map((item) => (
+                                  <button
+                                    key={item.label}
+                                    type="button"
+                                    role="menuitem"
+                                    className={`bm-menu-item${item.danger ? ' bm-menu-item-danger' : ''}`}
+                                    onClick={() => { setOpenMenuId(null); item.onSelect(); }}
+                                  >
+                                    {item.label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
       {/* Mobile cards (fallback for <640px) */}
       {!isLoading && filtered.length > 0 && (
         <div className="rso-table-cards">
-          {filtered.map((b) => (
+          {visible.map((b) => (
             <div key={b.batch_id} className="rso-table-card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
                 <div>
@@ -161,6 +319,16 @@ export default function BatchManagementPage() {
           ))}
         </div>
       )}
+
+        {!isLoading && filtered.length > 0 && (
+          <div className="bm-footer">
+            <span>Showing {visible.length} of {filtered.length} batches</span>
+            {visible.length < filtered.length && (
+              <Button variant="ghost" size="sm" onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}>Load more</Button>
+            )}
+          </div>
+        )}
+      </section>
 
       {/* Edit/Create Modal */}
       {editModal && (
@@ -217,6 +385,22 @@ export default function BatchManagementPage() {
       )}
     </div>
   );
+}
+
+// Dates are shown as MM-DD, matching the batch list layout.
+function fmtShortDate(value) {
+  return value ? String(value).slice(5, 10) : '—';
+}
+
+function fmtMonthDay(isoDate) {
+  return new Date(`${isoDate}T00:00:00`).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+}
+
+// Second line under the batch name: campus, fellowship and subgroup. Falls back to the batch id.
+function batchMeta(b, campusByCode) {
+  const campus = campusByCode.get(b.fellowship_group);
+  const parts = [campus, b.fellowship_group, b.subgroup_id || b.subgroup].filter(Boolean);
+  return parts.length ? parts.join(' · ') : b.batch_id;
 }
 
 function BatchModal({ batch, subgroups, moodleCourses, onClose, onSave, saving }) {
