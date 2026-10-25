@@ -245,8 +245,8 @@ async function applyRetry(
       .from("email_queue")
       .update({
         status: "Pending",
+        // email_queue has no last_error column. error_message is its only error field.
         error_message: null,
-        last_error: null,
         retry_count: Number(row.retry_count || 0) + 1,
         last_retry_at: now,
         updated_at: now,
