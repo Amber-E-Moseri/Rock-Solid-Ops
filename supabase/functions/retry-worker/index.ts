@@ -10,7 +10,7 @@ import {
   safeLogAudit,
 } from "../_shared/http.ts";
 import { authorizeRetryRequest } from "../_shared/retry-authorization.ts";
-import { resolveRetryAdmin } from "../_shared/retry-admin-lookup.ts";
+import { resolveRetryAdmin, type AdminDb } from "../_shared/retry-admin-lookup.ts";
 import { MOODLE_RETRY_HELD_CODE, planDirectRetry } from "../_shared/moodle-retry-hold.ts";
 
 // The hourly scheduled Moodle sweep is off. It would start live Moodle synchronization with no operator
@@ -374,7 +374,9 @@ Deno.serve(async (req) => {
         if (userErr || !userData?.user) return null;
         return { id: userData.user.id, email: userData.user.email };
       },
-      isAdmin: (user) => resolveRetryAdmin(serviceDb, user.id, user.email),
+      // The service client is structurally compatible with AdminDb at runtime; the cast only bridges the
+      // generic Supabase builder types, which resolveRetryAdmin does not use.
+      isAdmin: (user) => resolveRetryAdmin(serviceDb as unknown as AdminDb, user.id, user.email),
     });
     if (!authDecision.ok) {
       return json({ ok: false, error: authDecision.error, code: authDecision.code }, authDecision.status);

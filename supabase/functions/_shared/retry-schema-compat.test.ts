@@ -275,7 +275,7 @@ Deno.test("retry-worker reads class_options only through that single statement",
 
 Deno.test("retry-worker authorization no longer builds a PostgREST filter string", () => {
   assertEquals(workerSrc.includes(".or("), false);
-  assertStringIncludes(workerSrc, "resolveRetryAdmin(serviceDb, user.id, user.email)");
+  assertStringIncludes(workerSrc, "resolveRetryAdmin(serviceDb as unknown as AdminDb, user.id, user.email)");
 });
 
 // ── helper: scripted per call, for sequences that depend on the earlier result ──────────────────
