@@ -1,40 +1,56 @@
 # Release ledger
 
-Coordination record. Documentation only. Last updated 2026-10-25.
+Central documentation record. Documentation only. Last updated 2026-10-25.
 
-## Closeout: PR #37 (nine C1/C6 migration files, history-only)
+Status categories:
+- **MERGED-VERIFIED:** merged, and the merge or live state was checked.
+- **PREPARED:** prepared or certified, but not deployed or executed.
+- **AUTHORIZED-PENDING:** authorized, but execution not reported. An authorization is not proof of execution.
+- **BLOCKED:** blocked pending certification or a decision.
+- **UNVERIFIED:** not verified, or only partially verified.
 
-- Status: COMPLETE.
-- Merge SHA: `6e092a74883a97fba8099cdfbbc7f85b8b1208a5`, merge commit, parents `8510e818` (main before) and `1b6458ae` (PR head).
-- Scope: the nine migration files only, unchanged from `origin/integration/c6-edge-security`.
-- Main CI on the merge commit: Unit tests, Migration gate, Security regression all passed.
-- Database histories verified after merge (SELECT only):
-  - Staging (`hblahcaozlttknkzvkib`): 159 versions, latest `202610030004`.
-  - Production (`foundation-school`, `xelpsttqhrcqmttmjory`): 160 versions, latest `202610220100`.
-- No migration was recorded, replayed or applied. No `supabase db push`. No Edge Function deployment. No Netlify publication.
-- No further verification of these nine files unless new conflicting evidence arises.
+## Merged and verified
 
-## Unresolved history item
+| Item | Evidence |
+|---|---|
+| PR #37: nine C1/C6 migration files, history-only | Merged at `6e092a74883a97fba8099cdfbbc7f85b8b1208a5`. Main CI passed (Unit, Migration gate, Security regression). Staging history 159 versions, production 160, both unchanged after merge. |
+| PR #21: legacy login safe-next redirect fix | Merged to `main` at `8510e818`, under prior owner direction. Its CI and deploy preview passed before merge. |
+| PR #31: retry-worker fail-closed admin lookup | Merged to the integration candidate lineage at `53617310`, base `integration/consolidated-spa-release-candidate`. **Not on `main`.** |
 
-- `202610220100` (`repair_class_options_registration_columns`): recorded in production, not in staging. The two `class_options` columns exist in both.
-- Status: UNRESOLVED. Needs a separately approved reconciliation procedure. Not to be recorded or applied without that approval.
+## Prepared or certified, not deployed
 
-## Other merges on record
+| Item | Status |
+|---|---|
+| PR #41: Moodle emergency containment | Draft, head `f080515a`. CI green at this head: Unit tests, Migration gate, Security regression, deploy preview. Not merged, not deployed. |
+| PR #26: consolidated NEXT-release candidate | Draft, head `35a7ba48`, base `integration/teacher-onboarding-candidate`. CI green at prior check. **Pending updated certification at this head.** Not on `main`. |
+| PR #32: audit_logs privilege guard | Draft, head `9b9b7046`. Staging preflight and clone validation complete. Compatibility with both policy shapes confirmed. Not applied. |
+| PR #30: emoji cleanup | Draft, head `8d2146cd`. Not merged. |
 
-- PR #21 (legacy login safe-next redirect): merged to `main` at `8510e818`, under prior owner direction. Its Netlify publication is a separate release action.
+## Authorized, awaiting execution
 
-## Unresolved security-release gates
+| Item | Note |
+|---|---|
+| PR #32 staging apply (A1) | Authorized. **No execution has been reported.** Staging only. A3 remains held. |
+| PR #35: attendance RLS containment | Draft, head `79baba8b`. Live application held. |
 
-| Gate | State | Evidence / blocker |
-|---|---|---|
-| Legacy login: unprotected password-reset call on `main` | OPEN | `main` still sends `resetPasswordForEmail` from the legacy page. The hold is in PR #26 and the removal is in PR #29. Neither is on `main`. |
-| `audit_logs` privilege guard (PR #32) | OPEN, not applied anywhere | Production and staging both grant anon and authenticated write and TRUNCATE. Compatibility with both policy shapes confirmed. Staging-only apply, owner approval required (A1). |
-| Moodle retry server hold | NOT VERIFIED on `main` | Server-side hold merged to the consolidated candidate branch (PR #28, `d5d6e71`), not to `main`. Equivalence to `main`'s `f2cf8c7` not checked. |
-| PR #29 (legacy reset removal, Moodle hold cleanup) | BLOCKED | Merge state DIRTY (conflicts with the candidate). Needs rebase and reconciliation with the existing shared hold module. |
-| PR #31 (retry-worker fail-closed admin lookup) | PASS on its own CI | Fast-forward on candidate; not yet on `main`. |
-| PR #26 consolidated NEXT-release candidate | DRAFT | CI green. Not integrated into `main`. |
-| Staging security remediation | BLOCKED | No staging evidence recorded. |
-| Nexus C6 certification | BLOCKED | Live or staging Nexus round trip not run. PR #2 open since 2026-09-25. |
-| Attendance submit, availability approval, Moodle retry holds | HELD | `ATTENDANCE_SUBMIT_CERTIFIED`, `APPROVAL_CERTIFIED`, `MOODLE_RETRY_CERTIFIED` all `false`. |
-| Production deploy `6adce108` and rollback candidate | LOCKED | Owner-provided records. Rollback candidate `6adb8d7d` (commit `3ab00a2`). Not independently verified against live Netlify. |
-| PR #30 (emoji cleanup) | DRAFT | Pending remaining visual evidence. Not merged. |
+## Blocked pending certification or decision
+
+| Item | Blocker |
+|---|---|
+| PR #29: legacy reset removal, Moodle hold cleanup | Draft, head `74d595bc`. Merge state DIRTY against the candidate. Needs rebase and reconciliation with the existing shared hold module. |
+| PR #32 A3 | Held. |
+| `202610220100` staging-history discrepancy | Recorded in production, not in staging. Columns present in both. Needs a separately approved reconciliation procedure. Not to be recorded or applied without it. |
+| Nexus C6 live round-trip certification | Outstanding. No live or staging round trip has been run. PR #2 open since 2026-09-25. |
+| Staging security remediation | No staging evidence recorded. |
+| Attendance submit, availability approval, Moodle retry holds | Held. `ATTENDANCE_SUBMIT_CERTIFIED`, `APPROVAL_CERTIFIED`, `MOODLE_RETRY_CERTIFIED` are all `false`. |
+
+## Unverified
+
+| Item | Note |
+|---|---|
+| Production deploy `6adce108` | Locked. Owner-provided record. Not checked against live Netlify. |
+| Preferred rollback for the current production SPA | Deploy `6adce108`. Pre-SPA deploy `6adb8d7d` (commit `3ab00a2`) is not the preferred rollback. Owner-provided record. |
+| PR #30 authenticated visual QA | Not done. |
+| Moodle retry server hold on `main` | Merged to the consolidated candidate (PR #28, `d5d6e71`), not to `main`. Equivalence to `main`'s `f2cf8c7` not checked. |
+| Legacy login reset on `main` | `main` still sends an unprotected reset email from the legacy page. The hold is in PR #26, and the removal is in PR #29. Neither is on `main`. |
+| Production publication of PR #21 | Merged to `main`. Production publication is not confirmed. |
