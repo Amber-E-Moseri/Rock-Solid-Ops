@@ -82,7 +82,7 @@
               ${readOnly
                 ? `<button class="btn btn-xs" data-act="details" data-source="${esc(r.source)}" data-id="${esc(r.id)}">Details</button>`
                 : `<button class="btn btn-xs" data-act="retry" data-source="${esc(r.source)}" data-id="${esc(r.id)}">Retry</button>
-                   <button class="btn btn-xs" data-act="resolve" data-source="${esc(r.source)}" data-id="${esc(r.id)}">Resolve</button>
+                   ${r.source === "email_queue" ? "" : `<button class="btn btn-xs" data-act="resolve" data-source="${esc(r.source)}" data-id="${esc(r.id)}">Resolve</button>`}
                    <button class="btn btn-xs" data-act="details" data-source="${esc(r.source)}" data-id="${esc(r.id)}">Details</button>`}
             </div>
           </td>

@@ -17,6 +17,7 @@ import {
 } from "../_shared/moodle-retry-hold.ts";
 import { authorizeRetryRequest } from "../_shared/retry-authorization.ts";
 import { resolveRetryAdmin } from "../_shared/retry-admin-lookup.ts";
+import { EMAIL_RESOLVE_HELD_CODE, planResolve } from "../_shared/email-resolve-hold.ts";
 
 // The scheduled sweep is unavailable. retry-worker has no verified scheduler-authentication contract,
 // so no request can be recognised as the scheduler. Enable only with a verified contract (see
@@ -476,6 +477,20 @@ Deno.serve(async (req) => {
         { action, source, id, code: MOODLE_RETRY_HELD_CODE },
       );
       return json({ ok: false, error: "Moodle retry is on hold.", code: MOODLE_RETRY_HELD_CODE }, 409);
+    }
+
+    // email_queue has no Resolved status. Refuse before any write, and do not map to another status.
+    if (planResolve(action, source) === "refuse_held") {
+      await logAudit(
+        serviceDb,
+        actorEmail,
+        "EMAIL_RESOLVE_HELD",
+        source,
+        id,
+        "SKIPPED",
+        { action, source, id, code: EMAIL_RESOLVE_HELD_CODE },
+      );
+      return json({ ok: false, error: "Email Resolve is on hold.", code: EMAIL_RESOLVE_HELD_CODE }, 409);
     }
 
     if (action === "retry") {

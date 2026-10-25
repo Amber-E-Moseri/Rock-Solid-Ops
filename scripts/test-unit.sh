@@ -24,6 +24,7 @@ DENO_UNIT_TESTS=(
   "supabase/functions/_shared/retry-schema-compat.test.ts"
   "supabase/functions/_shared/retry-email-queue.test.ts"
   "supabase/functions/_shared/retry-release-config.test.ts"
+  "supabase/functions/_shared/email-resolve-hold.test.ts"
   "supabase/functions/admin-api/create-staff-direct.test.ts"
   "supabase/functions/admin-api/role-boundary-matrix.test.ts"
   "supabase/functions/teacher-portal-api/class-ownership.test.ts"

@@ -30,6 +30,19 @@ export function isMoodleRetryHeld(action, source, certified = MOODLE_RETRY_CERTI
   return MOODLE_RETRY_SOURCES.includes(String(source || '').trim());
 }
 
+// email_queue has no Resolved status: its status check allows Pending, Processing, Sent, Failed and Retried.
+// Resolve for email_queue is held until the release decides a status mapping. It is not mapped to Sent or
+// Retried. Retry for email_queue and Resolve for the other sources are not affected.
+export const EMAIL_QUEUE_RESOLVE_HELD = true;
+
+export const EMAIL_RESOLVE_HOLD_MESSAGE =
+  'Email Resolve is on hold: the email queue has no Resolved status yet. Retry is still available.';
+
+export function isEmailResolveHeld(action, source, held = EMAIL_QUEUE_RESOLVE_HELD) {
+  if (!held) return false;
+  return String(action || '').trim() === 'resolve' && String(source || '').trim() === 'email_queue';
+}
+
 // Teacher attendance and outcome submission write to the live roster. Keep this
 // false until the submit path is certified against the staging contract. While
 // false the teacher page disables Submit and Submit Outcomes, and the save
