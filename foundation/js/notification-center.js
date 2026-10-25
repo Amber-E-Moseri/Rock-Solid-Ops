@@ -54,6 +54,10 @@ const normalizeMoodleRows = (rows) => rows.map((r) => ({
 }));
 
 const invokeRetryWorker = async (action, source, id) => {
+  // Email Resolve is on hold: the email queue has no Resolved status yet. Retry is still available.
+  if (String(action || "").trim() === "resolve" && String(source || "").trim() === "email_queue") {
+    throw new Error("Email Resolve is on hold: the email queue has no Resolved status yet. Retry is still available.");
+  }
   const { data, error } = await supabase.functions.invoke("retry-worker", { body: { action, source, id } });
   if (error) throw error;
   if (!data?.ok) throw new Error(data?.error || "Retry worker failed");
@@ -114,7 +118,9 @@ const invokeRetryWorker = async (action, source, id) => {
       },
       bulk: async (action, rows) => {
         if (isRegionalSecretary) throw new Error("Regional Secretary has read-only access on this page.");
-        for (const row of rows) await invokeRetryWorker(action, row.source, row.id);
+        // Email rows are skipped for Resolve while that action is on hold.
+        const runnable = action === "resolve" ? rows.filter((r) => r.source !== "email_queue") : rows;
+        for (const row of runnable) await invokeRetryWorker(action, row.source, row.id);
       },
     },
     filters: { status: true, type: true, date: true, search: true },

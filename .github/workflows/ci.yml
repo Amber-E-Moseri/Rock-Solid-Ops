@@ -55,6 +55,10 @@ jobs:
         # Legacy /foundation auth: roles come only from the profiles row, and lookups fail closed.
         run: node --test tests/legacy-profile-trust.test.mjs
 
+      - name: Run legacy email Resolve hold test
+        # Legacy /foundation retry pages: email_queue Resolve is held, and Retry is unaffected.
+        run: node --test tests/legacy-email-resolve-hold.test.mjs
+
       - name: Run legacy login password-reset hold test
         # The legacy /foundation login must not send Auth reset requests while the hold is in force.
         run: node --test tests/legacy-login-recovery-hold.test.mjs
