@@ -76,3 +76,13 @@ Rollback-by-SQL is deliberately not provided. Restoring section 1 exposes the fi
 Run `supabase/tests/security/audit-logs-privilege-guard.sql` against the same database. All checks
 must pass. The only accepted deviation is an approved narrow grant from step 2, which must be
 listed in the migration log.
+
+## 5. Migration-history entry and reversal consequences (added 2026-10-24)
+
+The applied guard leaves a row `version 20261024120000, name audit_provenance_guard` in `supabase_migrations.schema_migrations`.
+
+- **Do not delete that row to "roll back".** Removing it makes the guard look unapplied. A later `supabase db push` would then try to re-apply `20261024120000`. The file is idempotent, so it would re-apply the guard, not reverse it, but the history would be misleading. History edits need a separately approved procedure.
+- **Reversing the guard is a security regression.** Restoring the pre-state re-grants `anon` and `authenticated` write privileges on `audit_logs`, restores the `FOR ALL` policies, and removes the provenance triggers. Do not do this on staging or production without a separate security decision recorded in `docs/migration-log.md`.
+- **Forward fix is the default.** Any correction is a new migration with a new version (not `20261024120000`, not reused), recorded in history by the normal path. This keeps the history a true record of what ran.
+- **Repair that needs the history row:** if a recovery step changes a guard object, record it as its own migration. Do not edit the `statements` text of the existing row.
+- **Drift check after any recovery:** compare the current `audit_logs` state with section 2 of this document, using the read-only checks in `supabase/ops/readonly_verify_2026-10-24.sql` (checks 7–10).
