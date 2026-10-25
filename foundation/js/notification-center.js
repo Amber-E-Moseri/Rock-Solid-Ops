@@ -89,7 +89,7 @@ const invokeRetryWorker = async (action, source, id) => {
   const mod = window.FSRetryTableModule?.initRetryTable({
     readOnly: isRegionalSecretary,
     sources: [
-      { id: "email_queue", label: "Email Queue", load: async () => normalizeEmailRows(await selectSafe("email_queue", (q) => q.select("id,recipient_email,template_key,subject,status,error_message,last_error,created_at,updated_at").order("created_at", { ascending: false }).limit(1000))) },
+      { id: "email_queue", label: "Email Queue", load: async () => normalizeEmailRows(await selectSafe("email_queue", (q) => q.select("id,recipient_email,template_key,subject,status,error_message,created_at,updated_at").order("created_at", { ascending: false }).limit(1000))) },
       { id: "scheduled_notifications", label: "Scheduled Notifications", load: async () => normalizeScheduledRows(await selectSafe("scheduled_notifications", (q) => q.select("id,recipient_email,event_type,template_key,status,error_message,last_error,created_at,updated_at,scheduled_for").order("created_at", { ascending: false }).limit(1000))) },
       { id: "failed_syncs", label: "Failed Syncs", load: async () => normalizeFailedSyncRows(await selectSafe("failed_syncs", (q) => q.select("id,sync_type,source_table,status,error_message,created_at,last_retry_at").order("created_at", { ascending: false }).limit(600))) },
       { id: "moodle_enrollment_sync", label: "Moodle Sync", load: async () => normalizeMoodleRows(await selectSafe("moodle_enrollment_sync", (q) => q.select("id,applicant_id,student_id,email,sync_status,error_message,last_error,error_code,last_attempt_at,updated_at,created_at,synced_at").order("updated_at", { ascending: false }).limit(600))) },
