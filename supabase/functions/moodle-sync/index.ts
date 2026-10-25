@@ -14,6 +14,7 @@ import {
   isValidString,
   safeLogAudit,
 } from "../_shared/http.ts";
+import { authorizeMoodleSyncCaller } from "../_shared/moodle-sync-auth.ts";
 
 type SyncStatus = "PENDING" | "PROCESSING" | "SYNCED" | "FAILED" | "RETRYING" | "SKIPPED" | "PERMANENTLY_FAILED";
 type MoodleFailureCode = "MOODLE_WAF_BLOCK" | "MOODLE_REST_DISABLED" | "MOODLE_PERMISSION_DENIED" | "MOODLE_403_UNKNOWN";
@@ -329,6 +330,30 @@ async function resolveCourseId(db: ReturnType<typeof createClient>, row: Record<
   return "";
 }
 
+// Staff roles that may run the connectivity test. Mirrors public.is_admin() (migration 202605220030).
+const ADMIN_PROFILE_ROLES = ["superadmin", "admin", "subgroup_admin", "pastor", "principal", "regional_secretary"];
+
+// Verifies a user bearer as an active admin profile. Read-only: auth lookup and one profile select.
+// Narrow structural view of the client, so this helper does not depend on the untyped generic client.
+type AdminLookupClient = {
+  auth: { getUser: (jwt: string) => Promise<{ data: { user: { id: string; email?: string } | null }; error: unknown }> };
+  from: (table: string) => any;
+};
+
+async function verifyAdminBearer(db: AdminLookupClient, jwt: string) {
+  const { data: userData, error: userErr } = await db.auth.getUser(jwt);
+  if (userErr || !userData?.user) return null;
+  const { data: profile, error: profileErr } = (await db
+    .from("profiles")
+    .select("role,is_active")
+    .eq("user_id", userData.user.id)
+    .maybeSingle()) as { data: { role?: string; is_active?: boolean } | null; error: unknown };
+  if (profileErr || !profile) return null;
+  if (profile.is_active !== true) return null;
+  if (!ADMIN_PROFILE_ROLES.includes(String(profile.role || ""))) return null;
+  return { id: userData.user.id, email: userData.user.email };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ ok: false, error: "Method not allowed" }, 405);
@@ -345,6 +370,17 @@ Deno.serve(async (req) => {
 
     const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
     const payload = await req.json().catch(() => ({}));
+
+    // Authorize before any database write and before any Moodle request. Reading the body is not a side effect.
+    const authDecision = await authorizeMoodleSyncCaller({
+      authHeader: req.headers.get("Authorization"),
+      serviceKey: SERVICE_KEY,
+      allowAdminJwt: String(payload?.action || "").trim() === "test",
+      verifyAdmin: (jwt) => verifyAdminBearer(db, jwt),
+    });
+    if (!authDecision.ok) {
+      return json({ ok: false, error: authDecision.error, code: authDecision.code }, authDecision.status);
+    }
 
     // Recovery: reset rows stuck in PROCESSING for more than 30 minutes.
     const processingStaleBeforeIso = new Date(Date.now() - (30 * 60 * 1000)).toISOString();
@@ -491,6 +527,19 @@ Deno.serve(async (req) => {
       }
 
       const nowIso = new Date().toISOString();
+      // Atomic claim: only a row still in a claimable state moves to PROCESSING. A row another run has
+      // already claimed, or that is no longer claimable, returns no id, and this run skips it.
+      const { data: claimed, error: claimError } = await db
+        .from("moodle_enrollment_sync")
+        .update({ sync_status: "PROCESSING", sync_attempts: Number(row.sync_attempts || 0) + 1, last_attempt_at: nowIso, updated_at: nowIso })
+        .eq("id", id)
+        .in("sync_status", ["PENDING", "RETRYING", "FAILED"])
+        .select("id");
+      if (claimError) throw claimError;
+      if (!Array.isArray(claimed) || claimed.length === 0) {
+        summary.skipped += 1;
+        continue;
+      }
       await patchSyncRow(db, id, {
         sync_status: "PROCESSING",
         sync_attempts: Number(row.sync_attempts || 0) + 1,
