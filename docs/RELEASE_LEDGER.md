@@ -5,7 +5,7 @@ Central documentation record. Documentation only. Last updated 2026-10-25.
 Status categories:
 - **MERGED-VERIFIED:** merged, and the merge or live state was checked.
 - **PUBLISHED-VERIFIED:** merged, published to production, and verified live after publication.
-- **DEPLOYED — VERIFICATION PENDING:** deployed to production, but post-deployment certification is not yet complete.
+- **DEPLOYED — VERIFICATION PENDING:** deployed to production, but post-deployment certification is not yet complete or is only partial.
 - **PREPARED:** prepared or certified, but not deployed or executed.
 - **AUTHORIZED-PENDING:** authorized, but execution not reported. An authorization is not proof of execution.
 - **BLOCKED:** blocked pending certification or a decision.
@@ -15,7 +15,7 @@ Status categories:
 
 | Item | Evidence |
 |---|---|
-| PR #21: legacy login safe-next redirect fix | **PUBLISHED-VERIFIED.** Merged to `main` at `8510e818` (merge commit; second parent is the certified head `431c602e`). Main CI passed, including the executed 9/9 safe-next tests (run `40141619791`). Published to production as Netlify deploy `6add3ad6da6e5fd93e892bdf` (source `8510e818`). Owner decision: accepted as production deployed and verified for its approved security patch scope. Publication is locked to the new deploy. Closeout accepted by the owner at ledger commit `155f987c`; not repeated. **Remains closed.** |
+| PR #21: legacy login safe-next redirect fix | **PUBLISHED-VERIFIED.** Merged to `main` at `8510e818` (merge commit; second parent is the certified head `431c602e`). Main CI passed, including the executed 9/9 safe-next tests (run `40141619791`). Published to production as Netlify deploy `6add3ad6da6e5fd93e892bdf` (source `8510e818`). Owner decision: accepted as production deployed and verified for its approved security patch scope. Publication is locked to the new deploy. Closeout accepted by the owner at ledger commit `155f987c`; not repeated. **Remains closed and complete.** |
 
 Post-publication live checks for PR #21:
 - Production `/foundation/auth/login.html` is byte-identical to the `8510e818` file (MD5 match).
@@ -29,14 +29,19 @@ Post-publication live checks for PR #21:
 
 | Item | Evidence |
 |---|---|
-| PR #41: Moodle emergency containment | **DEPLOYED — VERIFICATION PENDING.** Owner-confirmed: `moodle-sync` and `retry-worker` were both successfully deployed to production Supabase project `xelpsttqhrcqmttmjory` (`foundation-school`). Deployment used `--use-api` and `--no-verify-jwt`. The checkout was clean at source SHA `f080515acbc3f099872bc1bf2cd80cf992be43c6`. The versions recorded earlier were `moodle-sync` v84 and `retry-worker` v48; the deployed version numbers have not been re-verified. **PR #41 remains unmerged (draft).** Production post-deployment certification is pending. |
+| PR #41: Moodle emergency containment | **DEPLOYED — VERIFICATION PENDING (partially certified).** Both production functions are deployed to Supabase project `xelpsttqhrcqmttmjory` (`foundation-school`). Latest reported versions: `moodle-sync` **v87** and `retry-worker` **v51**, both ACTIVE. Deployed from a clean checkout at source SHA `f080515acbc3f099872bc1bf2cd80cf992be43c6` using `--use-api` and `--no-verify-jwt`. `verify_jwt=false` is confirmed for both. **PR #41 remains unmerged (draft).** |
 
-Outstanding PR #41 checks:
-- **CORS:** `ALLOWED_ORIGINS` was not successfully updated in the earlier attempt. CORS compatibility for both production domains remains unresolved.
-- **Secret-update permission failure:** the earlier `ALLOWED_ORIGINS` secret update failed with a permission error. The secret's contents have not been checked.
-- **Function versions:** confirm the deployed `moodle-sync` and `retry-worker` versions match the source at `f080515a`.
-- **Authorization:** confirm the functions verify the caller's authorization in code, since they were deployed with `--no-verify-jwt`.
-- **JWT configuration:** confirm the platform JWT setting on each function matches the intended configuration after deployment.
+PR #41 certification to date:
+- **ALLOWED_ORIGINS:** successfully updated. Digest `9d1a40fb…`. This supersedes the earlier permission failure.
+- **retry-worker CORS:** both production origins pass. The unauthorized control origin is rejected.
+- **retry-worker auth:** requests with a missing bearer token and with an invalid bearer token are rejected.
+- **moodle-sync browser CORS:** **fails.** It needs a separate reviewed patch. This is not resolved by the deployment.
+
+PR #41 open items:
+- **Deployed artifact identity:** not verified. Confirm the live functions were built from `f080515a`.
+- **Unexpected version increments:** the earlier recorded versions were `moodle-sync` v84 and `retry-worker` v48. The latest reported versions are v87 and v51. The reason for the increments is not established and remains unresolved.
+- **moodle-sync browser CORS:** needs a separate reviewed patch before it can pass.
+- **Merge:** PR #41 must remain unmerged until these items are resolved and the owner decides on merge.
 
 ## Merged and verified
 
@@ -51,7 +56,7 @@ Outstanding PR #41 checks:
 |---|---|
 | PR #26: consolidated NEXT-release candidate | Draft, head `35a7ba48`, base `integration/teacher-onboarding-candidate`. CI green at prior check. **Pending updated certification at this head.** Not on `main`. |
 | PR #32: audit_logs privilege guard | Draft, head `9b9b7046`. Staging preflight and clone validation complete. Compatibility with both policy shapes confirmed. Not applied. |
-| PR #30: emoji cleanup | Draft, head `8d2146cd`. Not merged. |
+| PR #30: emoji cleanup | Draft, head `8d2146cd`. **Automated checks passing. Authenticated visual certification HOLD.** Not merged. |
 
 ## Authorized, awaiting execution
 
@@ -76,17 +81,22 @@ Outstanding PR #41 checks:
 | Item | Note |
 |---|---|
 | Preferred rollback for the current production SPA | Deploy `6adce108e6f2eaacb214b0f6`, per owner direction. Netlify deploy page showed it as "Published & locked" before the PR #21 publication. Pre-SPA deploy `6adb8d7d` (commit `3ab00a2`) is not the preferred rollback. |
-| PR #30 authenticated visual QA | Not done. |
+| PR #30 authenticated visual certification | **HOLD.** Automated checks pass at `8d2146c`. Authenticated visual certification has not been completed. |
 | Moodle retry server hold on `main` | Merged to the consolidated candidate (PR #28, `d5d6e71`), not to `main`. Equivalence to `main`'s `f2cf8c7` not checked. |
-| `ALLOWED_ORIGINS` membership for production `foundation-school` | **Not updated.** The earlier secret update failed with a permission error. CORS compatibility for both production domains is unresolved. The required staff origin `https://rocksolidsuite.netlify.app` must be confirmed through a secure method before CORS can be treated as compatible. |
+| `ALLOWED_ORIGINS` for production `foundation-school` | **Updated successfully**, digest `9d1a40fb…`. The secret's contents were not re-read in this ledger. |
 | Legacy login password reset on `main` | `main` still sends an unprotected reset email from the legacy page. The hold is in PR #26, and the removal is in PR #29. Neither is on `main`. |
 
 ## Active security-release blockers
 
-1. PR #29 DIRTY against the candidate; rebase and reconcile with the shared hold module.
-2. PR #32 A3 held; A1 authorized, first attempt failed before connecting, no migration applied.
-3. PR #41 post-deployment verification pending: CORS for both production domains (`ALLOWED_ORIGINS` not updated, earlier secret-update permission failure), function versions, authorization in code, and JWT configuration.
-4. `202610220100` staging-history discrepancy needs an approved reconciliation procedure.
-5. Nexus C6 live round-trip certification outstanding.
-6. Staging security remediation: no staging evidence recorded beyond PR #32 preflight.
-7. Legacy login password reset: unprotected on `main` until PR #26 or PR #29 lands.
+1. **PR #41:** partially certified. Open items:
+   - `moodle-sync` browser CORS fails; needs a separate reviewed patch.
+   - Deployed artifact identity not verified.
+   - Unexpected version increments (v84→v87, v48→v51) unresolved.
+   - Remains unmerged.
+2. PR #29 DIRTY against the candidate; rebase and reconcile with the shared hold module.
+3. PR #32 A3 held; A1 authorized, first attempt failed before connecting, no migration applied.
+4. PR #30: automated checks passing; authenticated visual certification on HOLD.
+5. `202610220100` staging-history discrepancy needs an approved reconciliation procedure.
+6. Nexus C6 live round-trip certification outstanding.
+7. Staging security remediation: no staging evidence recorded beyond PR #32 preflight.
+8. Legacy login password reset: unprotected on `main` until PR #26 or PR #29 lands.
