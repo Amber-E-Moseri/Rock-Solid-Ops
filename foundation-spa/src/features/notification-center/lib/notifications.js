@@ -50,7 +50,7 @@ const normalizeMoodle = (r) => ({
 
 export async function fetchAllNotifications() {
   const [emails, scheduled, failedSyncs, moodle] = await Promise.all([
-    selectSafe('email_queue', (q) => q.select('id,recipient_email,template_key,subject,status,error_message,last_error,created_at,updated_at').order('created_at', { ascending: false }).limit(1000)),
+    selectSafe('email_queue', (q) => q.select('id,recipient_email,template_key,subject,status,error_message,created_at,updated_at').order('created_at', { ascending: false }).limit(1000)),
     selectSafe('scheduled_notifications', (q) => q.select('id,recipient_email,event_type,template_key,status,error_message,last_error,created_at,updated_at,scheduled_for').order('created_at', { ascending: false }).limit(1000)),
     selectSafe('failed_syncs', (q) => q.select('id,sync_type,source_table,status,error_message,created_at,last_retry_at').order('created_at', { ascending: false }).limit(600)),
     selectSafe('moodle_enrollment_sync', (q) => q.select('id,applicant_id,student_id,email,sync_status,error_message,last_error,error_code,last_attempt_at,updated_at,created_at,synced_at').order('updated_at', { ascending: false }).limit(600)),
