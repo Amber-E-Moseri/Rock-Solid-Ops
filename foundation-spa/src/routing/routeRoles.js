@@ -32,6 +32,8 @@ export const ROUTE_ACCESS = Object.freeze({
 
   // Comms
   '/staff/help-guide': OPERATIONAL_AND_TEACHER,
+  // Access request review. Admin and principal are not listed: they have no approval authority here.
+  '/staff/access-requests': Object.freeze(['superadmin', 'regional_secretary', 'pastor', 'subgroup_admin']),
   '/staff/messages': OPERATIONAL_AND_TEACHER,
   '/staff/notification-center': SYSTEM_ADMIN,
   '/staff/email-campaigns': Object.freeze(['superadmin', 'admin']),
