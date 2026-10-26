@@ -249,6 +249,64 @@ Deno.test("retry-worker: resolve for a non-Moodle, non-email source is unaffecte
   assertEquals(state.moodleCalls, []);
 });
 
+// ---------- moodle-sync: stale PROCESSING rows and the connectivity test ----------
+
+// Seeds the database, then calls the handler without the per-test reset, so the stale rows are visible to it.
+async function callSeeded(body: unknown, auth: string, rows: Array<Record<string, any>>) {
+  state = freshState();
+  (globalThis as any).__fakeState = state;
+  state.tables.moodle_enrollment_sync = rows;
+  const res = await moodleSync(req("moodle", body, auth));
+  return { status: res.status, json: (await res.json().catch(() => ({}))) as any };
+}
+
+const STALE = "2020-01-01T00:00:00.000Z";
+const staleRows = () => [
+  { id: "p-1", sync_status: "PROCESSING", updated_at: STALE },
+  { id: "p-2", sync_status: "PROCESSING", updated_at: STALE },
+];
+// Anything other than a read: the reads that authorization and the test action legitimately make.
+const writes = () => state.log.filter((e) => !e.startsWith("select:") && !e.startsWith("auth."));
+
+Deno.test("moodle-sync test action with stale PROCESSING rows: zero database writes, no reset audit", async () => {
+  const r = await callSeeded({ action: "test" }, "Bearer jwt-admin", staleRows());
+  assertEquals(r.status, 200);
+  assertEquals(r.json.ok, true);
+  assertEquals(writes(), [], "the connectivity test must not write, reset, audit or process");
+  assert(!state.log.includes("insert:audit_logs"), "no MOODLE_SYNC_STUCK_RESET audit");
+  assertEquals(state.tables.moodle_enrollment_sync.map((x) => x.sync_status), ["PROCESSING", "PROCESSING"]);
+  assertEquals(state.moodleCalls, ["core_webservice_get_site_info"], "only the read-only connectivity request");
+});
+
+Deno.test("moodle-sync test action by service role with stale rows: still zero writes", async () => {
+  const r = await callSeeded({ action: "test" }, `Bearer ${SVC}`, staleRows());
+  assertEquals(r.status, 200);
+  assertEquals(writes(), []);
+  assertEquals(state.moodleCalls, ["core_webservice_get_site_info"]);
+});
+
+Deno.test("moodle-sync test action with a non-admin profile and stale rows: denied, zero writes", async () => {
+  const r = await callSeeded({ action: "test" }, "Bearer jwt-teacher", staleRows());
+  assertEquals([r.status, r.json.code], [401, "INVALID_SESSION"]);
+  assertEquals(writes(), []);
+  assertEquals(state.moodleCalls, []);
+});
+
+Deno.test("moodle-sync processing with an admin JWT and stale rows: refused, zero writes", async () => {
+  const r = await callSeeded({ limit: 1 }, "Bearer jwt-admin", staleRows());
+  assertEquals(r.status, 403);
+  assertEquals(writes(), []);
+  assertEquals(state.moodleCalls, []);
+});
+
+Deno.test("moodle-sync processing by service role still runs stuck-row recovery and its audit", async () => {
+  const r = await callSeeded({ limit: 1 }, `Bearer ${SVC}`, staleRows());
+  assert(r.status !== 401 && r.status !== 403, `service role must be authorized, got ${r.status}`);
+  assert(mutated().includes("update:moodle_enrollment_sync"), "stale rows are reset for a processing run");
+  assert(state.log.includes("insert:audit_logs"), "the reset is audited");
+  assert(state.tables.audit_logs.some((row) => JSON.stringify(row).includes("MOODLE_SYNC_STUCK_RESET")));
+});
+
 Deno.test("cleanup: restore fetch", () => {
   globalThis.fetch = realFetch;
 });

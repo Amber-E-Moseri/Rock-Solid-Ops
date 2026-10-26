@@ -401,28 +401,6 @@ async function handleRequest(req: Request): Promise<Response> {
       return json({ ok: false, error: authDecision.error, code: authDecision.code }, authDecision.status);
     }
 
-    // Recovery: reset rows stuck in PROCESSING for more than 30 minutes.
-    const processingStaleBeforeIso = new Date(Date.now() - (30 * 60 * 1000)).toISOString();
-    const { data: resetRows, error: resetError } = await db
-      .from("moodle_enrollment_sync")
-      .update({ sync_status: "PENDING", updated_at: new Date().toISOString() })
-      .eq("sync_status", "PROCESSING")
-      .lt("updated_at", processingStaleBeforeIso)
-      .select("id");
-    if (resetError) throw resetError;
-
-    const resetCount = Array.isArray(resetRows) ? resetRows.length : 0;
-    await logAudit(
-      db,
-      "MOODLE_SYNC_STUCK_RESET",
-      "stuck-processing-recovery",
-      "SUCCESS",
-      {
-        reset_count: resetCount,
-        threshold_minutes: 30,
-      },
-    );
-
     if (!isValidPayload(payload)) {
       return json({ ok: false, error: "Invalid payload", code: "INVALID_PAYLOAD" }, 400);
     }
@@ -444,6 +422,29 @@ async function handleRequest(req: Request): Promise<Response> {
         return json({ ok: false, test: "moodle_connectivity", error: c.message, code: c.code, moodleUrl: MOODLE_URL });
       }
     }
+
+    // Recovery: reset rows stuck in PROCESSING for more than 30 minutes. Processing operations only. The test
+    // action returned above, so it never reaches this write or its audit event.
+    const processingStaleBeforeIso = new Date(Date.now() - (30 * 60 * 1000)).toISOString();
+    const { data: resetRows, error: resetError } = await db
+      .from("moodle_enrollment_sync")
+      .update({ sync_status: "PENDING", updated_at: new Date().toISOString() })
+      .eq("sync_status", "PROCESSING")
+      .lt("updated_at", processingStaleBeforeIso)
+      .select("id");
+    if (resetError) throw resetError;
+
+    const resetCount = Array.isArray(resetRows) ? resetRows.length : 0;
+    await logAudit(
+      db,
+      "MOODLE_SYNC_STUCK_RESET",
+      "stuck-processing-recovery",
+      "SUCCESS",
+      {
+        reset_count: resetCount,
+        threshold_minutes: 30,
+      },
+    );
 
     const forceId = String(payload?.id || "").trim();
     const limitInput = Number(payload?.limit || 5) || 5;
