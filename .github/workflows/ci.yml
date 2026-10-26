@@ -4,7 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    # brief/spa-cutover-integration is the stacked base for the SPA integration candidate (PR #23).
+    # integration/teacher-onboarding-candidate is the stacked base for the legacy auth fix (PR #24) and the teacher experience candidate (PR #25).
+    # integration/consolidated-spa-release-candidate is the base for the security remediation PR (PR #26 stack).
+    # Only pull requests into these branches are added. Pushes to them do not run CI, and nothing here deploys.
+    branches: [main, brief/spa-cutover-integration, integration/teacher-onboarding-candidate, integration/consolidated-spa-release-candidate]
 
 # Only one CI run per branch at a time; newer pushes cancel in-flight runs.
 concurrency:
@@ -46,6 +50,30 @@ jobs:
       - name: Run static login safe-next test
         # PR #21's validator for the legacy /foundation login redirect. Root tests/ is not run by test-unit.sh.
         run: node --test tests/safe-next.test.mjs
+
+      - name: Run legacy profile-trust authorization test
+        # Legacy /foundation auth: roles come only from the profiles row, and lookups fail closed.
+        run: node --test tests/legacy-profile-trust.test.mjs
+
+      - name: Run legacy email Resolve hold test
+        # Legacy /foundation retry pages: email_queue Resolve is held, and Retry is unaffected.
+        run: node --test tests/legacy-email-resolve-hold.test.mjs
+
+      - name: Run legacy login password-reset hold test
+        # The legacy /foundation login must not send Auth reset requests while the hold is in force.
+        run: node --test tests/legacy-login-recovery-hold.test.mjs
+
+      - name: Run legacy teacher-activation regression test
+        # Legacy Teacher Management never marks a teacher ACTIVE without the sign-in role, and surfaces role-write errors.
+        run: node --test tests/legacy-teacher-activation.test.mjs
+
+      - name: Run PR #41 / PR #47 reconciliation hold regression test
+        # Pins the reconciled holds, the admin/superadmin retry roles, verify_jwt, and the email_queue select.
+        run: node --test tests/reconciliation-holds.test.mjs
+
+      - name: Run Moodle compatibility static checks (PR #41)
+        # Staff dashboard retry is disabled, system-health uses the admin session, and no browser code holds service-role material.
+        run: node --test tests/moodle-compat.test.mjs
 
   # ──────────────────────────────────────────────────────────────
   # Job 2: Migration gate — db reset + schema invariant check.

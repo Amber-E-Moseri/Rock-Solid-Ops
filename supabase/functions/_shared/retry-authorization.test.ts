@@ -150,7 +150,7 @@ Deno.test("the gate precedes body parsing and every retry, resolve, sweep, Moodl
     "await applyResolve(serviceDb, source, id);",
     "await maybeEscalateMoodleFailure(",
     "await triggerMoodleSync(SUPABASE_URL, SERVICE_KEY, id);",
-
+    "await invokeMoodleRetrySync(fetch,",
     "await logAudit(",
   ];
   for (const site of sites) {

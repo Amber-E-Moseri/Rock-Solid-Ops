@@ -48,7 +48,11 @@ function readCachedProfile(userId) {
     const entry = JSON.parse(sessionStorage.getItem(PROFILE_CACHE_KEY) || 'null');
     if (!entry || entry.user_id !== userId) return null;
     if (Date.now() - entry.ts > PROFILE_CACHE_TTL_MS) return null;
-    return entry.profile || null;
+    // Only profiles produced by a server lookup are trusted. Anything else in the
+    // cache (for example a value written by an older build) is ignored.
+    const profile = entry.profile;
+    if (!profile || profile.source !== 'profiles' || profile.user_id !== userId) return null;
+    return profile;
   } catch {
     return null;
   }
@@ -84,13 +88,14 @@ function resolveActiveState(row, fallback = true) {
   return fallback;
 }
 
-function normalizeProfileRecord(source, row, user, opts = {}) {
-  const role = normalizeRole(
-    row?.role || user?.user_metadata?.role || user?.app_metadata?.role,
-    opts.defaultRole || 'user'
-  );
+// Builds the profile used for every authorization decision. It reads only the
+// server-side profiles row. user_metadata and app_metadata are writable by the
+// signed-in user (signUp data, updateUser), so they never supply the role or the
+// active state. The display name may still come from metadata because it grants
+// no access. A missing role falls back to the non-elevated 'pending' role.
+function normalizeProfileRecord(source, row, user) {
   return {
-    user_id: row?.id || row?.auth_user_id || user?.id || null,
+    user_id: row?.user_id || row?.id || user?.id || null,
     email: row?.email || user?.email || null,
     full_name:
       row?.full_name ||
@@ -99,8 +104,8 @@ function normalizeProfileRecord(source, row, user, opts = {}) {
       user?.user_metadata?.name ||
       user?.email ||
       'User',
-    role,
-    is_active: resolveActiveState(row, opts.defaultActive !== false),
+    role: normalizeRole(row?.role, 'pending'),
+    is_active: resolveActiveState(row, true),
     source,
   };
 }
@@ -133,7 +138,7 @@ const PROJECTIONS = [
 ];
 
 // Thrown when the profiles query itself fails. It is not an authorization
-// decision: the user is not treated as unauthorized and no metadata role is used.
+// decision: the user is not treated as unauthorized and no fallback role is used.
 class ProfileLoadError extends Error {
   constructor(message, cause) {
     super(message);
@@ -142,8 +147,18 @@ class ProfileLoadError extends Error {
   }
 }
 
-async function resolveProfile(user) {
-  const cached = readCachedProfile(user.id);
+// Thrown when the query succeeds but no profiles row exists. Fails closed.
+class ProfileMissingError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'ProfileMissingError';
+  }
+}
+
+// `fresh` skips the session cache so a role change or revocation is seen on the next
+// token refresh instead of after the cache TTL.
+async function resolveProfile(user, { fresh = false } = {}) {
+  const cached = fresh ? null : readCachedProfile(user.id);
   if (cached) return cached;
 
   let queryFailed = null;
@@ -155,10 +170,7 @@ async function resolveProfile(user) {
       .maybeSingle();
 
     if (!error && data) {
-      const profile = normalizeProfileRecord('profiles', data, user, {
-        defaultRole: 'user',
-        defaultActive: true,
-      });
+      const profile = normalizeProfileRecord('profiles', data, user);
       writeCachedProfile(user.id, profile);
       return profile;
     }
@@ -175,16 +187,8 @@ async function resolveProfile(user) {
     throw new ProfileLoadError('The profiles query failed.', queryFailed);
   }
 
-  const metadataProfile = normalizeProfileRecord('auth', {}, user, {
-    defaultRole: 'user',
-    defaultActive: true,
-  });
-  console.warn('[AuthContext] falling back to auth metadata profile', {
-    user_id: metadataProfile.user_id,
-    email: metadataProfile.email,
-    role: metadataProfile.role,
-  });
-  return metadataProfile;
+  // No profile row. There is no fallback: user-writable metadata must never grant a role.
+  throw new ProfileMissingError('No profile exists for this account.');
 }
 
 // ── Role helpers (exported so Shell and ProtectedRoute can use them) ──────────
@@ -246,10 +250,10 @@ export function AuthProvider({ children }) {
   // The profile load in progress, shared by concurrent callers for the same user.
   const inflightRef = useRef({ userId: null, promise: null });
 
-  const fetchProfileOnce = useCallback((sessionUser) => {
+  const fetchProfileOnce = useCallback((sessionUser, options) => {
     const current = inflightRef.current;
     if (current.promise && current.userId === sessionUser.id) return current.promise;
-    const promise = resolveProfile(sessionUser).finally(() => {
+    const promise = resolveProfile(sessionUser, options).finally(() => {
       if (inflightRef.current.promise === promise) {
         inflightRef.current = { userId: null, promise: null };
       }
@@ -262,7 +266,7 @@ export function AuthProvider({ children }) {
   // profile has resolved, so the route guard waits instead of treating the user
   // as signed out. A failed profile load is recorded in `error`; it is never
   // reported as an authorization decision.
-  const applySession = useCallback((sessionUser, { blocking = true } = {}) => {
+  const applySession = useCallback((sessionUser, { blocking = true, fresh = false } = {}) => {
     const requestId = ++sessionRequestRef.current;
 
     if (!sessionUser) {
@@ -275,7 +279,7 @@ export function AuthProvider({ children }) {
     }
 
     if (blocking) setLoading(true);
-    fetchProfileOnce(sessionUser).then(
+    fetchProfileOnce(sessionUser, { fresh }).then(
       (resolved) => {
         if (requestId !== sessionRequestRef.current) return;
         setUser(sessionUser);
@@ -286,10 +290,9 @@ export function AuthProvider({ children }) {
       (err) => {
         if (requestId !== sessionRequestRef.current) return;
         console.error('[AuthContext] profile load error', err);
-        if (blocking) {
-          setUser(null);
-          setProfile(null);
-        }
+        // Fail closed: a failed trusted lookup never keeps the previous profile.
+        setUser(null);
+        setProfile(null);
         setError(err);
         setLoading(false);
       }
@@ -322,7 +325,7 @@ export function AuthProvider({ children }) {
       } else if (event === 'SIGNED_IN') {
         applySession(session?.user ?? null, { blocking: true });
       } else if (event === 'TOKEN_REFRESHED') {
-        applySession(session?.user ?? null, { blocking: false });
+        applySession(session?.user ?? null, { blocking: false, fresh: true });
       }
     });
 

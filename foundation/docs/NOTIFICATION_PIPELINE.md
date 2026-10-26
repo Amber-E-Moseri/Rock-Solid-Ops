@@ -91,7 +91,7 @@ Responsibility:
 - **`action: "retry"`** — single-item retry for `email_queue` or `scheduled_notifications`:
   - Reads row, validates status is FAILED/ERROR/PENDING (case-insensitive)
   - Increments `attempts`
-  - For `email_queue`: resets `status = "Pending"`, clears `error_message` / `last_error`
+  - For `email_queue`: resets `status = "Pending"`, clears `error_message` (the table has no `last_error` column)
   - For `scheduled_notifications`: resets `status = "PENDING"`, resets `scheduled_for = now()`, clears `last_error`
 - **`action: "sweep"`** — auto-sweeps Moodle enrollment failures, retries failed syncs
 - On the hourly cron: runs the Moodle sweep automatically

@@ -12,10 +12,8 @@ entrypoint = "./functions/registration-processor/index.ts"
 
 [functions.retry-worker]
 enabled = true
-# Self-authenticating: index.ts calls authorizeRetryRequest() before any work. Matches functions/retry-worker/config.toml.
-verify_jwt = false
+verify_jwt = true
 entrypoint = "./functions/retry-worker/index.ts"
-# Schedule is defined in ./functions/retry-worker/config.toml
 
 [functions.clickup-sync]
 enabled = true

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../supabase.js';
 import { postLoginPath } from './postLoginPath.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { TEACHER_ONBOARDING_CERTIFIED } from '../../releaseHolds.js';
 
 const ERROR_MESSAGES = {
   inactive:     'Your account is inactive. Please contact your administrator.',
@@ -16,8 +17,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
-  const [resetMsg, setResetMsg] = useState('');
-  const [resetPending, setResetPending] = useState(false);
   // Set once Supabase accepts the password. Navigation waits until the auth
   // context has the profile, so the route guard never sees a half-finished sign-in.
   const [pendingNext, setPendingNext] = useState(null);
@@ -33,7 +32,14 @@ export default function LoginPage() {
     if (!pendingNext || sessionLoading) return;
     if (user && profile) {
       setPendingNext(null);
-      navigate(postLoginPath({ role: profile.role, next: pendingNext.next }), { replace: true });
+      navigate(
+        postLoginPath({
+          role: profile.role,
+          next: pendingNext.next,
+          teacherOnboardingEnabled: TEACHER_ONBOARDING_CERTIFIED,
+        }),
+        { replace: true },
+      );
       return;
     }
     setPendingNext(null);
@@ -53,26 +59,6 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  async function handleForgotPassword(e) {
-    e.preventDefault();
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail) {
-      setResetMsg('Enter your email address first.');
-      return;
-    }
-    setResetPending(true);
-    setResetMsg('Sending reset link...');
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
-      redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}auth/reset-password`,
-    });
-    setResetPending(false);
-    if (resetError) {
-      setResetMsg('Could not send reset link. Please try again or contact support.');
-      return;
-    }
-    setResetMsg('Check your email for a reset link.');
   }
 
   return (
@@ -165,19 +151,23 @@ export default function LoginPage() {
           </button>
           <button
             type="button"
-            onClick={handleForgotPassword}
-            disabled={resetPending}
+            onClick={() => navigate('/auth/forgot-password')}
             style={forgotButtonStyle}
           >
             Forgot password?
           </button>
         </form>
 
-        {resetMsg && (
-          <p style={{ color: 'var(--muted)', fontSize: 13, margin: '12px 0 0', lineHeight: 1.5 }}>
-            {resetMsg}
-          </p>
+        {TEACHER_ONBOARDING_CERTIFIED && (
+          <button
+            type="button"
+            onClick={() => navigate('/auth/teacher/register')}
+            style={forgotButtonStyle}
+          >
+            New teacher? Apply to teach
+          </button>
         )}
+
       </div>
     </div>
   );

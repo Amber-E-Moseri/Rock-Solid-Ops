@@ -214,7 +214,9 @@ Deno.test("retry-worker: a non-admin profile is refused with zero writes", async
 Deno.test("retry-worker: held Moodle retry causes no side effects", async () => {
   const r = await call("retry", { action: "retry", source: "moodle_enrollment_sync", id: "row-1" }, "Bearer jwt-admin");
   assertEquals([r.status, r.json.code], [409, "MOODLE_RETRY_HELD"]);
-  assertEquals(mutated(), [], "no write before the hold refuses");
+  // Approved contract: the refusal is audited, and it is the only write. No retry or Moodle row is touched.
+  assertEquals(mutated(), ["insert:audit_logs"], "only the audited refusal may write");
+  assert(state.tables.audit_logs.some((row) => JSON.stringify(row).includes("MOODLE_RETRY_HELD")));
   assertEquals(state.moodleCalls, []);
 });
 
@@ -222,7 +224,7 @@ Deno.test("retry-worker: held Moodle retry by legacy source name is also refused
   const r = await call("retry", { action: "retry", source: "moodle_sync", id: "row-1" }, "Bearer jwt-admin");
   assertEquals(r.status, 409);
   assertEquals(state.moodleCalls, []);
-  assertEquals(mutated(), []);
+  assertEquals(mutated(), ["insert:audit_logs"], "only the audited refusal may write");
 });
 
 Deno.test("retry-worker: scheduled sweep stays disabled for an admin with no id", async () => {
@@ -232,10 +234,18 @@ Deno.test("retry-worker: scheduled sweep stays disabled for an admin with no id"
   assertEquals(mutated(), []);
 });
 
-Deno.test("retry-worker: resolve for a non-Moodle source is unaffected by the hold", async () => {
+Deno.test("retry-worker: email_queue Resolve stays held (approved contract), with an audited refusal", async () => {
   const r = await call("retry", { action: "resolve", source: "email_queue", id: "e-1" }, "Bearer jwt-admin");
+  assertEquals([r.status, r.json.code], [409, "EMAIL_RESOLVE_HELD"]);
+  assert(!mutated().includes("update:email_queue"), "no email_queue write while Resolve is held");
+  assertEquals(state.moodleCalls, []);
+});
+
+Deno.test("retry-worker: resolve for a non-Moodle, non-email source is unaffected by either hold", async () => {
+  state.tables.failed_syncs.push({ id: "f-1", status: "Failed" });
+  const r = await call("retry", { action: "resolve", source: "failed_syncs", id: "f-1" }, "Bearer jwt-admin");
   assertEquals(r.status, 200);
-  assert(mutated().includes("update:email_queue"));
+  assert(mutated().includes("update:failed_syncs"));
   assertEquals(state.moodleCalls, []);
 });
 
