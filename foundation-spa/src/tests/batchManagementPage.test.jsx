@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import * as batchLib from '../features/batch-management/lib/batchManagement.js';
 
 const auth = vi.hoisted(() => ({ role: 'superadmin' }));
 // Batch-campus overrides served to the page. fail makes the settings read error.
@@ -278,26 +279,28 @@ describe('BatchManagementPage overflow menu permissions', () => {
 
 describe('BatchManagementPage campus coverage', () => {
   const openKpi = () => document.querySelector('.bm-kpi-rose');
+  const openValue = () => openKpi().querySelector('.bm-kpi-value').textContent;
 
   beforeEach(() => {
     auth.role = 'superadmin';
     coverage.rows = [];
     coverage.fail = false;
+    vi.mocked(batchLib.fetchAllCampusSettings).mockClear();
   });
 
-  it('explicit overrides close a campus for every open batch that names it', async () => {
+  it('explicit overrides close a campus for the batches that name it; a batch left with no campus is not open', async () => {
     // B1 and B2 are CESGA batches (Manitoba). B3 is a CESGB batch (Waterloo). Closing Manitoba for B1 and
-    // B2 leaves Waterloo as the only campus reached by the three open batches.
+    // B2 leaves them with no campus, so only B3 is open, at Waterloo.
     coverage.rows = [
       { batch_id: 'B1', fellowship_code: 'CMU', registration_open: false },
       { batch_id: 'B2', fellowship_code: 'CMU', registration_open: false },
     ];
     renderPage();
     await waitFor(() => expect(openKpi()).toHaveTextContent('Across 1 campus'));
-    expect(openKpi()).toHaveTextContent('3');
+    expect(openValue()).toBe('1');
   });
 
-  it('a batch closed at every campus it reaches contributes no campus', async () => {
+  it('every campus closed: no batch is open and the Open Registration KPI drops to zero', async () => {
     coverage.rows = [
       { batch_id: 'B1', fellowship_code: 'CMU', registration_open: false },
       { batch_id: 'B2', fellowship_code: 'CMU', registration_open: false },
@@ -305,6 +308,7 @@ describe('BatchManagementPage campus coverage', () => {
     ];
     renderPage();
     await waitFor(() => expect(openKpi()).toHaveTextContent('Across 0 campuses'));
+    expect(openValue()).toBe('0');
   });
 
   it('shows coverage as unavailable when the settings read fails, not as a count', async () => {
@@ -312,13 +316,24 @@ describe('BatchManagementPage campus coverage', () => {
     renderPage();
     await waitFor(() => expect(openKpi()).toHaveTextContent('Campus coverage unavailable'));
     expect(openKpi()).not.toHaveTextContent('Across');
+    expect(openValue()).toBe('—');
   });
 
-  it('a role that cannot read every override sees coverage as unavailable and no campus label', async () => {
-    auth.role = 'subgroup_admin';
+  it('a full-visibility role reads the settings once', async () => {
+    renderPage();
+    await waitFor(() => expect(openKpi()).toHaveTextContent('Across 2 campuses'));
+    expect(batchLib.fetchAllCampusSettings).toHaveBeenCalledTimes(1);
+  });
+
+  // Partial-visibility roles never read the override table. Under RLS they would see only some rows, so
+  // any count would look authoritative and be wrong.
+  it.each(['subgroup_admin', 'pastor', 'principal'])('%s: no settings read, coverage unavailable, no campus label', async (role) => {
+    auth.role = role;
     renderPage();
     await waitFor(() => expect(rows().length).toBeGreaterThan(0));
+    expect(batchLib.fetchAllCampusSettings).not.toHaveBeenCalled();
     expect(openKpi()).toHaveTextContent('Campus coverage unavailable');
+    expect(openValue()).toBe('—');
     expect(within(rows()[0]).getByText('CESGA')).toBeInTheDocument();
     expect(within(rows()[0]).queryByText(/Manitoba/)).toBeNull();
   });

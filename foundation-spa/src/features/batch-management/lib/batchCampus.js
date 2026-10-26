@@ -46,12 +46,19 @@ export function campusesForBatch(batch, fellowshipRows, settingsRows = []) {
   return [...new Set(names)];
 }
 
-// Distinct eligible campus codes across the given batches. Pass open batches only: a closed batch
-// contributes nothing. settingsByBatch maps batch_id to that batch's settings rows.
-export function countEligibleCampuses(openBatches, fellowshipRows, settingsByBatch = new Map()) {
+// Open Registration summary. A batch is open only when its registration flag is on AND at least one
+// eligible campus is still accepting registrations after overrides. An open batch with every campus
+// closed does not count. Campuses are the distinct codes still accepting registrations across the
+// counted batches. settingsByBatch maps batch_id to that batch's settings rows.
+export function summarizeOpenRegistration(batches, fellowshipRows, settingsByBatch = new Map()) {
   const codes = new Set();
-  for (const b of openBatches) {
-    for (const code of eligibleCampusCodes(b, fellowshipRows, settingsByBatch.get(b.batch_id) ?? [])) codes.add(code);
+  let openBatches = 0;
+  for (const b of batches) {
+    if (!b.registration_open) continue;
+    const accepting = eligibleCampusCodes(b, fellowshipRows, settingsByBatch.get(b.batch_id) ?? []);
+    if (accepting.length === 0) continue;
+    openBatches += 1;
+    for (const code of accepting) codes.add(code);
   }
-  return codes.size;
+  return { openBatches, campuses: codes.size };
 }

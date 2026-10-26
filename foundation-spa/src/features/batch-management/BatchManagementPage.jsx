@@ -5,7 +5,7 @@ import {
   archiveBatch, deleteBatch, closeBatch, reopenBatch, rolloverBatch, announceBatch,
   filterBatches, fmtDate,
 } from './lib/batchManagement.js';
-import { campusesForBatch, countEligibleCampuses } from './lib/batchCampus.js';
+import { campusesForBatch, summarizeOpenRegistration } from './lib/batchCampus.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { PageHeader, SearchInput, Skeleton, EmptyState, Badge, Button, Modal } from '../../components/ui/index.js';
@@ -58,7 +58,12 @@ export default function BatchManagementPage() {
   const { data, isLoading, refetch } = useQuery({ queryKey: ['batch-mgmt'], queryFn: fetchBatches, staleTime: 60_000 });
   const fellowships = useQuery({ queryKey: ['batch-fellowships'], queryFn: fetchFellowshipMap, staleTime: 5 * 60_000 });
   const subgroups = useQuery({ queryKey: ['batch-subgroups'], queryFn: fetchSubgroups, staleTime: 5 * 60_000 });
-  const campusSettings = useQuery({ queryKey: ['batch-campus-settings'], queryFn: fetchAllCampusSettings, staleTime: 60_000, retry: false });
+  // Settings are read only for roles that can see every row. For other roles the read is never made, so
+  // no count is computed from partial override data.
+  const canReadCampusSettings = FULL_CAMPUS_VIEW_ROLES.includes(profile?.role);
+  const campusSettings = useQuery({
+    queryKey: ['batch-campus-settings'], queryFn: fetchAllCampusSettings, enabled: canReadCampusSettings, staleTime: 60_000, retry: false,
+  });
 
   const batches = data?.batches ?? [];
   const counts = data?.counts ?? {};
@@ -93,8 +98,8 @@ export default function BatchManagementPage() {
     return map;
   }, [campusSettings.data]);
 
-  // Campus coverage is available only when the settings read succeeded and this role can read all of it.
-  const campusCoverageState = campusSettings.isError || !FULL_CAMPUS_VIEW_ROLES.includes(profile?.role)
+  // Campus coverage is available only when this role can read every settings row and the read succeeded.
+  const campusCoverageState = !canReadCampusSettings || campusSettings.isError
     ? 'unavailable'
     : campusSettings.isLoading ? 'loading' : 'ready';
 
@@ -109,16 +114,18 @@ export default function BatchManagementPage() {
       .filter((d) => d >= today)
       .sort();
     const years = batches.map((b) => new Date(b.created_at).getFullYear()).filter(Number.isFinite);
-    // Open Registration counts batches with registration open. Campuses are the ones those batches reach.
-    const openBatches = batches.filter((b) => b.registration_open);
+    // Open Registration needs override data, so it is unavailable (null) with the campus count.
+    const summary = campusCoverageState === 'ready'
+      ? summarizeOpenRegistration(batches, fellowshipRows, settingsByBatch)
+      : null;
     return {
       total: batches.length,
       since: years.length ? Math.min(...years) : null,
       active: batches.filter((b) => b.status === 'Active').length,
       upcoming: batches.filter((b) => b.status === 'Upcoming').length,
       nextStart: upcomingStarts[0] ? fmtMonthDay(upcomingStarts[0]) : null,
-      openReg: openBatches.length,
-      campuses: campusCoverageState === 'ready' ? countEligibleCampuses(openBatches, fellowshipRows, settingsByBatch) : null,
+      openReg: summary ? summary.openBatches : null,
+      campuses: summary ? summary.campuses : null,
     };
   }, [batches, fellowshipRows, settingsByBatch, campusCoverageState]);
 
@@ -183,7 +190,7 @@ export default function BatchManagementPage() {
         subtitle="Programme batches, campus registration and open classes."
         actions={
           <>
-            <Button variant="secondary" size="sm" onClick={() => { refetch(); campusSettings.refetch(); }}>↺ Refresh</Button>
+            <Button variant="secondary" size="sm" onClick={() => { refetch(); if (canReadCampusSettings) campusSettings.refetch(); }}>↺ Refresh</Button>
             <Button variant="primary" size="sm" className="bm-btn-gold" onClick={() => setEditModal({ isNew: true })}>+ Create Batch</Button>
           </>
         }
@@ -207,7 +214,7 @@ export default function BatchManagementPage() {
         </div>
         <div className="bm-kpi bm-kpi-rose">
           <span className="bm-kpi-label">Open Registration</span>
-          <span className="bm-kpi-value">{kpis.openReg}</span>
+          <span className="bm-kpi-value">{kpis.openReg ?? '—'}</span>
           <span className="bm-kpi-sub">
             {kpis.campuses !== null
               ? `Across ${kpis.campuses} campus${kpis.campuses === 1 ? '' : 'es'}`

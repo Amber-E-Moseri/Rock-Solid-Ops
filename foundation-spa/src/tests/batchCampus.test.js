@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  scopeCodes, eligibleCampusCodes, campusesForBatch, countEligibleCampuses,
+  scopeCodes, eligibleCampusCodes, campusesForBatch, summarizeOpenRegistration,
 } from '../features/batch-management/lib/batchCampus.js';
 
 const FELLOWSHIPS = [
@@ -78,37 +78,80 @@ describe('explicit batch-campus settings', () => {
   });
 });
 
-describe('countEligibleCampuses (Open Registration KPI)', () => {
-  it('counts distinct campuses across open batches, not every campus in the map', () => {
+describe('summarizeOpenRegistration (Open Registration KPI)', () => {
+  const open_ = (batch_id, fields) => ({ batch_id, registration_open: true, ...fields });
+  const closedBatch = (batch_id, fields) => ({ batch_id, registration_open: false, ...fields });
+
+  it('counts open batches and distinct accepting campuses, not every campus in the map', () => {
     // Open batches reach CMU (CESGA) and UWA (CESGB). UBC and YORK are in the map but unused.
-    const openBatches = [{ batch_id: 'A', subgroup_id: 'CESGA' }, { batch_id: 'B', subgroup_id: 'CESGA' }, { batch_id: 'C', subgroup_id: 'CESGB' }];
-    expect(countEligibleCampuses(openBatches, FELLOWSHIPS)).toBe(2);
+    const batches = [open_('A', { subgroup_id: 'CESGA' }), open_('B', { subgroup_id: 'CESGA' }), open_('C', { subgroup_id: 'CESGB' })];
+    expect(summarizeOpenRegistration(batches, FELLOWSHIPS)).toEqual({ openBatches: 3, campuses: 2 });
   });
 
   it('counts duplicate coverage once', () => {
     // Two CESGA batches and a group-scoped CE batch all reach CMU. CE also reaches UWA.
-    const openBatches = [
-      { batch_id: 'A', subgroup_id: 'CESGA' },
-      { batch_id: 'B', subgroup_id: 'CESGA' },
-      { batch_id: 'C', fellowship_group: 'CE' },
-    ];
-    expect(countEligibleCampuses(openBatches, FELLOWSHIPS)).toBe(2);
+    const batches = [open_('A', { subgroup_id: 'CESGA' }), open_('B', { subgroup_id: 'CESGA' }), open_('C', { fellowship_group: 'CE' })];
+    expect(summarizeOpenRegistration(batches, FELLOWSHIPS)).toEqual({ openBatches: 3, campuses: 2 });
   });
 
   it('applies each batch\'s own explicit overrides', () => {
-    const openBatches = [{ batch_id: 'A', subgroup_id: 'CESGA' }, { batch_id: 'B', subgroup_id: 'CESGB' }];
+    const batches = [open_('A', { subgroup_id: 'CESGA' }), open_('B', { subgroup_id: 'CESGB' })];
     const settings = new Map([['A', [closed('CMU')]]]);
-    // A is closed at CMU, so only B's UWA remains.
-    expect(countEligibleCampuses(openBatches, FELLOWSHIPS, settings)).toBe(1);
+    // A is closed at CMU and so does not count. B still counts through UWA.
+    expect(summarizeOpenRegistration(batches, FELLOWSHIPS, settings)).toEqual({ openBatches: 1, campuses: 1 });
   });
 
   it('a campus closed for one batch still counts through another open batch', () => {
-    const openBatches = [{ batch_id: 'A', subgroup_id: 'CESGA' }, { batch_id: 'B', subgroup_id: 'CESGA' }];
+    const batches = [open_('A', { subgroup_id: 'CESGA' }), open_('B', { subgroup_id: 'CESGA' })];
     const settings = new Map([['A', [closed('CMU')]]]);
-    expect(countEligibleCampuses(openBatches, FELLOWSHIPS, settings)).toBe(1);
+    // A has no campus left, so it is not open. B still reaches Manitoba, so the campus counts once.
+    expect(summarizeOpenRegistration(batches, FELLOWSHIPS, settings)).toEqual({ openBatches: 1, campuses: 1 });
+  });
+
+  it('a batch with every eligible campus closed does not count as open', () => {
+    const batches = [open_('A', { subgroup_id: 'CESGA' })];
+    const settings = new Map([['A', [closed('CMU')]]]);
+    expect(summarizeOpenRegistration(batches, FELLOWSHIPS, settings)).toEqual({ openBatches: 0, campuses: 0 });
+  });
+
+  it('a batch with every campus of its group closed does not count as open', () => {
+    const batches = [open_('A', { fellowship_group: 'CE' })];
+    const settings = new Map([['A', [closed('CMU'), closed('UWA')]]]);
+    expect(summarizeOpenRegistration(batches, FELLOWSHIPS, settings)).toEqual({ openBatches: 0, campuses: 0 });
+  });
+
+  it('one campus reopened after closure counts the batch once, with that campus only', () => {
+    // Group CE has Manitoba and Waterloo. Both are closed, then Waterloo is reopened.
+    const batches = [open_('A', { fellowship_group: 'CE' })];
+    const reopened = new Map([['A', [closed('CMU'), open('UWA')]]]);
+    expect(summarizeOpenRegistration(batches, FELLOWSHIPS, reopened)).toEqual({ openBatches: 1, campuses: 1 });
+  });
+
+  it('zero eligible campuses: an unmapped batch with registration on does not count', () => {
+    const batches = [open_('A', { subgroup_id: 'NOPE' }), open_('B', {})];
+    expect(summarizeOpenRegistration(batches, FELLOWSHIPS)).toEqual({ openBatches: 0, campuses: 0 });
+  });
+
+  it('a batch with registration closed is excluded even when its campuses accept', () => {
+    const batches = [closedBatch('A', { subgroup_id: 'CESGA' })];
+    expect(summarizeOpenRegistration(batches, FELLOWSHIPS)).toEqual({ openBatches: 0, campuses: 0 });
+  });
+
+  it('an explicit open override adds an eligible campus outside scope and counts it', () => {
+    const batches = [open_('A', { subgroup_id: 'CESGA' })];
+    const settings = new Map([['A', [open('UBC')]]]);
+    expect(summarizeOpenRegistration(batches, FELLOWSHIPS, settings)).toEqual({ openBatches: 1, campuses: 2 });
+  });
+
+  it('campus identity is the fellowship code; a shared campus name does not merge two codes', () => {
+    const rows = [
+      { fellowship_code: 'CMU', campus_name: 'Manitoba', group_id: 'CE', subgroup_id: 'CESGA' },
+      { fellowship_code: 'CMU2', campus_name: 'Manitoba', group_id: 'CE', subgroup_id: 'CESGA' },
+    ];
+    expect(summarizeOpenRegistration([open_('A', { subgroup_id: 'CESGA' })], rows)).toEqual({ openBatches: 1, campuses: 2 });
   });
 
   it('is zero when no batch is open', () => {
-    expect(countEligibleCampuses([], FELLOWSHIPS)).toBe(0);
+    expect(summarizeOpenRegistration([], FELLOWSHIPS)).toEqual({ openBatches: 0, campuses: 0 });
   });
 });
