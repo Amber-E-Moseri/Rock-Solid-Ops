@@ -189,6 +189,22 @@ for unauthenticated callers, but the check must still be recorded.
 Release flags, all `false`: `APPROVAL_CERTIFIED`, `MOODLE_RETRY_CERTIFIED` (SPA and server constant),
 `ATTENDANCE_SUBMIT_CERTIFIED`, `TEACHER_ONBOARDING_CERTIFIED`, `APPROVAL_CONTRACT_AVAILABLE`.
 
+### `brief/teacher-activation-fix` (PR #43, draft) — HOLD on merge; depends on PR #26 staging certification (2026-10-26)
+
+Narrow extraction of the teacher-activation fix from PR #29 (closed as superseded, not merged), based on
+`integration/consolidated-spa-release-candidate` (`5cd8423`). Head `eddcd3c5921a83dc83ffa9fbc8c95105f5662bac`.
+
+- **CI PASS at `eddcd3c`:** Migration gate pass, Security regression pass, Unit tests pass. The first Migration gate
+  run failed in Supabase CLI setup (GitHub API rate limit, infrastructure). The rerun passed with no code or pinning change.
+- **Residual 1 (accepted, not resolved):** legacy Teacher Management still grants the `teacher` sign-in role from the browser.
+  Only RLS and migration `202607131600` stand behind it. This PR makes that write fail closed; it does not remove it.
+- **Residual 2 (accepted, not resolved):** a superadmin can still approve a teacher directly, bypassing the application
+  workflow, until the P1 approval/activation contract exists.
+- Acceptance is documented only. It does not certify either behaviour for unrestricted production use.
+- Holds preserved and unchanged: legacy password reset (`LEGACY_PASSWORD_RESET_HOLD`), Moodle retry (server and SPA),
+  attendance submission, teacher onboarding, approval.
+- Not merged, not deployed. Stays dependent on PR #26 staging certification and P1 authorization-boundary review.
+
 
 ## Resolved (moot — already merged)
 

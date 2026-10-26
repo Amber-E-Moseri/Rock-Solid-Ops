@@ -2910,3 +2910,10 @@ Scope: limited frontend rollout with uncertified workflows disabled. Not a full 
 ### Follow-up required before the next staging run
 
 - **The staging harness must refresh authentication after sign-out.** The sign-out test performs a global `supabase.auth.signOut()` (`foundation-spa/src/context/AuthContext.jsx`). That revokes the teacher session saved for later tests. A fresh-session probe then returned `200`, which is consistent with a stale saved session causing the earlier `401` from `teacher-portal-api`.
+
+## 2026-10-26 — PR #43 (`brief/teacher-activation-fix`) CI and security review
+
+- PR #29 closed as superseded; its branch was not merged. Its teacher-activation fix was carried into PR #43 on the candidate baseline.
+- CI at `eddcd3c5921a83dc83ffa9fbc8c95105f5662bac`: Migration gate pass, Security regression pass, Unit tests pass. The first Migration gate run failed on a Supabase CLI setup rate limit (infrastructure); the rerun passed with no code or pinning change.
+- Security review: two residuals accepted as documented limitations, not resolved: (1) legacy browser-side teacher-role write; (2) direct superadmin approval bypass pending the P1 contract.
+- Holds preserved. PR #43 stays draft and unmerged, and depends on PR #26 staging certification.
