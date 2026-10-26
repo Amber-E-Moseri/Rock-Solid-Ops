@@ -71,6 +71,10 @@ jobs:
         # Pins the reconciled holds, the admin/superadmin retry roles, verify_jwt, and the email_queue select.
         run: node --test tests/reconciliation-holds.test.mjs
 
+      - name: Run Moodle compatibility static checks (PR #41)
+        # Staff dashboard retry is disabled, system-health uses the admin session, and no browser code holds service-role material.
+        run: node --test tests/moodle-compat.test.mjs
+
   # ──────────────────────────────────────────────────────────────
   # Job 2: Migration gate — db reset + schema invariant check.
   # Verifies the full migration chain replays cleanly from zero

@@ -1,7 +1,10 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 
-// The two self-authenticating functions must not depend on the gateway JWT check. Each must also
-// keep its in-code authorization call, so disabling the gateway check never removes the guard.
+// Gateway JWT contract, as approved for the reconciled candidate (owner decision, 2026-10-26):
+//   - retry-worker keeps verify_jwt = true at the gateway. Its in-code authorizeRetryRequest() gate still applies.
+//   - retry-worker has no per-function config.toml that could override the top-level setting.
+//   - moodle-sync is self-authenticating: verify_jwt = false, with authorizeMoodleSyncCaller() in code.
+// Changing any of these needs a new owner decision. See docs/BRANCH_HOLDS.md.
 const FUNCTIONS_ROOT = new URL("../", import.meta.url);
 
 function topLevelVerifyJwt(toml: string, name: string): string | null {
@@ -15,17 +18,23 @@ function topLevelVerifyJwt(toml: string, name: string): string | null {
   return match ? match[1] : null;
 }
 
-Deno.test("retry-worker top-level config disables the gateway JWT check", async () => {
+Deno.test("retry-worker top-level config keeps the gateway JWT check (approved contract)", async () => {
   const toml = await Deno.readTextFile(new URL("../../config.toml", import.meta.url));
-  assertEquals(topLevelVerifyJwt(toml, "retry-worker"), "false");
+  assertEquals(topLevelVerifyJwt(toml, "retry-worker"), "true");
 });
 
-Deno.test("retry-worker top-level config agrees with its per-function config", async () => {
-  const perFunction = await Deno.readTextFile(new URL("retry-worker/config.toml", FUNCTIONS_ROOT));
-  assert(/^verify_jwt\s*=\s*false\s*$/m.test(perFunction));
+Deno.test("retry-worker has no per-function config that could override the gateway setting", async () => {
+  let exists = true;
+  try {
+    await Deno.stat(new URL("retry-worker/config.toml", FUNCTIONS_ROOT));
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) exists = false;
+    else throw err;
+  }
+  assertEquals(exists, false);
 });
 
-Deno.test("moodle-sync per-function config disables the gateway JWT check", async () => {
+Deno.test("moodle-sync per-function config disables the gateway JWT check (self-authenticating)", async () => {
   const perFunction = await Deno.readTextFile(new URL("moodle-sync/config.toml", FUNCTIONS_ROOT));
   assert(/^verify_jwt\s*=\s*false\s*$/m.test(perFunction));
 });

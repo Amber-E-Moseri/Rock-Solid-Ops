@@ -34,9 +34,8 @@ DENO_UNIT_TESTS=(
   "supabase/functions/registration-processor/registration-processor.test.ts"
   "supabase/functions/nexus-users-search/nexus-cors.test.ts"
   "supabase/functions/_shared/moodle-sync-auth.test.ts"
-  "supabase/functions/_shared/moodle-retry-hold.test.ts"
-  "supabase/functions/_shared/retry-authorization.test.ts"
-  "supabase/functions/_shared/retry-schema-compat.test.ts"
+  "supabase/functions/_shared/function-jwt-config.test.ts"
+  "supabase/functions/_shared/request-origin.test.ts"
   "supabase/functions/moodle-sync/moodle-sync-contract.test.ts"
   "supabase/functions/retry-worker/retry-worker-contract.test.ts"
   # moodle-sync/moodle-sync.test.ts excluded: pre-existing type errors +
