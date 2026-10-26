@@ -89,7 +89,7 @@ export default function MakeupManagementPage() {
       </Toolbar>
 
       {isLoading ? <Skeleton variant="rows" rows={5} /> : filtered.length === 0 ? (
-        <EmptyState icon="📋" title="No makeups" message="No makeup records match your filters" />
+        <EmptyState icon="clipboard" title="No makeups" message="No makeup records match your filters" />
       ) : (
         <>
         <div className="rso-table-wrap">

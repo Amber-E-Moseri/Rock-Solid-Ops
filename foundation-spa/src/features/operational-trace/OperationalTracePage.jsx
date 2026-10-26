@@ -4,6 +4,7 @@ import { EVENT_STYLES, FILTER_CHIPS, relTime, absTime, exportTraceJson, exportTr
 import {
   PageHeader, Toolbar, Skeleton, EmptyState, Button, Badge,
 } from '../../components/ui/index.js';
+import NamedIcon from '../../components/ui/NamedIcon.jsx';
 
 const PAGE_SIZE = 50;
 
@@ -86,7 +87,7 @@ export default function OperationalTracePage() {
       {isLoading && <Skeleton variant="rows" rows={5} />}
 
       {!lookup && !isLoading && (
-        <EmptyState icon="🔍" title="Search for a student" subtitle="Enter an email, applicant ID, or trace ID to view their operational timeline." />
+        <EmptyState icon="search" title="Search for a student" subtitle="Enter an email, applicant ID, or trace ID to view their operational timeline." />
       )}
 
       {data && (
@@ -148,7 +149,7 @@ export default function OperationalTracePage() {
 
           {/* Timeline */}
           {filtered.length === 0 ? (
-            <EmptyState icon="📭" title="No events" subtitle="No events match the current filter." />
+            <EmptyState icon="inbox" title="No events" subtitle="No events match the current filter." />
           ) : (
             <div style={{ position: 'relative', paddingLeft: '2rem' }}>
               <div style={{ position: 'absolute', left: '0.75rem', top: 0, bottom: 0, width: 2, background: 'var(--border)' }} />
@@ -179,7 +180,7 @@ function TimelineEvent({ evt, style }) {
       <div className="card" style={{ padding: '0.75rem 1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
           <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, color: style.color }}>
-            {style.icon} {style.label}
+            <NamedIcon name={style.icon} size={14} /> {style.label}
           </span>
           <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }} title={absTime(evt.ts)}>
             {relTime(evt.ts)}

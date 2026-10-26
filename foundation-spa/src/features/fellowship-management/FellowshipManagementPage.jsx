@@ -60,7 +60,7 @@ export default function FellowshipManagementPage() {
       </Toolbar>
 
       {isLoading ? <Skeleton variant="rows" rows={5} /> : filtered.length === 0 ? (
-        <EmptyState icon="🏠" title="No fellowships" subtitle="No fellowships match your filters" />
+        <EmptyState icon="home" title="No fellowships" subtitle="No fellowships match your filters" />
       ) : (
         <div className="rso-table-wrap">
           <table className="rso-table">

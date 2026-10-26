@@ -41,7 +41,7 @@ export default function DataExportsPage() {
       {isLoading ? (
         <Skeleton variant="rows" rows={4} />
       ) : !data ? (
-        <EmptyState icon="📊" title="No data available" />
+        <EmptyState icon="chart" title="No data available" />
       ) : (
         <>
           <Toolbar>
@@ -74,7 +74,7 @@ export default function DataExportsPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem', marginTop: '1.5rem' }}>
             {level >= 2 && (
               <Card
-                icon="🙏"
+                icon="heart"
                 title="Faith Milestones by Class"
                 subtitle="Student milestone completion for a specific class"
               >
@@ -94,7 +94,7 @@ export default function DataExportsPage() {
 
             {level >= 3 && (
               <Card
-                icon="📦"
+                icon="package"
                 title="Full Batch Export"
                 subtitle="Complete batch data with milestones and attendance"
               >

@@ -193,7 +193,7 @@
       <div class="cards" id="mobileCards"></div>
 
       <div class="empty-state" id="emptyState">
-        <div class="emoji">🌱</div>
+        
         <h3>No batches created yet</h3>
         <p>Create your first batch to start coordinating registrations.</p>
         <button class="fs-btn fs-btn-primary" id="emptyCreateBtn">Create Batch</button>
@@ -219,7 +219,7 @@
       </div>
       <div class="cards" id="campusControlsCards"></div>
       <div class="empty-state" id="campusControlsEmpty" style="display:none">
-        <div class="emoji">🏫</div>
+        
         <p id="campusControlsEmptyMsg">Select an active batch above to manage campus registration.</p>
       </div>
     </section>
@@ -254,7 +254,7 @@
         </table>
       </div>
       <div class="empty-state" id="openClassesEmpty" style="display:none">
-        <div class="emoji">📚</div>
+        
         <p>No classes found for the selected filters.</p>
       </div>
     </section>
@@ -587,7 +587,7 @@
       $("closeCampusOverlay")?.addEventListener("click",(e)=>{ if(e.target===$("closeCampusOverlay"))closeModal($("closeCampusOverlay")); });
     }
 
-    async function init(){ if(!window.FS_CONFIG||!window.FS_CONFIG.SUPABASE_URL){ window.FSAdminShell&&window.FSAdminShell.mount({active:"batch",pageTitle:"Batch Management",profileName:"Not connected"}); const b=document.createElement("div"); b.style.cssText="margin-bottom:10px;padding:12px 14px;border-radius:12px;border:1px solid #92400e;background:#fff5df;color:#92400e;font-weight:600;font-size:13px;"; b.textContent="⚠ Not connected — open this page through a live server with config.js in place to load data"; els.skeletonWrap.before(b); els.skeletonWrap.style.display="none"; return; } const ok=await ensureAccess(); if(!ok) return; window.FSAdminShell && window.FSAdminShell.mount({ active: "batch", pageTitle: "Batch Management", profileName: state.profile?.full_name || state.profile?.email || "Admin", role: state.profile?.role || "" }); bindEvents(); bindCampusEvents(); await refreshAll(); toasts.push("Batch management ready.","info",1700); }
+    async function init(){ if(!window.FS_CONFIG||!window.FS_CONFIG.SUPABASE_URL){ window.FSAdminShell&&window.FSAdminShell.mount({active:"batch",pageTitle:"Batch Management",profileName:"Not connected"}); const b=document.createElement("div"); b.style.cssText="margin-bottom:10px;padding:12px 14px;border-radius:12px;border:1px solid #92400e;background:#fff5df;color:#92400e;font-weight:600;font-size:13px;"; b.textContent="Not connected — open this page through a live server with config.js in place to load data"; els.skeletonWrap.before(b); els.skeletonWrap.style.display="none"; return; } const ok=await ensureAccess(); if(!ok) return; window.FSAdminShell && window.FSAdminShell.mount({ active: "batch", pageTitle: "Batch Management", profileName: state.profile?.full_name || state.profile?.email || "Admin", role: state.profile?.role || "" }); bindEvents(); bindCampusEvents(); await refreshAll(); toasts.push("Batch management ready.","info",1700); }
     init();
   </script>
   <script src="../ui/premium-shell.js"></script>

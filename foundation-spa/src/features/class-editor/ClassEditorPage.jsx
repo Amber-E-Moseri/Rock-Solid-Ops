@@ -144,7 +144,7 @@ export default function ClassEditorPage() {
       )}
 
       {!rows.length ? (
-        <EmptyState icon="🏫" title="No classes" message="No class options found for the current filters." />
+        <EmptyState icon="school" title="No classes" message="No class options found for the current filters." />
       ) : (
         <div className="rso-class-split">
           {/* Class list */}
@@ -236,7 +236,7 @@ export default function ClassEditorPage() {
               }}
             />
           ) : (
-            <EmptyState icon="👈" title="Select a class" message="Pick a class from the list to edit it." />
+            <EmptyState icon="pointer" title="Select a class" message="Pick a class from the list to edit it." />
           )}
         </div>
       )}

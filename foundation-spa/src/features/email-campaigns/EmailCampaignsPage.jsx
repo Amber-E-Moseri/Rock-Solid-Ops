@@ -88,7 +88,7 @@ export default function EmailCampaignsPage() {
       {isLoading ? (
         <Skeleton variant="row" count={5} />
       ) : !campaigns.length ? (
-        <EmptyState icon="📣" title="No campaigns yet" message="Click New Campaign to start." />
+        <EmptyState icon="megaphone" title="No campaigns yet" message="Click New Campaign to start." />
       ) : (
         <div className="rso-table-wrap">
           <table className="rso-table">

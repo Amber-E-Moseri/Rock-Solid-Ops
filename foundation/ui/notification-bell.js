@@ -101,7 +101,7 @@ export class NotificationBell {
       <div style="position:relative;display:inline-flex;align-items:center;">
         <button id="nb-btn" aria-label="Notifications"
           style="position:relative;width:36px;height:36px;border-radius:10px;border:1px solid var(--color-border,#e2e8f0);background:var(--color-surface,#fff);cursor:pointer;display:grid;place-items:center;font-size:17px;padding:0;">
-          🔔${badge}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>${badge}
         </button>
         <div id="nb-panel"
           style="display:${this._open ? "flex" : "none"};flex-direction:column;position:absolute;right:0;top:42px;width:320px;max-height:400px;background:var(--color-surface,#fff);border:1px solid var(--color-border,#e2e8f0);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.15);z-index:9999;overflow:hidden;">

@@ -120,7 +120,7 @@ export default function AtRiskStudentsPage() {
       </Toolbar>
 
       {rows.length === 0 ? (
-        <EmptyState icon="🛟" title="No at-risk students" message="No students match the current filters." />
+        <EmptyState icon="lifebuoy" title="No at-risk students" message="No students match the current filters." />
       ) : (
         <div className="rso-table-wrap" style={{ marginTop: 12 }}>
           <table className="rso-table">

@@ -125,7 +125,7 @@ export default function AdminActivityPage() {
       {isLoading ? (
         <Skeleton variant="rows" rows={8} />
       ) : filtered.length === 0 ? (
-        <EmptyState icon="📋" title="No activity records" subtitle="Try adjusting your filters or date range." />
+        <EmptyState icon="clipboard" title="No activity records" subtitle="Try adjusting your filters or date range." />
       ) : (
         <div className="rso-table-wrap">
           <table className="rso-table">

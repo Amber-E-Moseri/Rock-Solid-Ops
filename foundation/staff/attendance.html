@@ -210,7 +210,7 @@
         var stTxt   = st === 'ok' ? 'Submitted' : st === 'miss' ? 'Missing' : 'In progress';
         var flagged = c.flagSessions && c.flagSessions.length > 1;
         var sessChip = '<span style="font-size:10px;font-weight:800;color:var(--primary);background:var(--soft-purple);border-radius:var(--r-full);padding:1px 7px;">S' + c.session + '</span>';
-        var flagChip = flagged ? '<span style="font-size:10px;font-weight:800;color:var(--danger);background:var(--danger-bg);border-radius:var(--r-full);padding:1px 7px;display:inline-flex;align-items:center;gap:3px;">🚩 ' + c.flagSessions.length + '</span>' : '';
+        var flagChip = flagged ? '<span style="font-size:10px;font-weight:800;color:var(--danger);background:var(--danger-bg);border-radius:var(--r-full);padding:1px 7px;display:inline-flex;align-items:center;gap:3px;">' + c.flagSessions.length + '</span>' : '';
         return '<div class="cl' + (c.id === selId ? ' sel' : '') + '" data-id="' + c.id + '">' +
           '<div class="cl-ic ' + st + '">' + label + '</div>' +
           '<div class="cl-main"><b>' + c.loc + '</b><div class="m">' + c.time + ' · ' + c.teacher + '</div>' +
@@ -233,7 +233,7 @@
           '<div class="sub">' + c.time + ' · ' + c.teacher + ' · ' + cc.total + ' student' + (cc.total !== 1 ? 's' : '') + '</div>' +
           '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;">' +
             '<span style="font-size:11px;font-weight:800;color:var(--primary);background:var(--soft-purple);border-radius:var(--r-full);padding:2px 10px;">' + sessLine + '</span>' +
-            (flagged ? '<span style="font-size:11px;font-weight:800;color:var(--danger);background:var(--danger-bg);border-radius:var(--r-full);padding:2px 10px;display:inline-flex;align-items:center;gap:4px;">🚩 Flagged · multi-session</span>' : '') +
+            (flagged ? '<span style="font-size:11px;font-weight:800;color:var(--danger);background:var(--danger-bg);border-radius:var(--r-full);padding:2px 10px;display:inline-flex;align-items:center;gap:4px;">Flagged · multi-session</span>' : '') +
           '</div>' +
         '</div>' +
         '<div class="tallies">' +

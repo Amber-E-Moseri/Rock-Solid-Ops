@@ -119,7 +119,7 @@ export default function RoleAuditPage() {
       {isLoading ? (
         <Skeleton variant="rows" rows={10} />
       ) : filtered.length === 0 ? (
-        <EmptyState icon="👥" title="No users found" subtitle="Try a different tab or search term." />
+        <EmptyState icon="users" title="No users found" subtitle="Try a different tab or search term." />
       ) : (
         <div className="rso-table-wrap">
           <table className="rso-table">

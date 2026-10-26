@@ -184,7 +184,6 @@
     return (
       '<div style="display:flex;flex-direction:column;align-items:center;' +
       'justify-content:center;min-height:280px;gap:16px;padding:48px 24px;text-align:center;">' +
-      '<div style="font-size:40px;">🔒</div>' +
       '<h2 style="margin:0;font-size:20px;font-weight:800;color:var(--text,#261f35)">Access Denied</h2>' +
       '<p style="margin:0;color:var(--muted,#6f6881);max-width:320px;line-height:1.6;">' +
       (msg || 'Your account does not have permission to view this page.') +
@@ -198,14 +197,14 @@
 
   // ─── Empty state configs ─────────────────────────────────────────────────────
   const EMPTY_CONFIGS = {
-    batches:      { emoji: '🌱', title: 'No batches yet',          body: 'Create your first batch to start coordinating registrations.' },
-    applicants:   { emoji: '🎓', title: 'No applicants found',     body: 'Try adjusting your filters, or no applications have been submitted yet.' },
-    notifications:{ emoji: '🔔', title: 'No notifications',        body: 'Notification queue is empty — nothing pending or failed.' },
-    'audit-logs': { emoji: '📋', title: 'No audit activity',       body: 'No logged events match the current filters.' },
-    'failed-syncs':{ emoji: '✅', title: 'All caught up',          body: 'All queues are healthy — no pending failures to retry.' },
-    attendance:   { emoji: '📅', title: 'No attendance records',   body: 'No attendance data found for this selection.' },
-    schedules:    { emoji: '🗓️', title: 'No schedules found',      body: 'No schedule entries available for the current filters.' },
-    generic:      { emoji: '📭', title: 'Nothing here',            body: 'No records match the current criteria.' },
+    batches:      { emoji: '', title: 'No batches yet',          body: 'Create your first batch to start coordinating registrations.' },
+    applicants:   { emoji: '', title: 'No applicants found',     body: 'Try adjusting your filters, or no applications have been submitted yet.' },
+    notifications:{ emoji: '', title: 'No notifications',        body: 'Notification queue is empty — nothing pending or failed.' },
+    'audit-logs': { emoji: '', title: 'No audit activity',       body: 'No logged events match the current filters.' },
+    'failed-syncs':{ emoji: '', title: 'All caught up',          body: 'All queues are healthy — no pending failures to retry.' },
+    attendance:   { emoji: '', title: 'No attendance records',   body: 'No attendance data found for this selection.' },
+    schedules:    { emoji: '', title: 'No schedules found',      body: 'No schedule entries available for the current filters.' },
+    generic:      { emoji: '', title: 'Nothing here',            body: 'No records match the current criteria.' },
   };
 
   // Returns an HTML string for an empty state panel.
@@ -224,7 +223,7 @@
     return (
       '<div class="fs-empty-state" style="padding:44px 16px;text-align:center;' +
       'color:var(--muted,#6f6881);">' +
-      '<div style="font-size:38px;margin-bottom:8px;">' + emoji + '</div>' +
+      (emoji ? '<div style="font-size:38px;margin-bottom:8px;">' + emoji + '</div>' : '') +
       '<h3 style="margin:0 0 6px;font-size:16px;font-weight:700;' +
       'color:var(--text,#261f35);">' + title + '</h3>' +
       '<p style="margin:0 0 14px;font-size:13px;line-height:1.6;">' + body + '</p>' +
@@ -247,7 +246,6 @@
     opts = opts || {};
     if (!el) return;
     const info = RT.classifyError(err);
-    const icon  = info.isNetwork || info.isTimeout ? '📡' : '⚠️';
     const title = opts.title || (info.isTimeout ? 'Request Timed Out' : info.isNetwork ? 'Connection Problem' : 'Failed to Load');
     const body  = opts.body  || info.message;
     const retryBtn = opts.onRetry
@@ -256,7 +254,6 @@
     el.innerHTML = (
       '<div class="fs-error-state" style="padding:36px 16px;text-align:center;' +
       'color:var(--muted,#6f6881);">' +
-      '<div style="font-size:32px;margin-bottom:8px;">' + icon + '</div>' +
       '<h3 style="margin:0 0 6px;font-size:15px;font-weight:700;' +
       'color:var(--bad-fg,#991b1b);">' + title + '</h3>' +
       '<p style="margin:0 0 10px;font-size:13px;line-height:1.5;">' + body + '</p>' +

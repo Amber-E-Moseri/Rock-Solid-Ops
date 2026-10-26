@@ -103,7 +103,7 @@ export default function TeacherManagementPage() {
       {isPending ? <Skeleton variant="rows" rows={6} /> : isError ? (
         <ErrorBanner message="Could not load teachers." onRetry={refetch} />
       ) : filtered.length === 0 ? (
-        <EmptyState icon="📭" title="No teachers" subtitle={search ? 'No records matched your search' : 'No teachers in this status'} />
+        <EmptyState icon="inbox" title="No teachers" subtitle={search ? 'No records matched your search' : 'No teachers in this status'} />
       ) : (
         <>
         <div className="rso-table-wrap">
