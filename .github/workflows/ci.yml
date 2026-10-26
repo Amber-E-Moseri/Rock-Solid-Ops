@@ -63,6 +63,10 @@ jobs:
         # The legacy /foundation login must not send Auth reset requests while the hold is in force.
         run: node --test tests/legacy-login-recovery-hold.test.mjs
 
+      - name: Run legacy teacher-activation regression test
+        # Legacy Teacher Management never marks a teacher ACTIVE without the sign-in role, and surfaces role-write errors.
+        run: node --test tests/legacy-teacher-activation.test.mjs
+
   # ──────────────────────────────────────────────────────────────
   # Job 2: Migration gate — db reset + schema invariant check.
   # Verifies the full migration chain replays cleanly from zero
