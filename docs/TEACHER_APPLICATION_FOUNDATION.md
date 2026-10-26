@@ -132,7 +132,14 @@ Limits, stated plainly:
 - **D1.** Keep public self-application, or invite-only first using the existing admin direct-create path?
 - **D2.** Resolved by owner: auth-first (applicant creates a confirmed account, then applies) is the future provisioning design.
 - **D3.** Resolved by owner: superadmin and regional secretary decide organization-wide. Pastor and subgroup admin decide within their assigned active subgroups. Admin has no review rights.
-- **D4.** Teacher profile role after approval: a service-role function, or a superadmin path? Admin sessions can no longer write `profiles.role`.
+- **D4.** Teacher profile role after approval. **Owner-deferred on 2026-10-26 to the provisioning phase.** Deferred for the non-provisioning foundation scope: not decided, not implemented, not certified. Admin sessions can no longer write `profiles.role`.
+  Requirements before any future role assignment (all required; none is met by this branch):
+  - A separate owner gate approves the mechanism (service-role function or superadmin path) before any code exists.
+  - Only a service-role function writes `profiles.role`. It verifies the caller's JWT server-side as an active superadmin, refuses self-targeting, and requires the application in `APPROVAL_PENDING_PROVISIONING`.
+  - Production verified first: `link_teacher_to_auth_user` matches `202605191330`; `unlink_teacher_from_auth_user` and `uq_teachers_teacher_user_id_not_null` are present or explicitly accepted; the `audit_logs.actor_id` drift is resolved or the actor stays in `details`.
+  - One audit row per role change with actor and target in `details`. The change is idempotent and never silently overwrites an existing active role.
+  - RLS and grant review of the function, including how `profiles_enforce_role_assignment` (`202607131600`) treats its writes.
+  - Activation, email and Moodle remain separate gates. Nothing in this foundation enables them.
 - **D5.** Re-application after rejection: cooldown length, or no re-application? Currently blocked.
 - **D6.** Should rejection reasons ever be shown to applicants? Currently internal only.
 - **D7.** Existing PENDING self-registered `teachers` rows in production: migrate to applications, or archive?
@@ -150,6 +157,6 @@ Limits, stated plainly:
 ## 10. GO / NO-GO
 
 - **GO for a draft foundation PR** against `main`, labelled as a security-boundary change, with the CI migration gate as a required check.
-- **NO-GO for merge** until: the migration gate passes on the exact head; D4 is decided; the production read-only checks in section 9 are recorded; and the staging gate is approved.
+- **NO-GO for merge** until: the migration gate passes on the exact head; D4 is owner-deferred to the provisioning phase (deferred, not completed or certified; requirements under D4); the production read-only checks in section 9 are recorded; and the staging gate is approved.
 - **NO-GO for the approval or linking mutation** until the link candidate is verified deployed and D4 is decided.
 - **NO-GO for public UI** until Turnstile (D9) and the Auth settings (section 5) are in place.

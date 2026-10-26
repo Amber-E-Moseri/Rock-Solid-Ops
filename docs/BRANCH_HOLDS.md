@@ -101,7 +101,7 @@ Status: Request Access Phases 1 and 2 (`org_subgroups`, `staff_scope_assignments
 Hold conditions before merge:
 1. CI migration gate (`scripts/test-migration.sh`, `db reset` from zero) passes on the PR head. Local runs used the Supabase-shaped stub baseline only: teacher-applications 87/87 and request-access-scope 75/75 passed. No full replay was run.
 2. Ordering with PR #14 (`brief/anon-privilege-hardening`, `20261022120000`) is verified by the gate in step 1. PR #14 requires the full schema and could not be applied on the stub baseline. Expected order: PR #14, then `202610230100`, `202610230200`, `202610250100`, `202610250200`, `202610250300`.
-3. Owner resolves decisions D2, D3 and D4 in `docs/TEACHER_APPLICATION_FOUNDATION.md` (inherited from PR #22).
+3. D2 and D3 are resolved by the owner. D4 is owner-deferred to the provisioning phase (2026-10-26): deferred, not completed or certified. Its requirements before any future role assignment are in `docs/TEACHER_APPLICATION_FOUNDATION.md` (D4). Inherited from PR #22.
 4. Owner approves the security boundary: RLS and grants on `org_subgroups` and `staff_scope_assignments`, and the service-role-only scope functions (`grant_staff_scope`, `revoke_staff_scope`, `staff_scope_covers`, `staff_scope_org_wide`).
 5. Read-only production checks for the Phase 1 objects are recorded in `docs/migration-log.md`.
 
