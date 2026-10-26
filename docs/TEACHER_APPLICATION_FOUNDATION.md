@@ -1,7 +1,7 @@
 # Teacher application foundation
 
-Branch: `feature/teacher-onboarding-foundation` (local, from `origin/main` at `3ab00a2`). Not pushed.
-Status: local implementation, data model and authorization tests. No public UI, no approval or linking mutation, no staging or production change.
+Branch: `claude/funny-hamilton-cx3ak3`. Stacked on PR #22 (`feature/teacher-onboarding-foundation`, head `a67e950`), with Request Access Phase 1 (org subgroups and staff scope) and Phase 2 (group and subgroup scope for this workflow) on top. Draft PR #45 targets `main`.
+Status: implementation, data model and authorization tests. No public UI, no linking or provisioning mutation, no role elevation, no staging or production change. APPROVE records `APPROVAL_PENDING_PROVISIONING` only.
 
 ## 1. Scope delivered
 
@@ -9,16 +9,17 @@ Status: local implementation, data model and authorization tests. No public UI, 
 |---|---|
 | Applications table, indexes, constraints, updated-at trigger | `supabase/migrations/202610230100_teacher_applications_foundation.sql` |
 | Lifecycle contract (`teacher_application_transition_allowed`) | same |
-| Applicant submission, idempotent per applicant | `submit_teacher_application` (same) |
+| Applicant submission, idempotent per applicant, with group and subgroup | `submit_teacher_application` (six-argument form; the four-argument form from the foundation is superseded and revoked) |
 | Applicant withdrawal | `withdraw_teacher_application` (same) |
-| Admin review: request information, reject. APPROVE is refused. | `review_teacher_application` (same) |
+| Scoped review: request information, reject, and approve to `APPROVAL_PENDING_PROVISIONING`. `APPROVED` stays refused. | `review_teacher_application` (same name, replaced in place) |
+| Phase 2 scope: `group_id` and `subgroup_id` with a composite FK to `org_subgroups`, `teacher_application_can_decide` (resolved from `auth.uid()`), and the status change | `supabase/migrations/202610250300_teacher_applications_scope.sql` |
 | Read surfaces: applicant view, reviewer view | `teacher_applications_applicant`, `teacher_applications_review` (same) |
 | Outbox helper with dedupe key | `enqueue_teacher_application_email` (same) |
 | Three email templates, plus `email_templates` FK mirror | `supabase/migrations/202610230200_teacher_application_email_templates.sql` |
-| Test stubs, harness and 83 checks | `supabase/tests/teacher-applications/` (`run.sh`, `stubs.sql`, `tests.sql`) |
+| Test stubs, harness and 132 checks, including the Phase 2 scope tests J0 to J35 | `supabase/tests/teacher-applications/` (`run.sh`, `stubs.sql`, `tests.sql`) |
 | Status enum for `/ai/statuses.md` | `ai/statuses.md` (new section) |
 
-Not delivered, by design: the approval and linking mutation, the public apply UI, Turnstile, rate limits, the re-application cooldown, and any change to the legacy anon insert policy or the email fallbacks.
+Not delivered, by design: the linking mutation and provisioning (approval is recorded as pending only), the public apply UI, Turnstile, rate limits, the re-application cooldown, and any change to the legacy anon insert policy or the email fallbacks.
 
 ## 2. Contract check (Task 1, read against `origin/main` at `3ab00a2`)
 
@@ -38,7 +39,7 @@ Not delivered, by design: the approval and linking mutation, the public apply UI
 
 ## 3. Lifecycle contract
 
-States: `SUBMITTED`, `INFO_REQUESTED`, `APPROVED`, `REJECTED`, `WITHDRAWN`.
+States: `SUBMITTED`, `INFO_REQUESTED`, `APPROVAL_PENDING_PROVISIONING`, `APPROVED` (reserved), `REJECTED`, `WITHDRAWN`.
 
 | From | To | Actor | Function | Notes |
 |---|---|---|---|---|
@@ -46,12 +47,13 @@ States: `SUBMITTED`, `INFO_REQUESTED`, `APPROVED`, `REJECTED`, `WITHDRAWN`.
 | `SUBMITTED` | `SUBMITTED` (UPDATED) | applicant | `submit_teacher_application` | Changed content, version +1, no email. |
 | `SUBMITTED` | `SUBMITTED` (UNCHANGED) | applicant | `submit_teacher_application` | Identical retry. No version, no audit, no email. |
 | `INFO_REQUESTED` | `SUBMITTED` (RESUBMITTED) | applicant | `submit_teacher_application` | Confirmation email for this version. |
-| `SUBMITTED` | `INFO_REQUESTED` | admin or superadmin | `review_teacher_application` `REQUEST_INFO` | Message required. Applicant-visible. |
-| `SUBMITTED` / `INFO_REQUESTED` | `REJECTED` | admin or superadmin | `review_teacher_application` `REJECT` | Reason required. Stored internally. Generic email. |
-| `SUBMITTED` / `INFO_REQUESTED` | `WITHDRAWN` | applicant | `withdraw_teacher_application` | Owner only. |
-| `SUBMITTED` / `INFO_REQUESTED` | `APPROVED` | **reserved** | refused with `APPROVAL_NOT_AVAILABLE` | Only the teacher-link contract may perform this (section 6). |
+| `SUBMITTED` | `INFO_REQUESTED` | scoped reviewer (section 4) | `review_teacher_application` `REQUEST_INFO` | Message required. Applicant-visible. |
+| `SUBMITTED` / `INFO_REQUESTED` | `REJECTED` | scoped reviewer (section 4) | `review_teacher_application` `REJECT` | Reason required. Stored internally. Generic email. |
+| `SUBMITTED` / `INFO_REQUESTED` | `APPROVAL_PENDING_PROVISIONING` | scoped reviewer (section 4) | `review_teacher_application` `APPROVE` | Records the decision and audits it. No role, roster, account or email change. No email. |
+| `SUBMITTED` / `INFO_REQUESTED` | `WITHDRAWN` | applicant | `withdraw_teacher_application` | Owner only. Not from `APPROVAL_PENDING_PROVISIONING`. |
+| `SUBMITTED` / `INFO_REQUESTED` | `APPROVED` | **reserved** | not reachable by any action | Only the teacher-link contract may perform this (section 6). P1 hold. |
 
-Terminal states: `APPROVED`, `REJECTED`, `WITHDRAWN`. A rejected address cannot re-apply (`APPLICATION_NOT_ALLOWED`) until the owner sets a cooldown or override (decision D5). A withdrawn applicant may apply again as a new application.
+Terminal states: `REJECTED`, `WITHDRAWN`. `APPROVAL_PENDING_PROVISIONING` is held until provisioning is certified and cannot be reviewed, rejected or withdrawn. A rejected address cannot re-apply (`APPLICATION_NOT_ALLOWED`) until the owner sets a cooldown or override (decision D5). A withdrawn applicant may apply again as a new application.
 
 Every write takes a row lock and checks `version`. A stale version returns `VERSION_CONFLICT`.
 
@@ -64,10 +66,11 @@ Invariants enforced by constraints: normalized email; name 2 to 120 characters; 
 | Anonymous | nothing (`42501`) | nothing |
 | Authenticated, unverified | nothing for applications | nothing; submit refused with `EMAIL_NOT_VERIFIED` |
 | Verified applicant, any profile state (including `pending` or no profile) | own rows through `teacher_applications_applicant`, applicant-safe columns only | submit, update, withdraw own open application |
-| Active admin or superadmin | all rows through `teacher_applications_review`, including internal fields | REQUEST_INFO, REJECT; cannot decide own application |
-| Pastor, principal, subgroup_admin, regional_secretary, teacher, inactive admin | nothing | nothing |
+| Superadmin or regional secretary (active) | every application through `teacher_applications_review`, including internal fields | REQUEST_INFO, REJECT, APPROVE (to `APPROVAL_PENDING_PROVISIONING`); never their own application |
+| Pastor or subgroup admin (active, with an active assignment for the application's group and subgroup) | applications in those subgroups through `teacher_applications_review` | the same actions, for assigned subgroups only; never their own application |
+| Admin, principal, teacher, pending, inactive admin, or any profile without scope | nothing for review | nothing |
 
-The base table has **no** direct grant to `anon` or `authenticated`, and no table policy. Reads go through two views whose `WHERE` clauses are the authority, because RLS cannot hide columns. The reviewer gate is `current_profile_role() in ('admin','superadmin')`, which honours `is_active`. It is deliberately narrower than `is_admin()`, which also admits pastor and principal.
+The base table has **no** direct grant to `anon` or `authenticated`, and no table policy. Reads go through two views whose `WHERE` clauses are the authority, because RLS cannot hide columns. Decision authority is `teacher_application_can_decide(id)`. It reads `auth.uid()` only, so no caller can name a reviewer. It refuses the applicant by user id and by normalized email. Organization-wide authority comes from an active superadmin or regional secretary. Scoped authority comes from an active pastor or subgroup admin with an active assignment for the application's group and subgroup, read from `staff_scope_assignments`. Revoking an assignment, deactivating a profile or changing its role takes effect on the next call.
 
 No function takes an actor, email or role from the client. The helper for the outbox is not executable by any application role.
 
@@ -101,7 +104,7 @@ The link candidate itself is **not verified deployed**. Its unlink function and 
 
 Run: `PG_BIN=/usr/lib/postgresql/16/bin PGHOST=… PGPORT=… PGUSER=postgres bash supabase/tests/teacher-applications/run.sh`
 
-Result on PostgreSQL 16.15, local: **83 of 83 checks passed**.
+Result on PostgreSQL 16.15, local: **132 of 132 checks passed**. Of these, 85 are PR #22 checks, with some expectations changed to the scoped rules (two pastor and subgroup-admin denials were removed, because those roles now pass by design, and their positive coverage is J3 and J5). The other 47 are the Phase 2 checks J0 to J35.
 
 Coverage, mapped to the brief:
 
@@ -109,16 +112,17 @@ Coverage, mapped to the brief:
 - Anonymous users cannot read, insert, submit, review, withdraw, or read either view (A2 to A7, H9, H10).
 - Verified applicants see only their own application, with no internal columns (B16, B17, H1 to H3).
 - Duplicate open applications: identical retry is UNCHANGED (B8); an edit does not resend mail (B9); a second account with the same email is refused (B10); concurrent-retry handling is code-reviewed, not tested; outbox dedupe (E1).
-- Non-admin users cannot review, approve, or change another application (C1 to C11, H5 to H7). The admin `APPROVE` path is refused (C14, C15).
+- Users without decision rights cannot review or approve (C1 to C7, C10, C11, H5 to H7, J7 to J11). Scoped reviewers are tested in section J: multi-subgroup authority (J1, J26, J29), cross-subgroup denial (J4, J24, J28), organization-wide authority (J5, J6), no self-approval by user id and by normalized email (J11, J12a, J13b, J13c, J25), revocation and deactivation (J27 to J31), and invalid group and subgroup pairs (J32 to J35).
 - An unapproved application cannot link into the roster (F3 to F5, F1).
 - Lifecycle transitions, versioning and audit (C17 to C26, D1 to D6).
+- `APPROVAL_PENDING_PROVISIONING`: no role, roster or email change (J14 to J17); no reject, request-information or withdrawal from pending (J18 to J21); `APPROVED` and the link path stay refused (J22, J23).
 - Constraints (G1 to G4).
 
-Mutation checks: adding `pastor` to the reviewer gate fails C6. Removing the email-verification check fails B2 (and the `NOT NULL` constraint still blocks the row).
+Mutation checks from the foundation were not repeated for Phase 2.
 
 Limits, stated plainly:
 
-- **The CI migration gate was not run.** `scripts/test-migration.sh` needs Docker and the Supabase CLI. The harness uses Supabase-shaped stubs (`stubs.sql`), copied from the canonical definitions, not a full replay of the 150+ migrations. The gate must run before any merge.
+- **The CI migration gate is not run locally.** It runs in CI on draft PR #45 for the exact head, because the local Supabase stack cannot pull its images here. `scripts/test-migration.sh` needs Docker and the Supabase CLI. The harness uses Supabase-shaped stubs (`stubs.sql`), copied from the canonical definitions, not a full replay of the 150+ migrations. The gate must run before any merge.
 - Supabase Auth itself (confirmation emails, token flow) is not exercised.
 - Concurrency is reasoned about (row locks, unique indexes, the unique-violation handler), not stress-tested.
 - Role-helper bodies are copies of `main`. A drift between copy and canonical would not be caught here.
@@ -126,8 +130,8 @@ Limits, stated plainly:
 ## 8. Outstanding decisions (owner)
 
 - **D1.** Keep public self-application, or invite-only first using the existing admin direct-create path?
-- **D2.** Confirm auth-first (applicant creates a confirmed account, then applies). This is what the branch implements.
-- **D3.** Who may review: admin and superadmin only (as implemented), or the broader `is_admin()` set?
+- **D2.** Resolved by owner: auth-first (applicant creates a confirmed account, then applies) is the future provisioning design.
+- **D3.** Resolved by owner: superadmin and regional secretary decide organization-wide. Pastor and subgroup admin decide within their assigned active subgroups. Admin has no review rights.
 - **D4.** Teacher profile role after approval: a service-role function, or a superadmin path? Admin sessions can no longer write `profiles.role`.
 - **D5.** Re-application after rejection: cooldown length, or no re-application? Currently blocked.
 - **D6.** Should rejection reasons ever be shown to applicants? Currently internal only.
@@ -146,6 +150,6 @@ Limits, stated plainly:
 ## 10. GO / NO-GO
 
 - **GO for a draft foundation PR** against `main`, labelled as a security-boundary change, with the CI migration gate as a required check.
-- **NO-GO for merge** until: the migration gate passes; the owner has resolved D2, D3 and D4; the production read-only checks in section 9 are recorded; and the staging gate is approved.
+- **NO-GO for merge** until: the migration gate passes on the exact head; D4 is decided; the production read-only checks in section 9 are recorded; and the staging gate is approved.
 - **NO-GO for the approval or linking mutation** until the link candidate is verified deployed and D4 is decided.
 - **NO-GO for public UI** until Turnstile (D9) and the Auth settings (section 5) are in place.
