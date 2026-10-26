@@ -2,6 +2,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse, safeLogAudit, withTimeout } from "../_shared/http.ts";
 import { buildClassAvailableDedupeKey, CANONICAL_TEMPLATE_KEY } from "./dedupe.ts";
 import { notifyProfilesPush, resolveStaffRecipients } from "../_shared/push-notify.ts";
+import { authorizeWaitlistCaller, type StaffLookup } from "./auth.ts";
+import { isClassOpenForSelection, isSlotActive } from "./eligibility.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -20,6 +22,7 @@ interface Slot {
 
 interface RunResults {
   slots_checked: number;
+  skipped_class_closed: number;
   notified: number;
   errors: string[];
 }
@@ -29,12 +32,15 @@ type ClassInfo = {
   day: string | null;
   class_time: string | null;
   fellowship_codes?: string[] | null;
+  active?: boolean | null;
+  enrollment_open?: boolean | null;
+  deleted_at?: string | null;
 } | null;
 
 async function getClassInfo(classOptionId: string): Promise<ClassInfo> {
   const { data } = await sb
     .from("class_options")
-    .select("teacher_name,day,class_time,fellowship_codes")
+    .select("teacher_name,day,class_time,fellowship_codes,active,enrollment_open,deleted_at")
     .eq("class_option_id", classOptionId)
     .limit(1)
     .maybeSingle();
@@ -213,8 +219,34 @@ async function notifyClassNowAvailable(slot: Slot, classInfo: ClassInfo, results
   return notified;
 }
 
+async function verifyStaffBearer(jwt: string): Promise<StaffLookup | null> {
+  const { data: userData, error: userErr } = await sb.auth.getUser(jwt);
+  if (userErr || !userData?.user) return null;
+  const { data: profile, error: profileErr } = await sb
+    .from("profiles")
+    .select("role,is_active")
+    .eq("user_id", userData.user.id)
+    .maybeSingle() as { data: { role?: string; is_active?: boolean } | null; error: unknown };
+  if (profileErr || !profile) return null;
+  return {
+    id: userData.user.id,
+    email: userData.user.email,
+    role: profile.role ?? null,
+    isActive: profile.is_active ?? null,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const decision = await authorizeWaitlistCaller({
+    authHeader: req.headers.get("authorization"),
+    serviceKey: SUPABASE_SERVICE,
+    verifyStaff: verifyStaffBearer,
+  });
+  if (!decision.ok) {
+    return jsonResponse({ ok: false, error: decision.code }, decision.status);
+  }
 
   try {
     const body = await req.json().catch(() => ({})) as {
@@ -224,6 +256,7 @@ Deno.serve(async (req) => {
 
     const results: RunResults = {
       slots_checked: 0,
+      skipped_class_closed: 0,
       notified: 0,
       errors: [],
     };
@@ -265,7 +298,12 @@ Deno.serve(async (req) => {
     results.slots_checked = slots.length;
 
     for (const slot of slots) {
+      if (!isSlotActive(slot)) continue;
       const classInfo = await getClassInfo(slot.class_option_id);
+      if (!isClassOpenForSelection(classInfo)) {
+        results.skipped_class_closed += 1;
+        continue;
+      }
       await notifyClassNowAvailable(slot, classInfo, results);
     }
 
