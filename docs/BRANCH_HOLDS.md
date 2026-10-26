@@ -79,6 +79,34 @@ that keeps `/foundation/auth/login.html` live. Verify its status before the next
 Known limitation: the staging harness must refresh authentication after sign-out, because the sign-out test
 revokes the teacher session that later tests reuse.
 
+### `brief/c6-layer1-nexus-shared` — HOLD: NOT FOR MERGE (2026-10-26)
+
+Status: draft PR only. Candidate `345c6f33facc0e0e9c6afb85de4f821acf7972ac`, based on `main` `8015ce9`.
+
+This is C6 Nexus **Layer 1**: pure shared modules and their offline tests. It is:
+- **NOT wired** into any Edge Function. No `index.ts` imports these modules.
+- **NOT deployed.** No function, config, secret, cron or gateway setting changes.
+- **NOT authorized for merge.**
+
+Scope: `supabase/functions/_shared/` only (`nexus-tasks.ts`, `nexus-reconcile.ts`, `nexus-test-support.ts`,
+`error-text.ts`, and the associated `*.test.ts` files), plus this entry. No migrations. No change to
+authorization, Moodle, retry-worker, scheduler, gateway or `verify_jwt` settings.
+
+Conditions before any merge of this branch (all required, each a separate gate):
+1. Layer 2 integrates Nexus task writing additively into the currently secured Edge Functions. The six
+   deferred requirements in `nexus-layer2-requirements.test.ts` (run with `NEXUS_LAYER2_WIRING=true`) must pass,
+   including the retry-worker reconcile-ordering anchor.
+2. The retry-worker `verify_jwt` contract is decided by a separate brief. The approved PR #51 contract is `true`;
+   `main` currently has `false` (self-authenticating via `authorizeRetryRequest`). Layer 1 does not touch it.
+3. Nexus prerequisites A–E and B5 are each certified as separate gates.
+4. Type-check limitations are resolved or explicitly accepted. `deno check` reports 13 pre-existing errors caused
+   by the untyped supabase client, which also affect `main`'s shared modules.
+5. The local-stack suites (`nexus-upstream.test.ts`, `LOCAL_INTEGRATION_TEST=true`) and the C6 real-database
+   suites have been run against a local stack.
+
+Do not wire these modules into a function, deploy, apply migrations, or enable Moodle retry or scheduling under
+this branch. Each of those needs its own authorization.
+
 
 ## Resolved (moot — already merged)
 
