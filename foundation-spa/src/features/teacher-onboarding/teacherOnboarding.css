@@ -1,0 +1,198 @@
+/* Teacher onboarding screens. Built on the shared tokens (styles/tokens.css) and rso-* primitives. */
+
+.to-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px 60px;
+  background: var(--bg);
+  box-sizing: border-box;
+}
+
+.to-card {
+  width: 100%;
+  max-width: 520px;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 32px 36px;
+  box-sizing: border-box;
+}
+
+.to-title {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.25;
+  margin: 0 0 6px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.to-subtitle,
+.to-body {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 0 0 16px;
+}
+
+.to-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.to-form {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.to-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.to-field > label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.to-card .rso-input,
+.to-card .rso-select,
+.to-card .rso-textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.to-card .rso-input[aria-invalid="true"],
+.to-card .rso-select[aria-invalid="true"],
+.to-card .rso-textarea[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.to-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.to-error-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+  margin: 0;
+}
+
+.to-notice {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 16px;
+  overflow-wrap: anywhere;
+}
+
+.to-notice-error {
+  background: var(--danger-bg);
+  border-color: var(--danger-bd);
+  color: var(--danger-text);
+}
+
+.to-notice-success {
+  background: var(--success-bg);
+  border-color: var(--success-bd);
+  color: var(--success-text);
+}
+
+.to-notice-info {
+  background: var(--info-bg);
+  border-color: var(--info-bd);
+  color: var(--text);
+}
+
+.to-request {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin: 0 0 18px;
+}
+
+.to-request-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.to-submit {
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.to-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.to-withdraw {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.to-footer {
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.to-link {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .to-shell {
+    padding: 20px 16px 40px;
+  }
+
+  .to-card {
+    padding: 24px 20px;
+    border-radius: var(--radius-md);
+  }
+
+  .to-title {
+    font-size: 20px;
+  }
+
+  /* 16px inputs stop iOS from zooming the page on focus. */
+  .to-card .rso-input,
+  .to-card .rso-select,
+  .to-card .rso-textarea {
+    font-size: 16px;
+  }
+
+  .to-actions {
+    flex-direction: column;
+  }
+
+  .to-actions .rso-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

@@ -123,6 +123,10 @@
       return data;
     },
     async invokeRetryWorker(client, payload) {
+      // Email Resolve is on hold: the email queue has no Resolved status yet. Retry is still available.
+      if (String(payload?.action || "").trim() === "resolve" && String(payload?.source || "").trim() === "email_queue") {
+        throw new Error("Email Resolve is on hold: the email queue has no Resolved status yet. Retry is still available.");
+      }
       const { data, error } = await client.functions.invoke("retry-worker", {
         body: payload
       });

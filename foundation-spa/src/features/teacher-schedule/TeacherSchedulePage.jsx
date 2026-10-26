@@ -11,7 +11,7 @@ import { PageHeader, Button, Skeleton, Modal, SearchInput, ErrorBanner } from '.
 
 export default function TeacherSchedulePage() {
   const { profile } = useAuth();
-  const { addToast } = useToast();
+  const addToast = useToast();
 
   const [teacherName, setTeacherName] = useState('');
   const [teacherEmail, setTeacherEmail] = useState('');

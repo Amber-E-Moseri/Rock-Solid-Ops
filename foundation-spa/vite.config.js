@@ -14,6 +14,9 @@ export default defineConfig(({ command, mode }) => {
     ? [{ find: /^(?:\.{1,2}\/)+supabase\.js$/, replacement: path.join(here, 'src/dev/fixtureSupabase.js') }]
     : [];
   return {
+    // Production base for the isolated /app/ publish build (scripts/build-spa-publish.mjs).
+    // Defaults to '/' so dev and the standalone build are unchanged.
+    base: process.env.SPA_BASE || '/',
   plugins: [
     react(),
     VitePWA({
@@ -30,15 +33,15 @@ export default defineConfig(({ command, mode }) => {
         name: 'Rock Solid Ops',
         short_name: 'RSO',
         description: 'Foundation School internal staff operations platform.',
-        start_url: '/',
-        scope: '/',
+        start_url: '/app/',
+        scope: '/app/',
         display: 'standalone',
         orientation: 'portrait-primary',
         theme_color: '#4C2A92',
         background_color: '#f8f5ee',
         icons: [
-          { src: '/pwa-icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
-          { src: '/pwa-icon-maskable.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
+          { src: '/app/pwa-icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+          { src: '/app/pwa-icon-maskable.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
         ],
       },
       injectManifest: {

@@ -1,14 +1,19 @@
 # Production publish is an allowlisted static directory, NOT the repository root.
 # scripts/build-static-publish.mjs copies only the static /foundation tree and
 # _headers into netlify-static-publish/, then fails the build if forbidden files
-# or configuration are present. The SPA is not built or published here.
-# Redirects below are unchanged from the previous root-publish configuration.
+# or configuration are present. Redirects below are unchanged from the previous
+# root-publish configuration.
+#
+# The build then installs foundation-spa dependencies and runs scripts/build-spa-publish.mjs,
+# which adds the isolated SPA preview under /app/ (see docs/SPA_CUTOVER_CANDIDATE.md).
+# Nothing in that step changes a /foundation/ or production URL.
+# Rollback: restore the command below to the single static step.
 #
 # Required Netlify environment variables: SUPABASE_URL, SUPABASE_ANON_KEY (anon
 # or publishable key only). BYPASS_ROLE must NOT be set; the build refuses.
 
 [build]
-  command = "node scripts/build-static-publish.mjs"
+  command = "npm --prefix foundation-spa ci && node scripts/build-static-publish.mjs && node scripts/build-spa-publish.mjs"
   publish = "netlify-static-publish"
 
 [[redirects]]

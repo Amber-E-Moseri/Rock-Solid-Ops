@@ -10,17 +10,22 @@ import { useAuth, isRoleAllowed } from '../../context/AuthContext.jsx';
  *
  * Behavior:
  *   - Loading  → render null (Shell spinner handles global loading)
+ *   - Profile load failed → redirect to /auth/login?error=session (explicit message)
  *   - No user  → redirect to /auth/login with ?next= return URL
  *   - Inactive / pending profile → redirect to /auth/login?error=inactive|pending
  *   - Role not in `roles` → redirect to /auth/login?error=unauthorized
  */
 export default function ProtectedRoute({ roles, children }) {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, error } = useAuth();
   const location = useLocation();
 
   if (loading) return null;
 
   const next = encodeURIComponent(location.pathname + location.search);
+
+  if (!user && error) {
+    return <Navigate to={`/auth/login?next=${next}&error=session`} replace />;
+  }
 
   if (!user) {
     return <Navigate to={`/auth/login?next=${next}`} replace />;

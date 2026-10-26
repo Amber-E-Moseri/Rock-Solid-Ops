@@ -8,12 +8,24 @@ export async function resolveTeacher(profile) {
   return data;
 }
 
+// teacher-portal-api answers { ok: true, data: [...] } on success and { ok: false, error }
+// on failure. Anything else is a malformed response. It must never be read as an empty
+// class list, so this throws instead of returning [].
+export function unwrapClassList(payload) {
+  if (payload && payload.ok === true && Array.isArray(payload.data)) return payload.data;
+  if (payload && payload.ok === false) {
+    const message = typeof payload.error === 'string' ? payload.error : payload.error?.message;
+    throw new Error(message || 'Class list request failed');
+  }
+  throw new Error('Class list response was malformed');
+}
+
 export async function fetchTeacherClasses(teacherId) {
   const { data, error } = await supabase.functions.invoke('teacher-portal-api', {
     body: { action: 'getTeacherActiveClassOptions', teacher_id: teacherId },
   });
   if (error) throw error;
-  return data?.class_options ?? data ?? [];
+  return unwrapClassList(data);
 }
 
 export async function fetchTeacherAvailability(teacherId) {

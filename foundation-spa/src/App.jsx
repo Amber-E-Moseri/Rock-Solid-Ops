@@ -4,6 +4,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import ProtectedRoute from './components/layout/ProtectedRoute.jsx';
+import { useAuth } from './context/AuthContext.jsx';
+import { landingPathForRole, SYSTEM_ADMIN_ROLES } from './routing/routeRoles.js';
+import { teacherOnboardingRoutes, ResetPasswordRoute, forgotPasswordRoute } from './features/teacher-onboarding/routes.jsx';
+import { teacherApplicationsRoute } from './features/teacher-applications/routes.jsx';
+import { TEACHER_ONBOARDING_CERTIFIED } from './releaseHolds.js';
 import Shell from './components/layout/Shell.jsx';
 import { PWAInstallPrompt } from './components/pwa/PWAInstallPrompt.jsx';
 import { OfflineIndicator } from './components/pwa/OfflineIndicator.jsx';
@@ -16,7 +21,6 @@ const queryClient = new QueryClient({
 
 // Lazy page imports — expand as portals are migrated
 const LoginPage          = lazy(() => import('./features/auth/LoginPage.jsx'));
-const ResetPasswordPage  = lazy(() => import('./features/auth/ResetPasswordPage.jsx'));
 const AuditLogPage       = lazy(() => import('./features/audit-log/AuditLogPage.jsx'));
 const AdminActivityPage  = lazy(() => import('./features/admin-activity/AdminActivityPage.jsx'));
 const RoleAuditPage      = lazy(() => import('./features/role-audit/RoleAuditPage.jsx'));
@@ -76,6 +80,17 @@ function StaffShell({ title, children }) {
   return <Shell pageTitle={title}>{children}</Shell>;
 }
 
+// Role-aware landing for "/" and unknown paths. Teachers go to /teacher/index,
+// operational roles to /staff/dashboards. Roles with no landing see the login
+// screen with an unauthorized notice, not a redirect loop.
+function HomeRedirect() {
+  const { user, profile, loading } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/auth/login" replace />;
+  const landing = landingPathForRole(String(profile?.role ?? '').trim().toLowerCase());
+  return <Navigate to={landing ?? '/auth/login?error=unauthorized'} replace />;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -87,7 +102,10 @@ export default function App() {
             <Routes>
               {/* Public */}
               <Route path="/auth/login" element={<LoginPage />} />
-              <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/auth/reset-password" element={<ResetPasswordRoute />} />
+              {forgotPasswordRoute}
+              {TEACHER_ONBOARDING_CERTIFIED && teacherOnboardingRoutes}
+              {TEACHER_ONBOARDING_CERTIFIED && teacherApplicationsRoute}
               <Route path="/auth/*" element={<Navigate to="/auth/login" replace />} />
 
               {/* Design system showcase: registered in development builds only */}
@@ -242,7 +260,7 @@ export default function App() {
               <Route
                 path="/teacher/attendance"
                 element={
-                  <ProtectedRoute roles={[...OPERATIONAL_ROLES, 'teacher']}>
+                  <ProtectedRoute roles={['teacher']}>
                     <StaffShell title="Teacher Attendance">
                       <TeacherAttendancePage />
                     </StaffShell>
@@ -317,7 +335,7 @@ export default function App() {
               <Route
                 path="/staff/failed-sync-retry-center"
                 element={
-                  <ProtectedRoute roles={ADMIN_ROLES}>
+                  <ProtectedRoute roles={SYSTEM_ADMIN_ROLES}>
                     <StaffShell title="Failed Sync Retry Center">
                       <FailedSyncRetryCenterPage />
                     </StaffShell>
@@ -559,8 +577,8 @@ export default function App() {
               />
 
               {/* Root redirect */}
-              <Route path="/" element={<Navigate to="/staff/dashboards" replace />} />
-              <Route path="*" element={<Navigate to="/staff/dashboards" replace />} />
+              <Route path="/" element={<HomeRedirect />} />
+              <Route path="*" element={<HomeRedirect />} />
             </Routes>
           </Suspense>
         </ToastProvider>

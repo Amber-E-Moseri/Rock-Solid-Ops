@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { PushToggle } from '../pwa/PushToggle.jsx';
+import { TEACHER_ONBOARDING_CERTIFIED } from '../../releaseHolds.js';
 import {
   LayoutDashboard, Shield, Calendar, Users, Clock, BookOpen,
   BarChart2, CheckSquare, CalendarCheck, TrendingUp, HelpCircle,
   MessageSquare, Bell, Mail, FileText, Lock, GraduationCap,
   RefreshCw, Activity, Layers, ExternalLink, Search, Star,
-  LogOut, ChevronLeft, ChevronRight, ChevronDown, Menu, X, Moon, Sun,
+  LogOut, ChevronLeft, ChevronRight, ChevronDown, Menu, X, Moon, Sun, UserCheck,
 } from 'lucide-react';
 
 // ── Nav structure (mirrors admin-shell.js NAV_SECTIONS) ──────────────────────
@@ -16,6 +17,9 @@ const OPERATIONAL_ROLES = ['regional_secretary', 'principal', 'subgroup_admin', 
 const SYSTEM_ADMIN_ROLES = ['admin', 'superadmin'];
 const TEACHER_MODE_ELIGIBLE = new Set(['regional_secretary', 'admin', 'superadmin']);
 const TEACHER_KEYS = new Set(['attendance', 'schedule', 'progress', 'help']);
+// Teacher-facing targets for shared nav items. Teachers cannot open the staff routes
+// (routeRoles.js), so their links must point at the teacher routes instead.
+const TEACHER_PATHS = { schedule: '/teacher/index', progress: '/teacher/progress', attendance: '/teacher/attendance' };
 
 const NAV_SECTIONS = [
   {
@@ -43,7 +47,8 @@ const NAV_SECTIONS = [
   {
     label: 'Teaching',
     items: [
-      { key: 'attendance',    label: 'Attendance',      path: '/teacher/attendance', Icon: CheckSquare },
+      // Staff and admins get the staff attendance view; teachers get their own page via TEACHER_PATHS.
+      { key: 'attendance',    label: 'Attendance',      path: '/staff/attendance', Icon: CheckSquare, roles: OPERATIONAL_ROLES },
       { key: 'schedule',      label: 'Schedule',        path: '/staff/teacher-schedule', Icon: CalendarCheck },
       { key: 'progress',      label: 'Student Progress', path: '/staff/student-progress', Icon: TrendingUp },
     ],
@@ -68,6 +73,9 @@ const NAV_SECTIONS = [
     label: 'System',
     items: [
       { key: 'teachers',      label: 'Teachers',         path: '/staff/teacher-management',       Icon: GraduationCap, roles: OPERATIONAL_ROLES },
+      ...(TEACHER_ONBOARDING_CERTIFIED
+        ? [{ key: 'teacherapps', label: 'Teacher Applications', path: '/staff/teacher-applications', Icon: UserCheck, roles: SYSTEM_ADMIN_ROLES }]
+        : []),
       { key: 'trace',         label: 'Operational Trace', path: '/staff/operational-trace',        Icon: Activity,      roles: ['admin', 'superadmin', 'regional_secretary'] },
       { key: 'fellowships',   label: 'Fellowships',      path: '/staff/fellowship-management',    Icon: Layers,        roles: SYSTEM_ADMIN_ROLES },
       { key: 'nexusmapping',  label: 'Nexus Mapping',    path: '/staff/nexus-management',         Icon: ExternalLink,  roles: SYSTEM_ADMIN_ROLES },
@@ -152,7 +160,7 @@ export default function Shell({ children, pageTitle }) {
       if (isTeacherRole) return TEACHER_KEYS.has(item.key);
       if (Array.isArray(item.roles) && item.roles.length > 0) return item.roles.includes(role);
       return true;
-    }),
+    }).map((item) => (isTeacherRole && TEACHER_PATHS[item.key] ? { ...item, path: TEACHER_PATHS[item.key] } : item)),
   })).filter((s) => s.items.length > 0);
 
   const profileName = profile?.full_name || profile?.email || 'Admin';
@@ -175,7 +183,7 @@ export default function Shell({ children, pageTitle }) {
           {!collapsed && (
             <div className="sb-brand">
               <div className="sb-name">Rock Solid</div>
-              <div className="sb-sub">Admin Portal</div>
+              <div className="sb-sub">{isTeacherRole ? 'Teacher Portal' : 'Admin Portal'}</div>
             </div>
           )}
           <button
@@ -237,7 +245,7 @@ export default function Shell({ children, pageTitle }) {
               {mobileOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
             <nav className="topbar-breadcrumb" aria-label="Breadcrumb">
-              <span>Admin</span>
+              <span>{isTeacherRole ? 'Teacher' : 'Admin'}</span>
               {pageTitle && (
                 <>
                   <span className="sep">/</span>

@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../supabase.js';
+import { postLoginPath } from './postLoginPath.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { TEACHER_ONBOARDING_CERTIFIED } from '../../releaseHolds.js';
 
 const ERROR_MESSAGES = {
   inactive:     'Your account is inactive. Please contact your administrator.',
   pending:      'Your account is pending approval.',
   unauthorized: 'You do not have permission to access that page.',
+  session:      'We could not load your account. Please sign in again.',
 };
 
 export default function LoginPage() {
@@ -13,13 +17,34 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
-  const [resetMsg, setResetMsg] = useState('');
-  const [resetPending, setResetPending] = useState(false);
+  // Set once Supabase accepts the password. Navigation waits until the auth
+  // context has the profile, so the route guard never sees a half-finished sign-in.
+  const [pendingNext, setPendingNext] = useState(null);
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const { user, profile, loading: sessionLoading, error: sessionError } = useAuth();
 
   const errorCode = params.get('error');
   const serverMsg = errorCode ? ERROR_MESSAGES[errorCode] : '';
+  const busy = loading || Boolean(pendingNext);
+
+  useEffect(() => {
+    if (!pendingNext || sessionLoading) return;
+    if (user && profile) {
+      setPendingNext(null);
+      navigate(
+        postLoginPath({
+          role: profile.role,
+          next: pendingNext.next,
+          teacherOnboardingEnabled: TEACHER_ONBOARDING_CERTIFIED,
+        }),
+        { replace: true },
+      );
+      return;
+    }
+    setPendingNext(null);
+    setError(sessionError ? ERROR_MESSAGES.session : 'Sign-in did not complete. Please try again.');
+  }, [pendingNext, sessionLoading, user, profile, sessionError, navigate]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -28,33 +53,12 @@ export default function LoginPage() {
     try {
       const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) { setError(authError.message); return; }
-      const next = params.get('next') || '/staff/dashboards';
-      navigate(decodeURIComponent(next), { replace: true });
+      setPendingNext({ next: params.get('next') });
     } catch (err) {
       setError(err.message || 'An unexpected error occurred.');
     } finally {
       setLoading(false);
     }
-  }
-
-  async function handleForgotPassword(e) {
-    e.preventDefault();
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail) {
-      setResetMsg('Enter your email address first.');
-      return;
-    }
-    setResetPending(true);
-    setResetMsg('Sending reset link...');
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
-      redirectTo: `${window.location.origin}/auth/reset-password`,
-    });
-    setResetPending(false);
-    if (resetError) {
-      setResetMsg('Could not send reset link. Please try again or contact support.');
-      return;
-    }
-    setResetMsg('Check your email for a reset link.');
   }
 
   return (
@@ -129,37 +133,41 @@ export default function LoginPage() {
           </label>
           <button
             type="submit"
-            disabled={loading}
+            disabled={busy}
             style={{
               marginTop: 8,
               padding: '11px 0',
               borderRadius: 'var(--radius-md)',
-              background: loading ? 'var(--soft-purple)' : 'var(--primary)',
+              background: busy ? 'var(--soft-purple)' : 'var(--primary)',
               color: '#fff',
               border: 'none',
               fontSize: 14,
               fontWeight: 700,
-              cursor: loading ? 'not-allowed' : 'pointer',
+              cursor: busy ? 'not-allowed' : 'pointer',
               transition: 'background 0.15s',
             }}
           >
-            {loading ? 'Signing in…' : 'Sign in'}
+            {busy ? 'Signing in…' : 'Sign in'}
           </button>
           <button
             type="button"
-            onClick={handleForgotPassword}
-            disabled={resetPending}
+            onClick={() => navigate('/auth/forgot-password')}
             style={forgotButtonStyle}
           >
             Forgot password?
           </button>
         </form>
 
-        {resetMsg && (
-          <p style={{ color: 'var(--muted)', fontSize: 13, margin: '12px 0 0', lineHeight: 1.5 }}>
-            {resetMsg}
-          </p>
+        {TEACHER_ONBOARDING_CERTIFIED && (
+          <button
+            type="button"
+            onClick={() => navigate('/auth/teacher/register')}
+            style={forgotButtonStyle}
+          >
+            New teacher? Apply to teach
+          </button>
         )}
+
       </div>
     </div>
   );

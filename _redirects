@@ -1,0 +1,23 @@
+# Netlify redirects. Single source; copied to the publish root by scripts/build-spa-publish.mjs.
+#
+# Part 1: production behaviour, unchanged. These rules were in netlify.toml on
+# origin/main and are moved here verbatim (same sources, targets and statuses).
+# Part 2: the isolated SPA preview, served under /app/. Nothing in part 2 changes
+# any /foundation/ or production URL.
+#
+# A trailing "!" forces the rule even when a file exists. Netlify serves files before
+# non-forced rules.
+
+/                                       /foundation/auth/login.html   302!
+/staff                                  /foundation/staff/admin-portal.html   302!
+/auth                                   /foundation/auth/login.html   302!
+/staff/*                                /foundation/staff/:splat      200
+/auth/*                                 /foundation/auth/:splat       200
+/supabase/*                             /foundation/auth/login.html   302!
+/ai/*                                   /foundation/auth/login.html   302!
+/archive/*                              /foundation/auth/login.html   302!
+/foundation/docs/*                      /foundation/auth/login.html   302!
+
+# Part 2: isolated SPA preview under /app/ (Vite base is /app/)
+/app                                    /app/index.html               200
+/app/*                                  /app/index.html               200

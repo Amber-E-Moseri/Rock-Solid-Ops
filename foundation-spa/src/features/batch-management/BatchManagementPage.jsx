@@ -33,7 +33,7 @@ function matchesTab(batch, tab) {
 
 export default function BatchManagementPage() {
   const { profile } = useAuth();
-  const { addToast } = useToast();
+  const addToast = useToast();
   const qc = useQueryClient();
   const isSuperadmin = profile?.role === 'superadmin';
 
