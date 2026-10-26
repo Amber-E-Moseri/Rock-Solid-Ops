@@ -395,10 +395,11 @@ async function suiteAudit(ids: Record<string, Identity>): Promise<void> {
       `HTTP=${res.status}`);
   }
 
-  // UPDATE: pending/teacher denied; admin/superadmin succeed
+  // UPDATE: denied for every browser role. audit_logs has no UPDATE grant or policy for
+  // authenticated after 20261024120000 (audit provenance guard); admin edits are not a valid path.
   for (const [role, expectMutate] of [
     ["pending", false], ["teacher", false],
-    ["admin", true], ["superadmin", true],
+    ["admin", false], ["superadmin", false],
   ] as Array<[string, boolean]>) {
     const rowId = crypto.randomUUID();
     await psql(
@@ -420,10 +421,12 @@ async function suiteAudit(ids: Record<string, Identity>): Promise<void> {
       `HTTP=${res.status}`);
   }
 
-  // DELETE: pending/teacher denied; admin/superadmin succeed
+  // DELETE: denied for every browser role (no DELETE grant or policy after 20261024120000).
+  // Cleanup of seed rows below runs through psql as the owner, which the guard does not block
+  // for ordinary rows.
   for (const [role, expectDelete] of [
     ["pending", false], ["teacher", false],
-    ["admin", true], ["superadmin", true],
+    ["admin", false], ["superadmin", false],
   ] as Array<[string, boolean]>) {
     const rowId = crypto.randomUUID();
     await psql(
