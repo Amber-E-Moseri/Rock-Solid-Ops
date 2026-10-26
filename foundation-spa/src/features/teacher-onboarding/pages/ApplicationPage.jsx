@@ -12,7 +12,7 @@ import {
   submitApplication,
   withdrawApplication,
 } from '../lib/applicationApi.js';
-import { GENERIC_ERROR, applicationErrorMessage } from '../lib/messages.js';
+import { GENERIC_ERROR, applicationErrorMessage, submitOutcomeMessage } from '../lib/messages.js';
 import { NOTES_MAX, hasErrors, validateApplication } from '../lib/validation.js';
 
 const EMPTY_FORM = { fullName: '', phone: '', fellowshipCode: '', notes: '' };
@@ -43,7 +43,7 @@ export default function ApplicationPage() {
       // Any failure here is an error state. It never falls back to showing the applicant form.
       const profile = await fetchApplicantRole(supabase, user.id);
       if (profile?.role && profile.role !== 'pending') {
-        setLoad({ state: 'not-applicant' });
+        setLoad({ state: 'not-applicant', role: profile.role });
         return;
       }
       const [rows, options] = await Promise.all([fetchMyApplications(supabase), fetchActiveFellowships(supabase)]);
@@ -102,7 +102,7 @@ export default function ApplicationPage() {
       const result = await submitApplication(supabase, form);
       setNotice({
         tone: 'success',
-        text: result?.outcome === 'UNCHANGED' ? 'Your application is already up to date.' : 'Your application has been sent.',
+        text: submitOutcomeMessage(result?.outcome),
       });
       await refresh(session.user);
     } catch (error) {
@@ -159,6 +159,9 @@ export default function ApplicationPage() {
     return (
       <AuthShell title="Your teacher application">
         <Notice tone="info">This page is for teacher applicants. Your account already has a portal role.</Notice>
+        {load.role === 'teacher' && (
+          <p className="to-body">Your teacher account is active. Sign in to the teacher portal to continue.</p>
+        )}
       </AuthShell>
     );
   }

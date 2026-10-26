@@ -36,6 +36,15 @@ export async function fetchFellowshipMap() {
   return data ?? [];
 }
 
+// Every batch-campus override, for campus coverage. Errors propagate: a failed read must not look like
+// "no overrides".
+export async function fetchAllCampusSettings() {
+  const { data, error } = await supabase.from('batch_campus_registration_settings')
+    .select('batch_id, fellowship_code, registration_open').limit(5000);
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function fetchSubgroups() {
   const { data } = await supabase.from('fellowship_map')
     .select('subgroup_id').eq('active', true);

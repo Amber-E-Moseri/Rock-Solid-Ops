@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { ProfileLookupError, isTrustedCacheEntry, resolveTrustedProfile } from "./profile-trust.js";
 // Consumers: foundation/index.html, foundation/auth/{login.html,logout.js}, foundation/js/{admin-review.js,admin-shell.js,applicant-directory.js,failed-sync-retry-center.js,notification-center.js,operational-trace.js,teacher-shell.js,teacher-management.js}, foundation/staff/*, foundation/teacher/*.
 
 function readRuntimeConfig() {
@@ -122,37 +123,6 @@ function normalizeRole(rawRole, fallbackRole = "user") {
   return role.toLowerCase();
 }
 
-function resolveActiveState(row, fallback = true) {
-  const status = String(row?.status || "").trim().toLowerCase();
-  if (row?.is_active === false) return false;
-  if (row?.active === false) return false;
-  if (status === "suspended" || status === "inactive" || status === "disabled") return false;
-  if (row?.is_active === true || row?.active === true) return true;
-  return fallback;
-}
-
-function normalizeProfileRecord(source, row, user, opts = {}) {
-  const role =
-    normalizeRole(
-      row?.role || user?.user_metadata?.role || user?.app_metadata?.role,
-      opts.defaultRole || "user",
-    );
-  return {
-    user_id: row?.id || row?.auth_user_id || user?.id || null,
-    email: row?.email || user?.email || null,
-    full_name:
-      row?.full_name ||
-      row?.name ||
-      user?.user_metadata?.full_name ||
-      user?.user_metadata?.name ||
-      user?.email ||
-      "User",
-    role,
-    is_active: resolveActiveState(row, opts.defaultActive !== false),
-    source,
-  };
-}
-
 const ROLES = Object.freeze({
   SUPERADMIN: "superadmin",
   ADMIN: "admin",
@@ -205,7 +175,7 @@ export function isStaff(role) {
 }
 
 export function isTeacher(role) {
-  return STAFF_ROLES.has(canonicalRole(role));
+  return canonicalRole(role) === ROLES.TEACHER;
 }
 
 export function isRegionalSecretary(role) {
@@ -259,12 +229,11 @@ async function selectFirstWorkingMaybeSingle({ table, matchers, projections, sta
 const PROFILE_CACHE_KEY = "fs_profile_cache_v1";
 const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
 
-function readCachedProfile(userId) {
+function readCachedProfile(userId, now) {
   try {
     const entry = JSON.parse(sessionStorage.getItem(PROFILE_CACHE_KEY) || "null");
-    if (!entry || entry.user_id !== userId) return null;
-    if (Date.now() - entry.ts > PROFILE_CACHE_TTL_MS) return null;
-    return entry.profile || null;
+    if (!isTrustedCacheEntry(entry, userId, now, PROFILE_CACHE_TTL_MS)) return null;
+    return entry.profile;
   } catch { return null; }
 }
 
@@ -279,15 +248,9 @@ function clearCachedProfile() {
 }
 
 /**
- * Returns the canonical profile for the current user.
- *
- * Resolution order:
- *   1. sessionStorage cache (5-minute TTL, per tab)
- *   2. profiles table (canonical)  - keyed by user_id = auth user UUID
- *   3. Auth user metadata fallback - role: "user", active: true
- *
- * Throws only on auth errors (JWT expired / no session).
- * Returns null if no user is signed in.
+ * Returns the trusted profile for the current user, or null when there is no signed-in user, no
+ * profiles row, or the profile is inactive. Throws when the lookup fails, so callers fail closed.
+ * Roles come only from the profiles table. Auth user metadata is never used for authorization.
  */
 export async function getCurrentProfile() {
   const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -296,44 +259,29 @@ export async function getCurrentProfile() {
   const user = userData?.user;
   if (!user) return null;
 
-  const cached = readCachedProfile(user.id);
-  if (cached) return cached;
-
-  const profilesResult = await selectFirstWorkingMaybeSingle({
-    table: "profiles",
-    stage: "profiles lookup",
-    matchers: [{ type: "eq", column: "user_id", value: user.id }],
-    projections: [
-      "user_id,email,full_name,role,is_active",
-      "user_id,email,full_name,role",
-      "user_id,email,role",
-      "user_id,role",
-    ],
+  return resolveTrustedProfile({
+    user,
+    readCache: (userId, now) => readCachedProfile(userId, now),
+    writeCache: (userId, profile, now) => {
+      try {
+        sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ user_id: userId, ts: now, profile }));
+      } catch { /* storage unavailable: cache is best-effort */ }
+    },
+    lookup: (userId) => selectFirstWorkingMaybeSingle({
+      table: "profiles",
+      stage: "profiles lookup",
+      matchers: [{ type: "eq", column: "user_id", value: userId }],
+      projections: [
+        "user_id,email,full_name,role,is_active",
+        "user_id,email,full_name,role",
+        "user_id,email,role",
+        "user_id,role",
+      ],
+    }),
   });
-
-  if (profilesResult.data) {
-    const profile = normalizeProfileRecord("profiles", profilesResult.data, user, {
-      defaultRole: "user",
-      defaultActive: true,
-    });
-    writeCachedProfile(user.id, profile);
-    return profile;
-  }
-  if (profilesResult.error && !isMissingTableError(profilesResult.error)) {
-    warnAuthResolution("profiles lookup exhausted projections", profilesResult.error, { user_id: user.id });
-  }
-
-  const metadataProfile = normalizeProfileRecord("auth", {}, user, {
-    defaultRole: "user",
-    defaultActive: true,
-  });
-  console.warn("[auth-client] falling back to auth metadata profile", {
-    user_id: metadataProfile.user_id,
-    email: metadataProfile.email,
-    role: metadataProfile.role,
-  });
-  return metadataProfile;
 }
+
+export { ProfileLookupError };
 
 /**
  * Returns the teacher record linked to the given email, or null if none.
@@ -443,8 +391,15 @@ export async function requireAuth(allowedRoles = []) {
     return null;
   }
 
-  const profile = await getCurrentProfile();
-  if (!profile || profile.is_active === false) {
+  let profile;
+  try {
+    profile = await getCurrentProfile();
+  } catch (err) {
+    warnAuthResolution("requireAuth profile lookup failed", err);
+    redirectToLoginWithError("session");
+    return null;
+  }
+  if (!profile || profile.is_active !== true) {
     redirectToLoginWithError("inactive");
     return null;
   }
