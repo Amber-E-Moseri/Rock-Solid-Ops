@@ -94,6 +94,19 @@ Staging apply additionally requires the owner's approval of the RLS and grant ch
 
 Approval and account linking are not part of this branch. They require the teacher-link contract to be verified deployed in production first.
 
+### `claude/funny-hamilton-cx3ak3` (PR #45) — HOLD on merge and on any staging or production apply (2026-10-25)
+
+Status: Request Access Phases 1 and 2 (`org_subgroups`, `staff_scope_assignments`, scope functions, teacher application scope migration `202610250300` with `APPROVAL_PENDING_PROVISIONING`, 75-check and teacher-applications harnesses), stacked on `feature/teacher-onboarding-foundation` (PR #22, head `a67e950`). The two PR #22 commits are included unchanged: all nine PR #22 files are byte-identical on both heads. PR #22 holds therefore apply to this branch too. Draft PR permitted; merge not permitted.
+
+Hold conditions before merge:
+1. CI migration gate (`scripts/test-migration.sh`, `db reset` from zero) passes on the PR head. Local runs used the Supabase-shaped stub baseline only: teacher-applications 87/87 and request-access-scope 75/75 passed. No full replay was run.
+2. Ordering with PR #14 (`brief/anon-privilege-hardening`, `20261022120000`) is verified by the gate in step 1. PR #14 requires the full schema and could not be applied on the stub baseline. Expected order: PR #14, then `202610230100`, `202610230200`, `202610250100`, `202610250200`, `202610250300`.
+3. Owner resolves decisions D2, D3 and D4 in `docs/TEACHER_APPLICATION_FOUNDATION.md` (inherited from PR #22).
+4. Owner approves the security boundary: RLS and grants on `org_subgroups` and `staff_scope_assignments`, and the service-role-only scope functions (`grant_staff_scope`, `revoke_staff_scope`, `staff_scope_covers`, `staff_scope_org_wide`).
+5. Read-only production checks for the Phase 1 objects are recorded in `docs/migration-log.md`.
+
+Provisioning, activation, role elevation and teacher linking are not part of this branch. No application code calls the scope functions yet. Any staging apply additionally requires the owner decision on `rocksolid-staging`.
+
 ## Resolved (moot — already merged)
 
 ### `brief/moodle-credential-safety` — RESOLVED 2026-07-23
