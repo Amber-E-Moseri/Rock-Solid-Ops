@@ -1,13 +1,26 @@
+import { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { PageHeader, Card, Badge, Button, Skeleton } from '../../components/ui/index.js';
 import { useSystemHealth } from './hooks/useSystemHealth.js';
-import { fmtDateTime } from './lib/system-health.js';
+import { fmtDateTime, runMoodleConnectivityTest } from './lib/system-health.js';
 
 export default function SystemHealthPage() {
   const supabaseUrl = window.FS_CONFIG?.SUPABASE_URL || '';
   const anonKey = window.FS_CONFIG?.SUPABASE_ANON_KEY || '';
 
   const { checks, metrics, failures, refresh } = useSystemHealth(supabaseUrl, anonKey);
+  const [moodleCheck, setMoodleCheck] = useState(null);
+  const [moodleTesting, setMoodleTesting] = useState(false);
+
+  // Explicit administrator action only. Opening the page never reaches this.
+  const testMoodle = async () => {
+    setMoodleTesting(true);
+    try {
+      setMoodleCheck(await runMoodleConnectivityTest(supabaseUrl, anonKey));
+    } finally {
+      setMoodleTesting(false);
+    }
+  };
 
   const isLoading = checks.isLoading && metrics.isLoading;
   const isFetching = checks.isFetching || metrics.isFetching || failures.isFetching;
@@ -48,6 +61,25 @@ export default function SystemHealthPage() {
 
       {/* Status bar */}
       <StatusBar state={overallState} uptimePct={uptimePct} passCount={passCount} warnCount={warnCount} failCount={failCount} total={healthChecks.length} />
+
+      {/* Moodle connectivity: one read-only request, only when the administrator presses the button */}
+      <Card>
+        <div className="rso-section-title">Moodle connectivity</div>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Button onClick={testMoodle} disabled={moodleTesting}>
+            {moodleTesting ? 'Testing…' : 'Test Moodle connection'}
+          </Button>
+          {moodleCheck && (
+            <>
+              <HealthChip state={moodleCheck.state} />
+              <span style={{ color: 'var(--muted)', fontSize: 12 }}>{moodleCheck.detail}</span>
+            </>
+          )}
+        </div>
+        <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 8 }}>
+          Runs only when you press the button. It makes one read-only request to Moodle.
+        </div>
+      </Card>
 
       {/* Runtime checks grid */}
       {healthChecks.length > 0 && (

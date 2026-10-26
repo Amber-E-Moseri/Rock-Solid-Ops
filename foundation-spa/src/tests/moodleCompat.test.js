@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { supabase } from '../supabase.js';
 import { retryAllFailedMoodleSyncs } from '../features/dashboards/lib/dashboard.js';
-import { runHealthChecks } from '../features/system-health/lib/system-health.js';
+import { runHealthChecks, runMoodleConnectivityTest } from '../features/system-health/lib/system-health.js';
 import { isMoodleRetryHeld, MOODLE_RETRY_CERTIFIED, MOODLE_RETRY_HOLD_MESSAGE } from '../releaseHolds.js';
 
 afterEach(() => {
@@ -37,7 +37,22 @@ describe('system-health Moodle connectivity', () => {
     return fetchSpy.mock.calls.filter(([url]) => String(url).includes('/functions/v1/moodle-sync'));
   }
 
-  it('sends the admin session token as bearer and the anon key only as apikey', async () => {
+  it('opening System Health sends no moodle-sync request, with or without a session', async () => {
+    for (const session of [{ access_token: 'admin-session-token' }, null]) {
+      vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({ data: { session }, error: null });
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+        new Response(JSON.stringify({ ok: true, sitename: 'Test' }), { status: 200 }),
+      );
+      await runHealthChecks(URL, ANON);
+      // The only automatic contact with moodle-sync is the CORS preflight reachability probe (OPTIONS).
+      // It returns before authorization, database or Moodle work. No POST, so no Moodle call.
+      const nonPreflight = moodleCalls(fetchSpy).filter(([, init]) => init?.method !== 'OPTIONS');
+      expect(nonPreflight).toHaveLength(0);
+      vi.restoreAllMocks();
+    }
+  }, 30000);
+
+  it('the explicit test sends the admin session token as bearer and the anon key only as apikey', async () => {
     vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({
       data: { session: { access_token: 'admin-session-token' } },
       error: null,
@@ -45,24 +60,25 @@ describe('system-health Moodle connectivity', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
       new Response(JSON.stringify({ ok: true, sitename: 'Test' }), { status: 200 }),
     );
-    await runHealthChecks(URL, ANON);
-    const calls = moodleCalls(fetchSpy).filter(([, init]) => init?.method === 'POST');
-    expect(calls.length).toBeGreaterThan(0);
-    for (const [, init] of calls) {
-      expect(init.headers.Authorization).toBe('Bearer admin-session-token');
-      expect(init.headers.apikey).toBe(ANON);
-      expect(init.headers.Authorization).not.toContain(ANON);
-      expect(JSON.parse(init.body)).toEqual({ action: 'test' });
-    }
+    const check = await runMoodleConnectivityTest(URL, ANON);
+    const calls = moodleCalls(fetchSpy);
+    expect(calls).toHaveLength(1);
+    const [, init] = calls[0];
+    expect(init.method).toBe('POST');
+    expect(init.headers.Authorization).toBe('Bearer admin-session-token');
+    expect(init.headers.apikey).toBe(ANON);
+    expect(init.headers.Authorization).not.toContain(ANON);
+    expect(JSON.parse(init.body)).toEqual({ action: 'test' });
+    expect(check).toMatchObject({ key: 'moodle-api', state: 'pass' });
   }, 30000);
 
-  it('makes no moodle-sync request with the anon key as bearer when there is no session', async () => {
+  it('the explicit test makes no moodle-sync request without a session', async () => {
     vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({ data: { session: null }, error: null });
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
       new Response('{}', { status: 200 }),
     );
-    await runHealthChecks(URL, ANON);
-    const posts = moodleCalls(fetchSpy).filter(([, init]) => init?.method === 'POST');
-    expect(posts).toHaveLength(0);
+    const check = await runMoodleConnectivityTest(URL, ANON);
+    expect(moodleCalls(fetchSpy)).toHaveLength(0);
+    expect(check).toMatchObject({ key: 'moodle-api', state: 'warn' });
   }, 30000);
 });

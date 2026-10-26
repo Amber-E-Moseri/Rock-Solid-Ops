@@ -71,6 +71,46 @@ test("SPA dashboard retry goes through retry-worker, not a direct moodle-sync re
   assert.match(js, /isMoodleRetryHeld\('retry', source, MOODLE_RETRY_CERTIFIED\)/);
 });
 
+// Returns the source between two markers, so checks can target one function body.
+function between(src, startMarker, endMarker) {
+  const start = src.indexOf(startMarker);
+  assert.ok(start >= 0, `marker not found: ${startMarker}`);
+  const end = endMarker ? src.indexOf(endMarker, start + startMarker.length) : src.length;
+  assert.ok(end > start, `end marker not found after ${startMarker}: ${endMarker}`);
+  return src.slice(start, end);
+}
+
+test("legacy system-health: automatic checks send no Moodle test request on page load", () => {
+  const js = read("foundation/js/system-health.js");
+  const checks = between(js, "async function runChecks()", "async function runMoodleConnectivityTest()");
+  assert.doesNotMatch(checks, /moodle-api-test/, "runChecks must not run the Moodle connectivity test");
+  assert.doesNotMatch(checks, /action: "test"/, "runChecks must not send a moodle-sync test action");
+  assert.doesNotMatch(checks, /Bearer \$\{token\}/, "runChecks must not send the session token to moodle-sync");
+});
+
+test("legacy system-health: the Moodle test runs only from its explicit button", () => {
+  const js = read("foundation/js/system-health.js");
+  const html = read("foundation/staff/system-health.html");
+  assert.match(html, /<button id="moodleTestBtn"[^>]*>Test Moodle connection<\/button>/);
+  assert.match(js, /\$\("moodleTestBtn"\)\?\.addEventListener\("click", runMoodleConnectivityTest\)/);
+  // One definition, and the only invocation is the button listener.
+  assert.equal(js.split("async function runMoodleConnectivityTest()").length - 1, 1);
+  assert.equal(js.split('$("moodleTestBtn")?.addEventListener("click", runMoodleConnectivityTest)').length - 1, 1);
+  // The only "name()" occurrence is the definition itself, so nothing calls it directly.
+  assert.equal(js.split("runMoodleConnectivityTest()").length - 1, 1, "no direct invocation outside the listener");
+});
+
+test("SPA system-health: the Moodle test is not called on load and is wired only to the button", () => {
+  const lib = read("foundation-spa/src/features/system-health/lib/system-health.js");
+  const checks = between(lib, "export async function runHealthChecks", null);
+  assert.doesNotMatch(checks, /\/functions\/v1\/moodle-sync/, "runHealthChecks must not call moodle-sync");
+  const page = read("foundation-spa/src/features/system-health/SystemHealthPage.jsx");
+  assert.match(page, /onClick=\{testMoodle\}/);
+  assert.doesNotMatch(page, /useEffect/, "the page must not run the Moodle test from an effect");
+  const uses = page.split("runMoodleConnectivityTest").length - 1;
+  assert.equal(uses, 2, "expected one import and one call inside the button handler");
+});
+
 // Walk browser sources (legacy and SPA), skipping tests and build output.
 function browserFiles(dir, out = []) {
   for (const name of readdirSync(dir)) {

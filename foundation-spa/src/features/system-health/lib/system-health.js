@@ -33,6 +33,32 @@ async function countTable(table, apply, optional = false) {
 
 // ── Health checks ───────────────────────────────────────────────────────────
 
+// Explicit administrator action only. moodle-sync accepts an admin session JWT for action "test" and runs
+// the read-only core_webservice_get_site_info call. The session token is the bearer; the anon key is only
+// the apikey header. Returns one check row. Never called on page load.
+export async function runMoodleConnectivityTest(supabaseUrl, anonKey) {
+  const key = 'moodle-api';
+  const title = 'Moodle API Connectivity';
+  if (!supabaseUrl || !anonKey) return { key, title, state: 'warn', detail: 'Missing runtime config.' };
+  try {
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess?.session?.access_token;
+    if (!token) return { key, title, state: 'warn', detail: 'Admin sign-in required to test Moodle connectivity.' };
+    const res = await withTimeout('moodle-api-test',
+      () => fetch(`${supabaseUrl}/functions/v1/moodle-sync`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, apikey: anonKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test' }),
+      }), 10000);
+    const data = await res.json().catch(() => ({}));
+    if (data.ok) return { key, title, state: 'pass', detail: `Connected — ${data.sitename || data.siteurl || 'Moodle'}` };
+    if (data.code === 'MOODLE_NOT_CONFIGURED') return { key, title, state: 'warn', detail: 'MOODLE_URL / MOODLE_TOKEN not configured.' };
+    return { key, title, state: 'fail', detail: `${data.error || data.code || 'Unknown error'}` };
+  } catch (e) {
+    return { key, title, state: 'fail', detail: String(e?.message || e) };
+  }
+}
+
 export async function runHealthChecks(supabaseUrl, anonKey) {
   const checks = [];
   const missingTables = new Set();
@@ -132,30 +158,8 @@ export async function runHealthChecks(supabaseUrl, anonKey) {
     push('moodle-mapping', 'Moodle Course Mapping', 'warn', String(e?.message || e));
   }
 
-  // 7. Moodle API connectivity. moodle-sync accepts an admin session JWT for action "test" only.
-  // The session token is the bearer; the anon key is only the apikey header.
-  if (supabaseUrl && anonKey) {
-    try {
-      const { data: sess } = await supabase.auth.getSession();
-      const token = sess?.session?.access_token;
-      if (!token) {
-        push('moodle-api', 'Moodle API Connectivity', 'warn', 'Admin sign-in required to test Moodle connectivity.');
-      } else {
-        const res = await withTimeout('moodle-api-test',
-          () => fetch(`${supabaseUrl}/functions/v1/moodle-sync`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}`, apikey: anonKey, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'test' }),
-          }), 10000);
-        const data = await res.json().catch(() => ({}));
-        if (data.ok) push('moodle-api', 'Moodle API Connectivity', 'pass', `Connected — ${data.sitename || data.siteurl || 'Moodle'}`);
-        else if (data.code === 'MOODLE_NOT_CONFIGURED') push('moodle-api', 'Moodle API Connectivity', 'warn', 'MOODLE_URL / MOODLE_TOKEN not configured.');
-        else push('moodle-api', 'Moodle API Connectivity', 'fail', `${data.error || data.code || 'Unknown error'}`);
-      }
-    } catch (e) {
-      push('moodle-api', 'Moodle API Connectivity', 'fail', String(e?.message || e));
-    }
-  }
+  // The Moodle connectivity test is not part of automatic checks. It runs only on an explicit
+  // administrator action (runMoodleConnectivityTest), so opening System Health sends no Moodle request.
 
   return { checks, missingTables: [...missingTables] };
 }
