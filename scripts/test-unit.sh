@@ -23,6 +23,7 @@ DENO_UNIT_TESTS=(
   "supabase/functions/admin-api/role-boundary-matrix.test.ts"
   "supabase/functions/teacher-portal-api/class-ownership.test.ts"
   "supabase/functions/teacher-portal-api/teacher-auth.test.ts"
+  "supabase/functions/teacher-portal-api/_actions/approve-availability.test.ts"
   "supabase/functions/waitlist-processor/waitlist-dedup.test.ts"
   "supabase/functions/registration-processor/registration-processor.test.ts"
   "supabase/functions/nexus-users-search/nexus-cors.test.ts"

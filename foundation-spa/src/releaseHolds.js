@@ -38,3 +38,21 @@ export const ATTENDANCE_SUBMIT_CERTIFIED = false;
 
 export const ATTENDANCE_SUBMIT_HOLD_MESSAGE =
   'Attendance submission is on hold pending certification. Nothing has been saved.';
+
+// Teacher activation (Approve, and unsuspend) sets a teacher ACTIVE and enables
+// sign-in. It is currently written from the browser in several tables with no
+// server-side certification, so it stays held. Default-deny: any value other than
+// an explicit true keeps the hold in force. This is a UI and service-layer hold
+// only. It is not a server-side security control.
+const TEACHER_ACTIVATION_CERTIFIED = false;
+export const TEACHER_ACTIVATION_HELD = TEACHER_ACTIVATION_CERTIFIED !== true;
+
+export const TEACHER_ACTIVATION_HOLD_MESSAGE =
+  'Teacher activation is on hold pending certification. Nothing has been changed.';
+
+const TEACHER_ACTIVATION_ACTIONS = Object.freeze(['activate', 'unsuspend']);
+
+// True when a teacher lifecycle action would activate a teacher while the hold is in force.
+export function isTeacherActivationHeld(action) {
+  return TEACHER_ACTIVATION_HELD && TEACHER_ACTIVATION_ACTIONS.includes(String(action || '').trim());
+}

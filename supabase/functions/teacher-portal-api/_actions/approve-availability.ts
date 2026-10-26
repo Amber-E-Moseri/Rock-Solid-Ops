@@ -5,7 +5,17 @@ import { assertClassOwnership } from "../_lib/class-ownership.ts";
 import { safeLogAudit, writeAudit } from "../_lib/teacher-auth.ts";
 
 
+// Availability approval is held until its backend certification is recorded. Keep this in step with
+// APPROVAL_CERTIFIED in foundation-spa/src/releaseHolds.js. Default-deny: only an explicit true runs the action.
+// Refuse before any RPC call, write or audit row.
+const AVAILABILITY_APPROVAL_CERTIFIED = false;
+export const AVAILABILITY_APPROVAL_HOLD_MESSAGE =
+  "Availability approval is pending backend certification. Nothing has been approved.";
+
 export async function approveAvailabilityAction(ctx: ActionContext): Promise<Response> {
+  if (AVAILABILITY_APPROVAL_CERTIFIED !== true) {
+    throw new ApiError("ACTION_HELD", AVAILABILITY_APPROVAL_HOLD_MESSAGE, 423);
+  }
   const { db, auth, params } = ctx;
       // INVARIANT: After this step, at least one class_options row must exist
       // for batch_id + class_option_id. If missing, audit and throw — do not proceed.
