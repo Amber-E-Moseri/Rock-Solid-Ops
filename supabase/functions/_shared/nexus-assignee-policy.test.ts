@@ -10,7 +10,7 @@ import { assert, assertEquals, assertFalse, assertStringIncludes } from "jsr:@st
 import { buildDedupeKey, ensureNexusTask, isAssigneeNotFound, NexusHttpError, nexusErrorText } from "./nexus-tasks.ts";
 import { FakeNexus, FakeNexusDb } from "./nexus-test-support.ts";
 
-const CFG = { nexusUrl: "http://nexus.test/task-api", nexusApiKey: "key", timeoutMs: 60 };
+const CFG = { nexusUrl: "https://nexus.test/task-api", nexusApiKey: "key", timeoutMs: 60 };
 const GHOST = "dead0000-0000-4000-8000-000000000001";
 const REAL = "11111111-1111-4111-8111-111111111111";
 const payload = () => ({

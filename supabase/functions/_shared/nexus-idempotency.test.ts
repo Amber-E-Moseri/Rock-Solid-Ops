@@ -19,6 +19,9 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { buildDedupeKey } from "./nexus-tasks.ts";
 
+// Loopback Deno.serve endpoints are explicit local test opt-ins; production callers never pass this.
+const LOCAL_TEST = { allowLocalTestHttp: true };
+
 // ── ID04 Different keys independent ──────────────────────────────
 
 Deno.test("ID04: different dedupe keys can be claimed independently", () => {
@@ -65,14 +68,6 @@ Deno.test("ID15: missed-class-detector trigger semantics preserved", async () =>
   assert(src.includes("MISSED_CLASS_DETECTOR_SUMMARY"), "summary audit log still present");
 });
 
-Deno.test("ID15: retry-worker authorization structure unchanged", async () => {
-  const src = await Deno.readTextFile(new URL("../retry-worker/index.ts", import.meta.url));
-
-  assert(src.includes("validateCronAuth"), "cron auth still present");
-  assert(src.includes('req.headers.has("x-cron-secret")'), "cron secret path still present");
-  assert(src.includes("await isAdmin(serviceDb"), "admin check still present");
-});
-
 // ── ID09 Nexus success persists task ID ──────────────────────────────
 
 Deno.test("ID09: Nexus success persists canonical task ID", async () => {
@@ -106,7 +101,7 @@ Deno.test("ID11: Nexus timeout never resolves with success", async () => {
   );
   try {
     const url = `http://127.0.0.1:${(server.addr as Deno.NetAddr).port}`;
-    const out = await createNexusTask(url, "k", {}, "rocksolid:t", 100).then(() => "resolved", (e) => e);
+    const out = await createNexusTask(url, "k", {}, "rocksolid:t", 100, LOCAL_TEST).then(() => "resolved", (e) => e);
     assert(out instanceof NexusTimeoutError, "timeout must reject with NexusTimeoutError, never resolve");
   } finally {
     await server.shutdown();

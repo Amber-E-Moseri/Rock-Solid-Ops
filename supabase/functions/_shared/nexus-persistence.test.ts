@@ -12,7 +12,7 @@ import { buildDedupeKey, buildExternalUniqueKey, ensureNexusTask } from "./nexus
 import { reconcileUnknownNexusTasks } from "./nexus-reconcile.ts";
 import { FakeNexus, FakeNexusDb } from "./nexus-test-support.ts";
 
-const CFG = { nexusUrl: "http://nexus.test/task-api", nexusApiKey: "key", timeoutMs: 60 };
+const CFG = { nexusUrl: "https://nexus.test/task-api", nexusApiKey: "key", timeoutMs: 60 };
 const MIN = 60_000;
 const payload = () => ({
   student_id: "S1", student_name: "Jane", email: "j@x.test",

@@ -8,13 +8,11 @@
 // NT06  Nexus 5xx classification proven in source (avoid 15 s backoff in CI)
 // NT07  timeout does not report success
 // NT08  buildDedupeKey produces deterministic keys; different events differ
-// NT09  missed-class-detector imports from _shared/nexus-tasks, not clickup-sync
-// NT10  retry-worker imports from _shared/nexus-tasks, not clickup-sync
-// NT11  no clickup-sync HTTP invocation from missed-class-detector
-// NT12  no clickup-sync HTTP invocation from retry-worker
 // NT13  existing missed-class trigger semantics unchanged
-// NT14  existing retry-worker authorization unchanged
-// NT15  C3B Moodle retry behavior unchanged
+// NT15  C3B Moodle retry eligibility unchanged (the Nexus escalation-log check is a Layer 2 requirement)
+//
+// Layer 2 wiring and retry-worker auth cases (formerly NT09-NT12, NT14, and the NT15 escalation check) live in
+// nexus-layer2-requirements.test.ts. They are not Layer 1 unit tests.
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import {
@@ -27,6 +25,9 @@ import {
   NexusMalformedResponseError,
   NexusTimeoutError,
 } from "./nexus-tasks.ts";
+
+// Loopback Deno.serve endpoints are explicit local test opt-ins; production callers never pass this.
+const LOCAL_TEST = { allowLocalTestHttp: true };
 
 const nexusSrc  = await Deno.readTextFile(new URL("./nexus-tasks.ts",                    import.meta.url));
 const missedSrc = await Deno.readTextFile(new URL("../missed-class-detector/index.ts",  import.meta.url));
@@ -70,7 +71,7 @@ Deno.test("NT02: createNexusTask authenticates with x-api-key (not Authorization
   });
   try {
     const port = (server.addr as Deno.NetAddr).port;
-    await createNexusTask(`http://127.0.0.1:${port}`, "nexus-key-123", { title: "t" }, "rocksolid:k", 5000);
+    await createNexusTask(`http://127.0.0.1:${port}`, "nexus-key-123", { title: "t" }, "rocksolid:k", 5000, LOCAL_TEST);
     assertEquals(seen!.get("x-api-key"), "nexus-key-123");
     assertEquals(seen!.get("authorization"), null, "no Authorization header is sent to Nexus");
   } finally {
@@ -95,7 +96,7 @@ Deno.test("NT03: Nexus timeout aborts the request and throws", async () => {
   );
   try {
     const port = (server.addr as Deno.NetAddr).port;
-    await createNexusTask(`http://127.0.0.1:${port}`, "test-key", { title: "test" }, "rocksolid:test", 100);
+    await createNexusTask(`http://127.0.0.1:${port}`, "test-key", { title: "test" }, "rocksolid:test", 100, LOCAL_TEST);
     assert(false, "should have thrown on timeout");
   } catch (e) {
     assert(e instanceof NexusTimeoutError, `timeout must surface as NexusTimeoutError; got: ${e}`);
@@ -115,9 +116,9 @@ Deno.test("NT04: Nexus 201 {task:{id}} returns the task id; 200 {duplicate:true}
   );
   try {
     const url = `http://127.0.0.1:${(server.addr as Deno.NetAddr).port}`;
-    const created = await createNexusTask(url, "key", {}, "rocksolid:test", 5000);
+    const created = await createNexusTask(url, "key", {}, "rocksolid:test", 5000, LOCAL_TEST);
     assertEquals(created, { id: "nexus-task-abc", duplicate: false });
-    const replay = await createNexusTask(url, "key", {}, "rocksolid:test", 5000);
+    const replay = await createNexusTask(url, "key", {}, "rocksolid:test", 5000, LOCAL_TEST);
     assertEquals(replay, { id: "nexus-task-abc", duplicate: true });
   } finally {
     await server.shutdown();
@@ -139,11 +140,11 @@ Deno.test("NT04b: a 2xx that does not confirm a task id fails closed (NexusMalfo
   try {
     const url = `http://127.0.0.1:${(server.addr as Deno.NetAddr).port}`;
     for (let k = 0; k < bodies.length; k++) {
-      const err = await createNexusTask(url, "key", {}, "rocksolid:test", 5000).then(() => null, (e) => e);
+      const err = await createNexusTask(url, "key", {}, "rocksolid:test", 5000, LOCAL_TEST).then(() => null, (e) => e);
       assert(err instanceof NexusMalformedResponseError, `case ${k} must be malformed, got ${err}`);
     }
     const notJson = Deno.serve({ port: 0, onListen: () => {} }, () => new Response("<html>", { status: 201 }));
-    const e2 = await createNexusTask(`http://127.0.0.1:${(notJson.addr as Deno.NetAddr).port}`, "k", {}, "rocksolid:t", 5000).then(() => null, (e) => e);
+    const e2 = await createNexusTask(`http://127.0.0.1:${(notJson.addr as Deno.NetAddr).port}`, "k", {}, "rocksolid:t", 5000, LOCAL_TEST).then(() => null, (e) => e);
     assert(e2 instanceof NexusMalformedResponseError, "non-JSON 2xx is malformed");
     await notJson.shutdown();
   } finally {
@@ -161,7 +162,7 @@ Deno.test("NT05: Nexus 4xx throws immediately with no retry", async () => {
   });
   try {
     const port = (server.addr as Deno.NetAddr).port;
-    await createNexusTask(`http://127.0.0.1:${port}`, "key", {}, "rocksolid:test", 5000);
+    await createNexusTask(`http://127.0.0.1:${port}`, "key", {}, "rocksolid:test", 5000, LOCAL_TEST);
     assert(false, "should have thrown");
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -183,7 +184,7 @@ Deno.test("NT06: createNexusTask treats 5xx as a typed non-2xx failure with a si
   });
   try {
     const url = `http://127.0.0.1:${(server.addr as Deno.NetAddr).port}`;
-    const err = await createNexusTask(url, "key", {}, "rocksolid:test", 5000).then(() => null, (e) => e);
+    const err = await createNexusTask(url, "key", {}, "rocksolid:test", 5000, LOCAL_TEST).then(() => null, (e) => e);
     assert(err instanceof NexusHttpError && err.status === 500);
     assertEquals(calls, 1, "no retry loop");
   } finally {
@@ -203,7 +204,7 @@ Deno.test("NT07: timeout does not return a nexus_task_id (throws, not resolves)"
   );
   try {
     const port = (server.addr as Deno.NetAddr).port;
-    const result = await createNexusTask(`http://127.0.0.1:${port}`, "key", {}, "rocksolid:test", 100)
+    const result = await createNexusTask(`http://127.0.0.1:${port}`, "key", {}, "rocksolid:test", 100, LOCAL_TEST)
       .catch((e: unknown) => ({ __error: true, msg: e instanceof Error ? e.message : String(e) }));
     assert("__error" in result, "timeout must reject, not resolve with a task id");
   } finally {
@@ -232,44 +233,6 @@ Deno.test("NT08: buildDedupeKey is deterministic; different events produce diffe
     "different types must produce different key prefixes");
 });
 
-// ── NT09 ─────────────────────────────────────────────────────────────────────
-
-Deno.test("NT09: missed-class-detector imports ensureNexusTask from _shared/nexus-tasks", () => {
-  assert(missedSrc.includes('from "../_shared/nexus-tasks.ts"'),
-    "missed-class-detector must import from nexus-tasks.ts");
-  assert(missedSrc.includes("ensureNexusTask("),
-    "missed-class-detector must call ensureNexusTask");
-});
-
-// ── NT10 ─────────────────────────────────────────────────────────────────────
-
-Deno.test("NT10: retry-worker imports ensureNexusTask from _shared/nexus-tasks", () => {
-  assert(retrySrc.includes('from "../_shared/nexus-tasks.ts"'),
-    "retry-worker must import from nexus-tasks.ts");
-  assert(retrySrc.includes("ensureNexusTask("),
-    "retry-worker must call ensureNexusTask");
-});
-
-// ── NT11 ─────────────────────────────────────────────────────────────────────
-
-Deno.test("NT11: no clickup-sync HTTP invocation from missed-class-detector", () => {
-  assertEquals(missedSrc.includes("/functions/v1/clickup-sync"), false,
-    "no clickup-sync URL in missed-class-detector");
-  assertEquals(missedSrc.includes("invokeClickupSync"), false,
-    "invokeClickupSync function must be removed");
-  assertEquals(missedSrc.includes('"x-internal-secret": internalSecret'), false,
-    "no internal-secret clickup pathway in missed-class-detector");
-});
-
-// ── NT12 ─────────────────────────────────────────────────────────────────────
-
-Deno.test("NT12: no clickup-sync HTTP invocation from retry-worker", () => {
-  assertEquals(retrySrc.includes("/functions/v1/clickup-sync"), false,
-    "no clickup-sync URL in retry-worker");
-  assertEquals(retrySrc.includes("triggerClickupEscalation"), false,
-    "triggerClickupEscalation function must be removed");
-});
-
 // ── NT13 ─────────────────────────────────────────────────────────────────────
 
 Deno.test("NT13: missed-class-detector trigger semantics are preserved", () => {
@@ -281,16 +244,6 @@ Deno.test("NT13: missed-class-detector trigger semantics are preserved", () => {
   assert(missedSrc.includes("48 * 60 * 60 * 1000"),  "48h review threshold preserved");
 });
 
-// ── NT14 ─────────────────────────────────────────────────────────────────────
-
-Deno.test("NT14: retry-worker authorization structure is unchanged", () => {
-  assert(retrySrc.includes("validateCronAuth"),               "cron auth still present");
-  assert(retrySrc.includes('req.headers.has("x-cron-secret")'), "cron secret path still present");
-  assert(retrySrc.includes("serviceDb.auth.getUser"),         "user JWT path still present");
-  assert(retrySrc.includes("await isAdmin(serviceDb"),        "admin check still present");
-  assert(retrySrc.includes("Admin access required"),          "admin error message preserved");
-});
-
 // ── NT15 ─────────────────────────────────────────────────────────────────────
 
 Deno.test("NT15: C3B Moodle retry eligibility rules are preserved in retry-worker", () => {
@@ -299,7 +252,6 @@ Deno.test("NT15: C3B Moodle retry eligibility rules are preserved in retry-worke
   assert(retrySrc.includes("MOODLE_REST_DISABLED"),      "REST disabled non-retryable preserved");
   assert(retrySrc.includes("MOODLE_PERMISSION_DENIED"),  "permission denied non-retryable preserved");
   assert(retrySrc.includes("sweepMoodleEnrollmentRetries"), "moodle sweep function still present");
-  assert(retrySrc.includes("RETRY_WORKER_NEXUS_ESCALATION_ERROR"), "escalation error log renamed to NEXUS");
 });
 
 // ── I01 external_unique_key sent in POST body ────────────────────────────────
@@ -311,7 +263,7 @@ Deno.test("I01: outgoing Nexus POST includes external_unique_key", async () => {
     return new Response(JSON.stringify({ task: { id: "t" } }), { status: 201 });
   });
   try {
-    await createNexusTask(`http://127.0.0.1:${(server.addr as Deno.NetAddr).port}`, "k", { title: "x" }, "rocksolid:the-key", 5000);
+    await createNexusTask(`http://127.0.0.1:${(server.addr as Deno.NetAddr).port}`, "k", { title: "x" }, "rocksolid:the-key", 5000, LOCAL_TEST);
     assertEquals(body.external_unique_key, "rocksolid:the-key");
     assertEquals(body.title, "x");
   } finally {

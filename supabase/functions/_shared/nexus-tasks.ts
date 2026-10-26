@@ -16,7 +16,7 @@
 // Sprint/Team are NOT used: placement comes from the API key's own scope.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { describeError } from "./error-text.ts";
+import { describeError, redactSecrets } from "./error-text.ts";
 
 export type RequestType = "missed_class" | "escalation";
 
@@ -49,6 +49,51 @@ export interface NexusTaskConfig {
   nexusUrl: string;
   nexusApiKey: string;
   timeoutMs?: number;
+  /** Test-only opt-in for a loopback http:// endpoint. Never read from the environment. */
+  allowLocalTestHttp?: boolean;
+}
+
+/** Explicit per-call opt-in for a local test endpoint. Production callers never pass it. */
+export interface NexusEndpointOptions {
+  allowLocalTestHttp?: boolean;
+}
+
+export type NexusConfigProblem =
+  | "missing_url"
+  | "malformed_url"
+  | "insecure_scheme"
+  | "url_has_credentials"
+  | "url_has_query"
+  | "missing_api_key";
+
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/**
+ * Checks the Nexus task API endpoint and key BEFORE any request is made. Pure: performs no network access.
+ * Production requires a nonempty https:// URL without embedded credentials or query string. Plain http:// is
+ * accepted only for a loopback host AND only when allowLocalTestHttp is explicitly true.
+ */
+export function validateNexusTaskConfig(
+  config: { nexusUrl: string; nexusApiKey: string } & NexusEndpointOptions,
+): { ok: true; baseUrl: string } | { ok: false; problem: NexusConfigProblem } {
+  const raw = String(config.nexusUrl ?? "").trim();
+  if (!raw) return { ok: false, problem: "missing_url" };
+  if (!String(config.nexusApiKey ?? "").trim()) return { ok: false, problem: "missing_api_key" };
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return { ok: false, problem: "malformed_url" };
+  }
+  if (!url.hostname) return { ok: false, problem: "malformed_url" };
+  if (url.username || url.password) return { ok: false, problem: "url_has_credentials" };
+  if (url.search || url.hash) return { ok: false, problem: "url_has_query" };
+  const baseUrl = raw.replace(/\/+$/, "");
+  if (url.protocol === "https:") return { ok: true, baseUrl };
+  if (url.protocol === "http:" && config.allowLocalTestHttp === true && LOOPBACK_HOSTS.has(url.hostname)) {
+    return { ok: true, baseUrl };
+  }
+  return { ok: false, problem: "insecure_scheme" };
 }
 
 /** Task API configuration from the environment. Never falls back to NEXUS_API_KEY (a different credential). */
@@ -86,7 +131,11 @@ export class NexusTimeoutError extends Error {
 /** Nexus answered with a non-2xx status: the request was refused (or failed) before/without a confirmed insert. */
 export class NexusHttpError extends Error {
   status: number;
-  /** Nexus's own `{ "error": "..." }` text when the body was JSON of that shape, else "". */
+  /**
+   * Nexus's own `{ "error": "..." }` text, used ONLY to classify the failure (isAssigneeNotFound). It is never
+   * placed in a message, error_message or audit row. The message itself carries the status code and nothing from
+   * the response body.
+   */
   detail: string;
   constructor(status: number, message: string, detail = "") {
     super(message);
@@ -94,6 +143,28 @@ export class NexusHttpError extends Error {
     this.status = status;
     this.detail = detail;
   }
+}
+
+/** The endpoint or key was rejected by validateNexusTaskConfig. No request was made. */
+export class NexusConfigRejectedError extends Error {
+  problem: NexusConfigProblem;
+  constructor(problem: NexusConfigProblem) {
+    super(`Nexus task API configuration rejected: ${problem}`);
+    this.name = "NexusConfigRejectedError";
+    this.problem = problem;
+  }
+}
+
+/** Upper bound for any Nexus-derived text stored in error_message or an audit row. */
+export const STORED_ERROR_MAX = 500;
+
+/**
+ * The only form in which a failure may be persisted (error_message, audit details, returned summaries): redacted
+ * (JWTs, Nexus keys and the supplied secret values) and bounded. Raw upstream response bodies must never reach
+ * this function's output; they are not part of any error message in this module.
+ */
+export function storableNexusError(err: unknown, apiKey = ""): string {
+  return describeError(err, [apiKey], STORED_ERROR_MAX);
 }
 
 /** The error string of a task-api `{ error }` body, or "" when the body is not that shape. */
@@ -295,14 +366,19 @@ export async function createNexusTask(
   body: Record<string, unknown>,
   externalUniqueKey: string,
   timeoutMs = NEXUS_TIMEOUT_MS,
+  options: NexusEndpointOptions = {},
 ): Promise<NexusCreateResult> {
+  // Validate before any request exists: a malformed endpoint or missing key must never reach fetch.
+  const endpoint = validateNexusTaskConfig({ nexusUrl, nexusApiKey: apiKey, allowLocalTestHttp: options.allowLocalTestHttp });
+  if (!endpoint.ok) throw new NexusConfigRejectedError(endpoint.problem);
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let status = 0;
   let json: unknown;
   let text = "";
   try {
-    const res = await fetch(`${nexusUrl}/tasks`, {
+    const res = await fetch(`${endpoint.baseUrl}/tasks`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -324,7 +400,8 @@ export async function createNexusTask(
   }
 
   if (status < 200 || status >= 300) {
-    throw new NexusHttpError(status, `Nexus task create failed (${status}): ${text.slice(0, 300)}`, nexusErrorText(text));
+    // The response body is NOT included in the message. Only the classification field is retained.
+    throw new NexusHttpError(status, `Nexus task create failed (${status})`, nexusErrorText(text));
   }
   try {
     json = JSON.parse(text);
@@ -441,8 +518,9 @@ export async function ensureNexusTask(
     });
 
   if (claimErr) {
-    await _logAudit(db, actorEmail, "NEXUS_TASK_CLAIM_ERROR", sourceType, sourceId || dedupeKey, { dedupe_key: dedupeKey, error: claimErr.message });
-    return { ok: false, dedupe_key: dedupeKey, nexus_task_id: null, reused: false, non_fatal: true, error: claimErr.message };
+    const claimMessage = storableNexusError(claimErr, nexusApiKey);
+    await _logAudit(db, actorEmail, "NEXUS_TASK_CLAIM_ERROR", sourceType, sourceId || dedupeKey, { dedupe_key: dedupeKey, error: claimMessage });
+    return { ok: false, dedupe_key: dedupeKey, nexus_task_id: null, reused: false, non_fatal: true, error: claimMessage };
   }
 
   const claim = (claimResult as unknown[])?.[0] as any;
@@ -462,12 +540,14 @@ export async function ensureNexusTask(
     return { ok: false, dedupe_key: dedupeKey, nexus_task_id: null, reused: false, non_fatal: true, error: `not claim owner (status ${claim.status ?? "unknown"})` };
   }
 
+  // Single choke point for everything written to error_message and to the audit row: redacted and bounded.
   const markFailed = async (
     status: "FAILED" | "TIMEOUT_UNKNOWN" | "ASSIGNEE_REJECTED",
-    message: string,
+    rawMessage: string,
     extra: Record<string, unknown> = {},
     auditAction = "NEXUS_TASK_FAILED",
   ) => {
+    const message = storableNexusError(rawMessage, nexusApiKey);
     const patch: Record<string, unknown> = { status, error_message: message, updated_at: new Date().toISOString() };
     if (status === "TIMEOUT_UNKNOWN") {
       patch.reconcile_attempts = 0;
@@ -486,8 +566,16 @@ export async function ensureNexusTask(
     return { ok: false, dedupe_key: dedupeKey, nexus_task_id: null, reused: false, non_fatal: true, error: message } as NexusTaskResult;
   };
 
-  if (!nexusUrl || !nexusApiKey) {
-    return await markFailed("FAILED", "Nexus task API is not configured (NEXUS_TASK_API_URL/NEXUS_API_URL and NEXUS_TASK_API_KEY)");
+  // Configuration is validated before any request. Malformed endpoints fail here, with no fetch.
+  const endpoint = validateNexusTaskConfig({ nexusUrl, nexusApiKey, allowLocalTestHttp: config.allowLocalTestHttp });
+  if (!endpoint.ok) {
+    const missing = endpoint.problem === "missing_url" || endpoint.problem === "missing_api_key";
+    return await markFailed(
+      "FAILED",
+      missing
+        ? "Nexus task API is not configured (NEXUS_TASK_API_URL/NEXUS_API_URL and NEXUS_TASK_API_KEY)"
+        : `Nexus task API configuration rejected: ${endpoint.problem}`,
+    );
   }
 
   const groupId = normalizeText((payload as MissedClassPayload).group_id || (payload as EscalationPayload).group_id);
@@ -506,7 +594,9 @@ export async function ensureNexusTask(
 
   let created: NexusCreateResult;
   try {
-    created = await createNexusTask(nexusUrl, nexusApiKey, taskBody, externalUniqueKey, timeoutMs);
+    created = await createNexusTask(nexusUrl, nexusApiKey, taskBody, externalUniqueKey, timeoutMs, {
+      allowLocalTestHttp: config.allowLocalTestHttp,
+    });
   } catch (err) {
     const e = err instanceof Error ? err : new Error(String(err));
     // Confirmed permanent: the mapped Nexus user does not exist. Stop re-POSTing; needs a human to fix the mapping.
@@ -519,7 +609,7 @@ export async function ensureNexusTask(
         "NEXUS_TASK_ASSIGNEE_REJECTED",
       );
     }
-    return await markFailed(classifyCreateFailure(e), e.message);
+    return await markFailed(classifyCreateFailure(e), e.message); // markFailed redacts and bounds e.message
   }
 
   const nexusTaskId = created.id;
@@ -604,6 +694,18 @@ async function writeFenced(
   }
 }
 
+/**
+ * Last line of defence for audit rows: every string field is redacted (JWTs, Nexus keys) and bounded. Callers
+ * already pass sanitized text; this makes a raw value that slips through harmless instead of persisted.
+ */
+export function redactAuditDetails(details: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(details)) {
+    out[key] = typeof value === "string" ? redactSecrets(value).slice(0, STORED_ERROR_MAX) : value;
+  }
+  return out;
+}
+
 async function _logAudit(
   db: ReturnType<typeof createClient>,
   actorEmail: string,
@@ -621,7 +723,7 @@ async function _logAudit(
       entity_type: entityType,
       entity_id: entityId,
       status: action.endsWith("FAILED") || action.endsWith("REJECTED") ? "FAILED" : "SUCCESS",
-      details,
+      details: redactAuditDetails(details),
       logged_at: new Date().toISOString(),
     });
   } catch { /* audit failures must never break task creation */ }

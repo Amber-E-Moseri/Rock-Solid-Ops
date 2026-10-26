@@ -7,7 +7,7 @@ import { buildDedupeKey, ensureNexusTask } from "./nexus-tasks.ts";
 import { reconcileUnknownNexusTasks } from "./nexus-reconcile.ts";
 import { FakeNexus, FakeNexusDb } from "./nexus-test-support.ts";
 
-const CFG = { nexusUrl: "http://nexus.test/task-api", nexusApiKey: "key", timeoutMs: 60 };
+const CFG = { nexusUrl: "https://nexus.test/task-api", nexusApiKey: "key", timeoutMs: 60 };
 const ADMIN_A = "11111111-1111-4111-8111-111111111111"; // group-level admin
 const ADMIN_B = "22222222-2222-4222-8222-222222222222"; // subgroup admin
 const MIN = 60_000;

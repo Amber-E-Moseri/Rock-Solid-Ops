@@ -27,7 +27,10 @@ import {
   linkEscalationSource,
   logNexusAudit,
   NEXUS_TIMEOUT_MS,
+  type NexusEndpointOptions,
   type NexusTaskConfig,
+  storableNexusError,
+  validateNexusTaskConfig,
 } from "./nexus-tasks.ts";
 
 export const NEXUS_LIST_WINDOW = 200;
@@ -43,13 +46,18 @@ export async function fetchNexusTaskWindow(
   nexusUrl: string,
   apiKey: string,
   timeoutMs = NEXUS_TIMEOUT_MS,
+  options: NexusEndpointOptions = {},
 ): Promise<NexusWindow> {
+  // Validate before any request exists. A rejected configuration is a lookup failure, never a fetch.
+  const endpoint = validateNexusTaskConfig({ nexusUrl, nexusApiKey: apiKey, allowLocalTestHttp: options.allowLocalTestHttp });
+  if (!endpoint.ok) return { ok: false, reason: `lookup_config_${endpoint.problem}` };
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let status = 0;
   let text = "";
   try {
-    const res = await fetch(`${nexusUrl}/tasks?source=api&limit=${NEXUS_LIST_WINDOW}`, {
+    const res = await fetch(`${endpoint.baseUrl}/tasks?source=api&limit=${NEXUS_LIST_WINDOW}`, {
       method: "GET",
       headers: { "x-api-key": apiKey },
       signal: controller.signal,
@@ -129,9 +137,12 @@ export async function reconcileUnknownNexusTasks(
 ): Promise<ReconcileSummary> {
   const summary = emptySummary();
 
-  // Without credentials a lookup would be "unavailable", which must not consume attempts.
-  if (!config.nexusUrl || !config.nexusApiKey) {
-    summary.skipped = "nexus_task_api_not_configured";
+  // Without a valid endpoint and key a lookup would be "unavailable", which must not consume attempts.
+  // Nothing is claimed and nothing is fetched in this branch.
+  const endpoint = validateNexusTaskConfig(config);
+  if (!endpoint.ok) {
+    const missing = endpoint.problem === "missing_url" || endpoint.problem === "missing_api_key";
+    summary.skipped = missing ? "nexus_task_api_not_configured" : `nexus_task_api_config_rejected:${endpoint.problem}`;
     return summary;
   }
 
@@ -144,7 +155,7 @@ export async function reconcileUnknownNexusTasks(
   });
   if (error) {
     summary.errors += 1;
-    summary.skipped = `claim_error: ${error.message}`;
+    summary.skipped = `claim_error: ${storableNexusError(error, config.nexusApiKey)}`;
     return summary;
   }
 
@@ -152,7 +163,9 @@ export async function reconcileUnknownNexusTasks(
   summary.claimed = rows.length;
   if (!rows.length) return summary;
 
-  const win = await fetchNexusTaskWindow(config.nexusUrl, config.nexusApiKey, config.timeoutMs || NEXUS_TIMEOUT_MS);
+  const win = await fetchNexusTaskWindow(config.nexusUrl, config.nexusApiKey, config.timeoutMs || NEXUS_TIMEOUT_MS, {
+    allowLocalTestHttp: config.allowLocalTestHttp,
+  });
 
   for (const row of rows) {
     let outcome: "FOUND" | "ABSENT" | "UNKNOWN";

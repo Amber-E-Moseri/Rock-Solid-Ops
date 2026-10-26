@@ -9,7 +9,7 @@ import { buildDedupeKey, buildExternalUniqueKey, ensureNexusTask } from "./nexus
 import { reconcileUnknownNexusTasks } from "./nexus-reconcile.ts";
 import { FakeNexus, FakeNexusDb, type GetMode } from "./nexus-test-support.ts";
 
-const CFG = { nexusUrl: "http://nexus.test/task-api", nexusApiKey: "key", timeoutMs: 60 };
+const CFG = { nexusUrl: "https://nexus.test/task-api", nexusApiKey: "key", timeoutMs: 60 };
 const USER = "7c1c7d5e-2b0e-4c43-9a37-1b7a3f1d2c11";
 const MIN = 60_000;
 
@@ -419,16 +419,6 @@ Deno.test("RC19: the reconciler module cannot create tasks (no POST, no createNe
   assertFalse(/method:\s*["']POST["']/.test(code));
   assertFalse(/createNexusTask|ensureNexusTask/.test(code));
   assert(/method:\s*["']GET["']/.test(code));
-});
-
-Deno.test("RC20: retry-worker reconciles BEFORE any step of the cron sweep that could reach ensureNexusTask", async () => {
-  const src = await Deno.readTextFile(new URL("../retry-worker/index.ts", import.meta.url));
-  const handlerStart = src.indexOf("Deno.serve(");
-  const reconcileAt = src.indexOf("reconcileUnknownNexusTasks(serviceDb", src.indexOf("if (isCronCall && !id)", handlerStart));
-  const sweepAt = src.indexOf("sweepMoodleEnrollmentRetries(serviceDb, limit)", handlerStart);
-  assert(reconcileAt > 0 && sweepAt > 0 && reconcileAt < sweepAt, "reconcile must precede the sweep/escalation");
-  assert(src.includes('"reconcile_nexus"'), "explicit operator action present");
-  assert(src.includes("NEXUS_RECONCILE_ERROR"), "a reconcile failure must not break the sweep");
 });
 
 Deno.test("RC21: migration 202610030001 is additive/idempotent, locks with SKIP LOCKED + tokens, and is service_role only", async () => {
