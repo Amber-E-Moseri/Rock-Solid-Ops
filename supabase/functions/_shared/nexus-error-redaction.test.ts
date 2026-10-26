@@ -18,7 +18,7 @@ import {
 import { reconcileUnknownNexusTasks } from "./nexus-reconcile.ts";
 import { FakeNexus, FakeNexusDb } from "./nexus-test-support.ts";
 
-const API_KEY = "nexus-api-key-LIVE-9f8e7d6c5b4a";
+const API_KEY = "fixture-nexus-api-key-0000000000";
 const JWT = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.c2lnbmF0dXJlMTIzNDU2";
 const NEXUS_KEY = "blwk_0123456789abcdef";
 const SENTINEL = "UPSTREAM_BODY_SENTINEL_MUST_NOT_PERSIST";
