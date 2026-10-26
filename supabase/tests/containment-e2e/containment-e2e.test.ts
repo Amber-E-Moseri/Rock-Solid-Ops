@@ -307,6 +307,58 @@ Deno.test("moodle-sync processing by service role still runs stuck-row recovery 
   assert(state.tables.audit_logs.some((row) => JSON.stringify(row).includes("MOODLE_SYNC_STUCK_RESET")));
 });
 
+// ---------- connectivity test: read-only, role-separated ----------
+
+const CONNECTIVITY_ROLES = ["superadmin", "admin", "subgroup_admin", "pastor", "principal", "regional_secretary"];
+
+function seedRole(role: string) {
+  state.tables.profiles.push({ user_id: `u-${role}`, email: `${role}@test`, role, is_active: true });
+  state.jwts[`jwt-${role}`] = { id: `u-${role}`, email: `${role}@test` };
+}
+
+Deno.test("moodle-sync test action with stale PROCESSING rows performs zero database mutations", async () => {
+  reset();
+  state.tables.moodle_enrollment_sync.push({
+    id: "row-stale", sync_status: "PROCESSING", registration_status: "ASSIGNED", updated_at: "2020-01-01T00:00:00Z",
+  });
+  const res = await moodleSync(req("moodle", { action: "test" }, "Bearer jwt-admin"));
+  assertEquals(res.status, 200);
+  assertEquals(mutated(), []);
+  assertEquals(state.tables.moodle_enrollment_sync[0].sync_status, "PROCESSING");
+  assertEquals(state.tables.audit_logs.length, 0, "no audit row for a connectivity test");
+  assertEquals(state.moodleCalls, ["core_webservice_get_site_info"], "only the read-only site-info request");
+});
+
+Deno.test("each connectivity-test role can run only the read-only test, never processing", async () => {
+  for (const role of CONNECTIVITY_ROLES) {
+    const token = `Bearer jwt-${role}`;
+
+    reset(); seedRole(role);
+    const t = await moodleSync(req("moodle", { action: "test" }, token));
+    assertEquals(t.status, 200, `${role}: test allowed`);
+    assertEquals(state.moodleCalls, ["core_webservice_get_site_info"], `${role}: test is read-only`);
+    assertEquals(mutated(), [], `${role}: test writes nothing`);
+
+    reset(); seedRole(role);
+    state.tables.moodle_enrollment_sync.push({ id: "row-1", sync_status: "PENDING", registration_status: "ASSIGNED", updated_at: "2026-10-01T00:00:00Z" });
+    const p = await moodleSync(req("moodle", { limit: 5 }, token));
+    assertEquals(p.status, 403, `${role}: processing refused`);
+    assertEquals(state.moodleCalls, [], `${role}: no Moodle call`);
+    assertEquals(mutated(), [], `${role}: no processing write`);
+    assertEquals(state.tables.moodle_enrollment_sync[0].sync_status, "PENDING");
+  }
+});
+
+Deno.test("retry-worker stays admin/superadmin only: the other connectivity-test roles are refused with zero writes", async () => {
+  for (const role of ["subgroup_admin", "pastor", "principal", "regional_secretary"]) {
+    reset(); seedRole(role);
+    const r = await retryWorker(req("retry", { action: "retry", source: "moodle_enrollment_sync", id: "row-1" }, `Bearer jwt-${role}`));
+    assertEquals(r.status, 403, `${role}: retry refused`);
+    assertEquals(state.moodleCalls, [], `${role}: no Moodle call`);
+    assertEquals(mutated(), [], `${role}: no write`);
+  }
+});
+
 Deno.test("cleanup: restore fetch", () => {
   globalThis.fetch = realFetch;
 });
