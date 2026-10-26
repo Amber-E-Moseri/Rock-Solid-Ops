@@ -3,6 +3,7 @@ import {
   type AdminDb,
   isActiveAdminProfile,
   isActiveLegacyAdmin,
+  RETRY_ADMIN_ROLES,
   resolveRetryAdmin,
 } from "./retry-admin-lookup.ts";
 
@@ -58,12 +59,43 @@ Deno.test("active admin profile is authorized and admin_users is never consulted
   assertEquals(tablesQueried(calls), ["profiles"]);
 });
 
-for (const role of ["superadmin", "subgroup_admin", "pastor", "principal"]) {
+for (const role of ["admin", "superadmin"]) {
   Deno.test(`active ${role} profile is authorized`, async () => {
     const { db } = fakeDb({ profiles: { data: { role, is_active: true }, error: null } });
     assertEquals(await resolveRetryAdmin(db, ADMIN_ID, ADMIN_EMAIL), true);
   });
 }
+
+// Manual retry and resolve are limited to admin and superadmin. These roles were authorized before the
+// release restriction, and must be denied now, with no fallback to admin_users.
+for (const role of ["subgroup_admin", "pastor", "principal", "regional_secretary", "teacher", "pending", ""]) {
+  Deno.test(`active ${JSON.stringify(role)} profile is denied and never falls back to admin_users`, async () => {
+    const { db, calls } = fakeDb({
+      profiles: { data: { role, is_active: true }, error: null },
+      admin_users: { data: { role: "admin", status: "active", active: true }, error: null },
+    });
+    assertEquals(await resolveRetryAdmin(db, ADMIN_ID, ADMIN_EMAIL), false);
+    assertEquals(tablesQueried(calls), ["profiles"]);
+  });
+}
+
+Deno.test("the retry role set is exactly admin and superadmin", () => {
+  assertEquals([...RETRY_ADMIN_ROLES], ["admin", "superadmin"]);
+});
+
+Deno.test("legacy admin_users role is narrowed the same way: superadmin allowed, subgroup_admin denied", async () => {
+  const allowed = fakeDb({
+    profiles: { data: null, error: null },
+    admin_users: { data: { role: "superadmin", status: "active", active: true }, error: null },
+  });
+  assertEquals(await resolveRetryAdmin(allowed.db, ADMIN_ID, ADMIN_EMAIL), true);
+
+  const denied = fakeDb({
+    profiles: { data: null, error: null },
+    admin_users: { data: { role: "subgroup_admin", status: "active", active: true }, error: null },
+  });
+  assertEquals(await resolveRetryAdmin(denied.db, ADMIN_ID, ADMIN_EMAIL), false);
+});
 
 Deno.test("role comparison ignores case and surrounding whitespace", async () => {
   const { db } = fakeDb({ profiles: { data: { role: "  ADMIN ", is_active: true }, error: null } });
@@ -275,7 +307,7 @@ Deno.test("retry-worker reads class_options only through that single statement",
 
 Deno.test("retry-worker authorization no longer builds a PostgREST filter string", () => {
   assertEquals(workerSrc.includes(".or("), false);
-  assertStringIncludes(workerSrc, "resolveRetryAdmin(serviceDb as unknown as AdminDb, user.id, user.email)");
+  assertStringIncludes(workerSrc, "resolveRetryAdmin(serviceDb, user.id, user.email)");
 });
 
 // ── helper: scripted per call, for sequences that depend on the earlier result ──────────────────

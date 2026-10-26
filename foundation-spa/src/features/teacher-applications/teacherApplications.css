@@ -1,0 +1,264 @@
+/* Teacher application review screen. Colours and type come from the shared tokens. Phone-first: the
+   queue and the detail stack in one column, and the two-column layout starts at 1024px. */
+
+.ta-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4, 16px);
+  min-width: 0;
+}
+
+.ta-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 8px);
+}
+
+.ta-toolbar > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ta-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4, 16px);
+  min-width: 0;
+}
+
+.ta-queue,
+.ta-detail {
+  min-width: 0;
+  background: var(--surface, var(--color-surface));
+  border: 1px solid var(--line, var(--border));
+  border-radius: var(--r-xl, 16px);
+  box-shadow: var(--sh-xs);
+  padding: var(--space-4, 16px);
+  overflow-wrap: anywhere;
+}
+
+.ta-count {
+  margin: 0 0 var(--space-2, 8px);
+  color: var(--muted);
+  font-size: var(--fs-meta, 13px);
+}
+
+.ta-name-cell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  min-width: 0;
+}
+
+.ta-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.ta-link:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.ta-muted {
+  color: var(--muted);
+  font-size: var(--fs-meta, 13px);
+  margin: 0;
+}
+
+.ta-wrap {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.ta-card-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  min-width: 0;
+}
+
+.ta-detail-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4, 16px);
+  min-width: 0;
+}
+
+.ta-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2, 8px);
+}
+
+.ta-detail-title {
+  margin: 0;
+  font-size: var(--fs-section-title, 18px);
+  overflow-wrap: anywhere;
+}
+
+.ta-verified {
+  margin: 0;
+  color: var(--success-text, var(--success));
+  font-weight: 600;
+}
+
+.ta-unverified {
+  margin: 0;
+  color: var(--danger-text, var(--danger));
+  font-weight: 600;
+}
+
+.ta-facts {
+  display: grid;
+  gap: var(--space-2, 8px);
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+}
+
+.ta-facts > div {
+  min-width: 0;
+}
+
+.ta-facts dt {
+  color: var(--muted);
+  font-size: var(--fs-label, 12px);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ta-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.ta-block {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2, 8px);
+  min-width: 0;
+  border-top: 1px solid var(--line, var(--border));
+  padding-top: var(--space-3, 12px);
+}
+
+.ta-block-title {
+  margin: 0;
+  font-size: var(--fs-label, 13px);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ta-body {
+  margin: 0;
+}
+
+.ta-warning {
+  display: grid;
+  gap: 4px;
+  padding: var(--space-3, 12px);
+  border-radius: var(--r-md, 12px);
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-bd, var(--line, var(--border)));
+  color: var(--warn);
+}
+
+.ta-warning p {
+  margin: 0;
+  color: var(--text, var(--ink));
+}
+
+.ta-error {
+  margin: 0;
+  color: var(--danger-text, var(--danger));
+}
+
+.ta-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2, 8px);
+}
+
+.ta-list-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  min-width: 0;
+  padding: var(--space-2, 8px) 0;
+  border-bottom: 1px solid var(--line, var(--border));
+}
+
+.ta-label {
+  font-weight: 600;
+  font-size: var(--fs-label, 13px);
+}
+
+.ta-dialog {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2, 8px);
+  min-width: 0;
+}
+
+.ta-dialog .rso-textarea {
+  width: 100%;
+  min-height: 120px;
+  font-size: 16px;
+}
+
+.ta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 8px);
+  align-items: center;
+  border-top: 1px solid var(--line, var(--border));
+  padding-top: var(--space-3, 12px);
+}
+
+.ta-actions > p {
+  flex-basis: 100%;
+}
+
+.ta-actions .rso-btn {
+  max-width: 100%;
+}
+
+@media (min-width: 640px) {
+  .ta-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .ta-layout {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .ta-detail {
+    position: sticky;
+    top: var(--space-4, 16px);
+  }
+}
+
+@media (max-width: 639px) {
+  .ta-actions .rso-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .ta-toolbar > * {
+    flex: 1 1 100%;
+  }
+}

@@ -79,6 +79,141 @@ that keeps `/foundation/auth/login.html` live. Verify its status before the next
 Known limitation: the staging harness must refresh authentication after sign-out, because the sign-out test
 revokes the teacher session that later tests reuse.
 
+### `feature/teacher-onboarding-experience` — P2 candidate, HOLD: do not merge or deploy (2026-10-24)
+
+Pushed as `feature/teacher-onboarding-experience-p2` (head `1cf3db3`) and open as draft PR #25, based on
+`integration/teacher-onboarding-candidate` (`28bd91d`). Incorporated into `integration/consolidated-spa-release-candidate`
+(see the consolidated entry below). The holds in this entry stay in force on that candidate.
+
+Holds that stay in force:
+
+- Teacher applications review route and nav item are registered but gated by `TEACHER_ONBOARDING_CERTIFIED`
+  (false). They stay invisible until PR #22 is deployed to staging and the hold is lifted by its owner.
+- Approve control is held disabled (`APPROVAL_CONTRACT_AVAILABLE = false` in
+  `src/features/teacher-applications/lib/reviewApi.js`). Release requires the P1 teacher-link contract.
+- Public account forms require a Turnstile site key in production (`VITE_TURNSTILE_SITE_KEY`), and Turnstile
+  CAPTCHA protection must be enabled and verified in Supabase Auth. The widget alone is not enforcement.
+- `TEACHER_ONBOARDING_CERTIFIED` stays `false`. The three existing release holds are unchanged.
+
+Release condition: PR #22 deployed to staging and verified; Supabase Auth CAPTCHA, redirect and rate-limit
+settings confirmed; recovery-link verification done in staging; P1 approval and activation contract certified.
+
+
+### `integration/teacher-onboarding-candidate` (PR #23, stacked on PR #20) — HOLD on merge and launch (2026-10-24)
+
+Status: draft candidate. Teacher onboarding gate `TEACHER_ONBOARDING_CERTIFIED` is false. The three other release holds are false.
+
+Dependencies:
+- PR #20 (`brief/spa-cutover-integration`, head `9391cf0`) is the base.
+- PR #21 (`brief/legacy-login-safe-next`, head `026d88d`) is cherry-picked here as `489911e`. Its validator was not in PR #20's head, and the legacy `/foundation` login had the old open-redirect check.
+- PR #22 (`feature/teacher-onboarding-foundation`, head `a67e950`) supplies the applicant API at runtime. It is not in this branch's history.
+
+Holds (each must clear before launch):
+1. `/auth/reset-password` now serves the hardened page on an existing public route, while onboarding is held. Live recovery-link verification is required: a real recovery email, its redirect allow-list, the recovery `amr` claim, and expired and reused links.
+2. Legacy metadata-role fallback. Fixed locally in PR #24 (`security/legacy-metadata-authorization`, head `6782183`): the
+   metadata role fallback is removed, the profile is the only source of authority, and the legacy tests are in CI. The fix is
+   incorporated into `integration/consolidated-spa-release-candidate`. This hold stays until live legacy admin and teacher
+   login, RLS self-read on `profiles`, missing and inactive profile denial, and sign-in and token refresh are certified.
+3. CI coverage. `ci.yml` runs `pull_request` for the base branches `brief/spa-cutover-integration` and
+   `integration/teacher-onboarding-candidate`. The unit job runs the PR #21 safe-next test and the legacy profile-trust test. The
+   owner approved this trigger change in the PR #24 review (2026-10-24).
+4. Live sign-in and token-refresh test, to confirm the fail-closed refresh does not cause an unintended sign-out loop. Not verified.
+
+### `integration/consolidated-spa-release-candidate` — HOLD on merge, deploy and feature enablement (2026-10-24)
+
+Status: one isolated candidate combining the legacy authorization security fix and the teacher experience work. Draft
+integration PR only. Not merged, not deployed, no migrations applied, no live Auth settings changed.
+
+Dependency chain (each is a PR against the one above it):
+- PR #20 `brief/spa-cutover-integration` (head `f2cf8c7`), the base of PR #23. PR #23 is still based on the older PR #20
+  commit `9391cf0`, and `f2cf8c7` is not in PR #23's history. PR #23 is not rebased or changed by this candidate.
+- PR #23 `integration/teacher-onboarding-candidate` (head `28bd91d`). The candidate branches from this head.
+- PR #20's `f2cf8c7` (Moodle retry release hold across retry actions) is incorporated into the candidate by cherry-pick,
+  as `9c20761`. It is not a git ancestor of the candidate, so check it by content, not by ancestry. Its tests are in the candidate.
+- PR #24 `security/legacy-metadata-authorization` (head `6782183`) is merged into the candidate. CI 3/3 PASS on its head.
+- PR #25 `feature/teacher-onboarding-experience-p2` (head `1cf3db3`) is merged into the candidate. CI 3/3 PASS on its head.
+- The merge of PR #24 and PR #25 duplicates their commits. When PR #24 and PR #25 are closed, this candidate must be the only path,
+  so do not merge them separately.
+
+Release flags stay false: `APPROVAL_CERTIFIED`, `MOODLE_RETRY_CERTIFIED`, `ATTENDANCE_SUBMIT_CERTIFIED` and
+`TEACHER_ONBOARDING_CERTIFIED` (`foundation-spa/src/releaseHolds.js`). `APPROVAL_CONTRACT_AVAILABLE` stays false in
+`foundation-spa/src/features/teacher-applications/lib/reviewApi.js`, so the approve control stays disabled.
+
+Live certification gates, none verified by CI or local tests:
+1. Legacy admin and teacher login with real accounts.
+2. Trusted profile self-read under RLS on the deployed project (`profiles_self_or_admin_select` in the live database).
+3. Missing and inactive profile denial on a live account.
+4. Sign-in, token refresh and sign-out on the legacy pages.
+5. Production `BYPASS_ROLE` configuration: confirm it is empty or inert in the deployed `config.js`.
+6. Legacy navigation and the 2.5 s landing timeout (login pending path and slow but valid lookups).
+7. Recovery-link verification and Turnstile enforcement, from the holds above.
+
+Staging blockers: the staging site and its database are not yet deployed from this candidate. Staging remains on hold per
+`rocksolid-staging` above.
+
+### `security/limited-release-remediation` — server-side Moodle retry hold and legacy reset hold (2026-10-24)
+
+Two narrow fixes on top of PR #26 (`9db8a96`). Not merged, not deployed.
+
+- **Moodle retry (server-side).** `supabase/functions/_shared/moodle-retry-hold.ts` sets `MOODLE_RETRY_CERTIFIED = false`
+  and is used by `retry-worker`. A direct retry of `moodle_enrollment_sync` or `moodle_sync` is refused (409
+  `MOODLE_RETRY_HELD`) before any write. The automated sweep is skipped while held. Every retry-driven call to
+  `moodle-sync` goes through a guard that rejects before any request. Non-Moodle retries and all resolves are unchanged.
+  The hold is a code constant, not an environment variable, so it cannot be flipped by configuration. Lifting it needs
+  a code change, a tested contract and an owner decision recorded here.
+- **Legacy password reset.** `foundation/auth/login.html` no longer calls `resetPasswordForEmail`. `LEGACY_PASSWORD_RESET_HOLD`
+  is `true`, and the reset link shows a held message. The protected SPA recovery route has not been verified at the deployed
+  origin, so no redirect is introduced. Sign-in and `safe-next` are unchanged.
+
+Not verified: the deployed `retry-worker` (repo source only; the deployed function must be inspected or redeployed under
+owner authorization); the deployed legacy login page; live Moodle behaviour.
+
+Lift conditions: Moodle retry contract certified against the live endpoint, both identifiers covered by tests, and the
+deployed retry-worker confirmed to match this source. Legacy reset may return only after the protected SPA route is verified
+at the deployed origin and the Auth redirect allow-list is confirmed.
+
+**Authorization hardening (2026-10-24).** `retry-worker` now authorizes every request before any body read, retry,
+resolve, sweep, Moodle call, escalation or audit write. The request needs a Bearer token that verifies as an active admin
+(`_shared/retry-authorization.ts`). A missing or invalid Authorization header is refused with 401. A non-admin is refused
+with 403. A missing header is never treated as a trusted scheduler.
+
+**Scheduled sweep: unavailable.** `SCHEDULED_SWEEP_ENABLED = false` in `retry-worker/index.ts`. No request reaches the sweep.
+The scheduler authentication contract is unverified: the repository has no scheduler secret, no pg_cron definition and no
+documented invocation identity. Enabling the sweep needs a verified contract, owner approval and a recorded change here.
+
+**Staging check required before any deployment:** confirm the effective `verify_jwt` for `retry-worker` on the deployed
+project. The root `supabase/config.toml` sets `true`, and `supabase/functions/retry-worker/config.toml` sets `false`. The
+repository cannot show which one the platform applies. With the authorization gate in place, either setting fails closed
+for unauthenticated callers, but the check must still be recorded.
+
+Release flags, all `false`: `APPROVAL_CERTIFIED`, `MOODLE_RETRY_CERTIFIED` (SPA and server constant),
+`ATTENDANCE_SUBMIT_CERTIFIED`, `TEACHER_ONBOARDING_CERTIFIED`, `APPROVAL_CONTRACT_AVAILABLE`.
+
+### `brief/teacher-activation-fix` (PR #43, draft) — HOLD on merge; depends on PR #26 staging certification (2026-10-26)
+
+Narrow extraction of the teacher-activation fix from PR #29 (closed as superseded, not merged), based on
+`integration/consolidated-spa-release-candidate` (`5cd8423`). Head `eddcd3c5921a83dc83ffa9fbc8c95105f5662bac`.
+
+- **CI PASS at `eddcd3c`:** Migration gate pass, Security regression pass, Unit tests pass. The first Migration gate
+  run failed in Supabase CLI setup (GitHub API rate limit, infrastructure). The rerun passed with no code or pinning change.
+- **Residual 1 (accepted, not resolved):** legacy Teacher Management still grants the `teacher` sign-in role from the browser.
+  Only RLS and migration `202607131600` stand behind it. This PR makes that write fail closed; it does not remove it.
+- **Residual 2 (accepted, not resolved):** a superadmin can still approve a teacher directly, bypassing the application
+  workflow, until the P1 approval/activation contract exists.
+- Acceptance is documented only. It does not certify either behaviour for unrestricted production use.
+- Holds preserved and unchanged: legacy password reset (`LEGACY_PASSWORD_RESET_HOLD`), Moodle retry (server and SPA),
+  attendance submission, teacher onboarding, approval.
+- Not merged, not deployed. Stays dependent on PR #26 staging certification and P1 authorization-boundary review.
+
+
+### `reconcile/pr41-into-pr47` — retry-worker scheduler HOLD: scheduled Moodle retry sweeps stay disabled (2026-10-26)
+
+Owner decision: keep scheduled Moodle retry sweeps disabled. Local reconciliation candidate `94e691f`, not deployed.
+
+- `SCHEDULED_SWEEP_ENABLED = false` in `retry-worker/index.ts` stays. No scheduler authentication mechanism is added in this release.
+- The production `retry-worker` cron is treated as uncertified, even though its schedule remains present. Its request headers are not in the repository. Under the current function authorization it cannot authenticate as a user session, so it is refused.
+- `retry-worker` keeps `verify_jwt = true` in the candidate. Production gateway setting is unverified and is not changed by this hold.
+- Lifting this hold needs a new owner decision on a scheduler identity the function can verify, a certified contract, and a recorded change here.
 
 ## Resolved (moot — already merged)
 

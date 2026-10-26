@@ -9,12 +9,19 @@ import {
   isValidString,
   safeLogAudit,
 } from "../_shared/http.ts";
+import {
+  MOODLE_RETRY_HELD_CODE,
+  invokeMoodleRetrySync,
+  planDirectRetry,
+  planSweep,
+} from "../_shared/moodle-retry-hold.ts";
 import { authorizeRetryRequest } from "../_shared/retry-authorization.ts";
-import { resolveRetryAdmin, type AdminDb } from "../_shared/retry-admin-lookup.ts";
-import { MOODLE_RETRY_HELD_CODE, planDirectRetry } from "../_shared/moodle-retry-hold.ts";
+import { resolveRetryAdmin } from "../_shared/retry-admin-lookup.ts";
+import { EMAIL_RESOLVE_HELD_CODE, planResolve } from "../_shared/email-resolve-hold.ts";
 
-// The hourly scheduled Moodle sweep is off. It would start live Moodle synchronization with no operator
-// present. Re-enable only with a certified scheduler authentication contract (see docs/BRANCH_HOLDS.md).
+// The scheduled sweep is unavailable. retry-worker has no verified scheduler-authentication contract,
+// so no request can be recognised as the scheduler. Enable only with a verified contract (see
+// docs/BRANCH_HOLDS.md), and never on a missing Authorization header.
 const SCHEDULED_SWEEP_ENABLED = false;
 
 type RetryAction = "retry" | "resolve";
@@ -61,7 +68,7 @@ async function triggerMoodleSync(
   serviceKey: string,
   id: string,
 ) {
-  const res = await fetch(`${supabaseUrl}/functions/v1/moodle-sync`, {
+  const res = await invokeMoodleRetrySync(fetch, `${supabaseUrl}/functions/v1/moodle-sync`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${serviceKey}`,
@@ -97,7 +104,6 @@ async function triggerClickupEscalation(
   if (!res.ok) throw new Error(String(data?.error || `clickup-sync failed (${res.status})`));
   return data as Record<string, unknown>;
 }
-
 
 async function logAudit(
   db: ReturnType<typeof createClient>,
@@ -240,8 +246,8 @@ async function applyRetry(
       .from("email_queue")
       .update({
         status: "Pending",
+        // email_queue has no last_error column. error_message is its only error field.
         error_message: null,
-        last_error: null,
         retry_count: Number(row.retry_count || 0) + 1,
         last_retry_at: now,
         updated_at: now,
@@ -365,8 +371,8 @@ Deno.serve(async (req) => {
     if (!SUPABASE_URL || !SERVICE_KEY) return json({ ok: false, error: "Missing Supabase env" }, 500);
 
     const serviceDb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
-    // Every request must present a bearer that verifies as an active admin, before any body is read or any
-    // write happens. A missing Authorization header is refused, never treated as a scheduler.
+    // Every request must present a Bearer token that verifies as an active admin, before any body is
+    // read, retry, resolve, sweep, Moodle call or escalation. A missing header is not a trusted scheduler.
     const authDecision = await authorizeRetryRequest({
       authHeader: req.headers.get("Authorization"),
       verifyUser: async (jwt) => {
@@ -374,9 +380,7 @@ Deno.serve(async (req) => {
         if (userErr || !userData?.user) return null;
         return { id: userData.user.id, email: userData.user.email };
       },
-      // The service client is structurally compatible with AdminDb at runtime; the cast only bridges the
-      // generic Supabase builder types, which resolveRetryAdmin does not use.
-      isAdmin: (user) => resolveRetryAdmin(serviceDb as unknown as AdminDb, user.id, user.email),
+      isAdmin: (user) => resolveRetryAdmin(serviceDb, user.id, user.email),
     });
     if (!authDecision.ok) {
       return json({ ok: false, error: authDecision.error, code: authDecision.code }, authDecision.status);
@@ -410,6 +414,18 @@ Deno.serve(async (req) => {
     }
 
     if (SCHEDULED_SWEEP_ENABLED && !id) {
+      if (planSweep() === "skip_held") {
+        await logAudit(
+          serviceDb,
+          actorEmail,
+          "MOODLE_RETRY_SWEEP_HELD",
+          "moodle_enrollment_sync",
+          "batch",
+          "SKIPPED",
+          { source: "moodle_enrollment_sync", limit, code: MOODLE_RETRY_HELD_CODE },
+        );
+        return json({ ok: true, mode: "auto_sweep", source: "moodle_enrollment_sync", skipped: MOODLE_RETRY_HELD_CODE, selected: 0, attempted: 0, escalated: 0, limit });
+      }
       const sweep = await sweepMoodleEnrollmentRetries(serviceDb, limit);
       let escalated = 0;
       for (const row of sweep.candidates || []) {
@@ -432,7 +448,7 @@ Deno.serve(async (req) => {
       // Trigger Moodle sync once after sweep to process newly marked RETRYING rows.
       if (sweep.attempted > 0) {
         try {
-          await fetch(`${SUPABASE_URL}/functions/v1/moodle-sync`, {
+          await invokeMoodleRetrySync(fetch, `${SUPABASE_URL}/functions/v1/moodle-sync`, {
             method: "POST",
             headers: {
               Authorization: `Bearer ${SERVICE_KEY}`,
@@ -450,10 +466,31 @@ Deno.serve(async (req) => {
 
     if (!id) return json({ ok: false, error: "id is required", code: "MISSING_ID" }, 400);
 
-    // Server-side Moodle hold: a retry for a Moodle source starts live Moodle synchronization. Refuse before
-    // any write while certification is pending. Resolve and non-Moodle sources are unaffected.
     if (planDirectRetry(action, source) === "refuse_held") {
-      return json({ ok: false, error: "Moodle retry is on hold pending endpoint and authorization certification.", code: MOODLE_RETRY_HELD_CODE }, 409);
+      await logAudit(
+        serviceDb,
+        actorEmail,
+        "MOODLE_RETRY_HELD",
+        source,
+        id,
+        "SKIPPED",
+        { action, source, id, code: MOODLE_RETRY_HELD_CODE },
+      );
+      return json({ ok: false, error: "Moodle retry is on hold.", code: MOODLE_RETRY_HELD_CODE }, 409);
+    }
+
+    // email_queue has no Resolved status. Refuse before any write, and do not map to another status.
+    if (planResolve(action, source) === "refuse_held") {
+      await logAudit(
+        serviceDb,
+        actorEmail,
+        "EMAIL_RESOLVE_HELD",
+        source,
+        id,
+        "SKIPPED",
+        { action, source, id, code: EMAIL_RESOLVE_HELD_CODE },
+      );
+      return json({ ok: false, error: "Email Resolve is on hold.", code: EMAIL_RESOLVE_HELD_CODE }, 409);
     }
 
     if (action === "retry") {
