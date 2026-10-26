@@ -3,9 +3,12 @@ import { json, normalizeTimeSlot, parseDate, safeLower, withTimeout } from "../_
 import type { ActionContext } from "../_lib/types.ts";
 import { assertClassOwnership } from "../_lib/class-ownership.ts";
 import { safeLogAudit, writeAudit } from "../_lib/teacher-auth.ts";
+import { assertAttendanceSubmitCertified } from "../_lib/attendance-submit-hold.ts";
 
 
 export async function submitTeacherAttendanceAction(ctx: ActionContext): Promise<Response> {
+  // Refuse before any database read, write, audit or external call while attendance submission is uncertified.
+  assertAttendanceSubmitCertified();
   const { db, auth, params } = ctx;
       const classOptionId = String(params.classOptionId || "").trim();
       await assertClassOwnership(db, classOptionId, auth.teacher.teacherId, { email: auth.teacher.email, userId: auth.user.id });
