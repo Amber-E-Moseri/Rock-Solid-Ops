@@ -67,6 +67,10 @@ jobs:
         # Legacy Teacher Management never marks a teacher ACTIVE without the sign-in role, and surfaces role-write errors.
         run: node --test tests/legacy-teacher-activation.test.mjs
 
+      - name: Run PR #41 / PR #47 reconciliation hold regression test
+        # Pins the reconciled holds, the admin/superadmin retry roles, verify_jwt, and the email_queue select.
+        run: node --test tests/reconciliation-holds.test.mjs
+
   # ──────────────────────────────────────────────────────────────
   # Job 2: Migration gate — db reset + schema invariant check.
   # Verifies the full migration chain replays cleanly from zero
