@@ -80,6 +80,41 @@ Known limitation: the staging harness must refresh authentication after sign-out
 revokes the teacher session that later tests reuse.
 
 
+### `feature/teacher-onboarding-foundation` — HOLD on merge and on any staging or production apply (2026-10-23)
+
+Status: local branch from `origin/main` (`3ab00a2`). Application foundation only: additive migrations, read views, lifecycle functions, email templates and an 83-check authorization harness. Not pushed. Draft PR permitted; merge not permitted.
+
+Hold conditions before merge:
+1. CI migration gate (`scripts/test-migration.sh`, `db reset` from zero) passes on the PR head. It could not be run locally.
+2. Owner resolves decisions D2 (auth-first), D3 (reviewer scope) and D4 (teacher profile role) in `docs/TEACHER_APPLICATION_FOUNDATION.md`.
+3. Read-only production checks in section 9 of that document are recorded in `docs/migration-log.md`.
+4. Merge order with PR #14 (`brief/anon-privilege-hardening`, timestamp `20261022120000`) is decided. This branch uses `20261023…`.
+
+Staging apply additionally requires the owner's approval of the RLS and grant changes, and a decision on `rocksolid-staging`.
+
+Approval and account linking are not part of this branch. They require the teacher-link contract to be verified deployed in production first.
+
+### `claude/funny-hamilton-cx3ak3` (PR #45) — HOLD on merge and on any staging or production apply (2026-10-25)
+
+Status: Request Access Phases 1 and 2 (`org_subgroups`, `staff_scope_assignments`, scope functions, teacher application scope migration `202610250300` with `APPROVAL_PENDING_PROVISIONING`, 75-check and teacher-applications harnesses), stacked on `feature/teacher-onboarding-foundation` (PR #22, head `a67e950`). The two PR #22 commits are included unchanged: all nine PR #22 files are byte-identical on both heads. PR #22 holds therefore apply to this branch too. Draft PR permitted; merge not permitted.
+
+Hold conditions before merge:
+1. CI migration gate (`scripts/test-migration.sh`, `db reset` from zero) passes on the PR head. Local runs used the Supabase-shaped stub baseline only: teacher-applications 87/87 and request-access-scope 75/75 passed. No full replay was run.
+2. Ordering with PR #14 (`brief/anon-privilege-hardening`, `20261022120000`) is verified by the gate in step 1. PR #14 requires the full schema and could not be applied on the stub baseline. Expected order: PR #14, then `202610230100`, `202610230200`, `202610250100`, `202610250200`, `202610250300`.
+3. D2 and D3 are resolved by the owner. D4 is owner-deferred to the provisioning phase (2026-10-26): deferred, not completed or certified. Its requirements before any future role assignment are in `docs/TEACHER_APPLICATION_FOUNDATION.md` (D4). Inherited from PR #22.
+4. Owner approves the security boundary: RLS and grants on `org_subgroups` and `staff_scope_assignments`, and the service-role-only scope functions (`grant_staff_scope`, `revoke_staff_scope`, `staff_scope_covers`, `staff_scope_org_wide`).
+5. Read-only production checks for the Phase 1 objects are recorded in `docs/migration-log.md`.
+
+Provisioning, activation, role elevation and teacher linking are not part of this branch. No application code calls the scope grant or revoke functions. Any staging apply additionally requires the owner decision on `rocksolid-staging`.
+
+**Phase 3 update (2026-10-26).** Adds the general Request Access intake and review (`202610250400_access_request_intake_and_review.sql`), the public `/auth/request-access` page and the staff inbox at `/staff/access-requests`. Approval records `APPROVAL_PENDING_PROVISIONING` and changes nothing else. Phase 3 is held under the same conditions 1 to 5 above, plus:
+
+6. Owner approves the Phase 3 security boundary: `access_requests` and `access_request_events` RLS, the three views, the decision function's authority check (`access_request_can_decide`), and the public `access_request_org_options()` (anon and authenticated, active rows only).
+7. Supabase Auth sign-up and email-confirmation settings for the project are confirmed. The page depends on them and they were not verified here.
+8. The provisioning queue and worker are not built. Approved requests stay held. Phase 4 has its own gate.
+
+Phase 3 status of the hold: draft PR permitted, merge not permitted. No staging or production apply.
+
 ## Resolved (moot — already merged)
 
 ### `brief/moodle-credential-safety` — RESOLVED 2026-07-23

@@ -147,3 +147,34 @@ notification-retry-helper — RETRY HELPER ONLY
   Used by Retry Center only
   Must not be given a cron schedule
 # sender-worker deleted 2026-05-18 — reconcile-stuck.sql archived in git history.
+
+# TEACHER APPLICATION STATUSES
+
+Source: `supabase/migrations/202610230100_teacher_applications_foundation.sql` (base) and `supabase/migrations/202610250300_teacher_applications_scope.sql` (adds `APPROVAL_PENDING_PROVISIONING`). Transitions are enforced by `teacher_application_transition_allowed`.
+
+```
+SUBMITTED                      applicant submitted (or resubmitted); awaiting review
+INFO_REQUESTED                 reviewer asked for information; applicant may respond
+APPROVAL_PENDING_PROVISIONING  scoped approval recorded. No role, roster, account or email change.
+                               Held until provisioning is certified (P1 hold). Not reviewable or withdrawable.
+APPROVED                       reserved: set only by the teacher-link contract (not wired; P1 hold)
+REJECTED                       terminal; internal reason; re-application blocked pending owner decision
+WITHDRAWN                      terminal; applicant withdrew; a new application may follow
+```
+
+Email template keys added for this flow: `teacher_application_received`, `teacher_application_info_requested`, `teacher_application_rejected`. `APPROVAL_PENDING_PROVISIONING` sends no email.
+
+# ACCESS REQUEST STATUSES (general requests: pastor, subgroup admin, other)
+
+Source: `supabase/migrations/202610250400_access_request_intake_and_review.sql`. Transitions are enforced by `access_request_transition_allowed`. Teacher requests keep the teacher statuses above.
+
+```
+SUBMITTED                      applicant submitted (or resubmitted after information was requested)
+INFO_REQUESTED                 reviewer asked a question; applicant may update and resubmit
+APPROVAL_PENDING_PROVISIONING  approval recorded. No account, role, scope, teacher or email change.
+                               Held until provisioning is certified. Not reviewable or withdrawable.
+REJECTED                       terminal; reviewer's reason is internal, applicant sees a generic outcome
+WITHDRAWN                      terminal; applicant withdrew from SUBMITTED or INFO_REQUESTED
+```
+
+Only `SUBMITTED` and `INFO_REQUESTED` are open. The partial unique index on `access_requests` allows one open request per applicant. `APPROVED` is not used by this flow.

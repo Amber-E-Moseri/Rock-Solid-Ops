@@ -2910,3 +2910,24 @@ Scope: limited frontend rollout with uncertified workflows disabled. Not a full 
 ### Follow-up required before the next staging run
 
 - **The staging harness must refresh authentication after sign-out.** The sign-out test performs a global `supabase.auth.signOut()` (`foundation-spa/src/context/AuthContext.jsx`). That revokes the teacher session saved for later tests. A fresh-session probe then returned `200`, which is consistent with a stale saved session causing the earlier `401` from `teacher-portal-api`.
+
+## 2026-10-23 — Teacher application foundation (branch `feature/teacher-onboarding-foundation`, local only)
+
+Scope: additive application data model, applicant and reviewer views, lifecycle functions, three email templates and an authorization harness. Approval and account linking are deliberately not implemented; they depend on the teacher-link contract, which is not verified deployed in production (`docs/SCHEMA_DRIFT_INVENTORY_2026-10-22.md`).
+
+- Migrations: `202610230100_teacher_applications_foundation.sql`, `202610230200_teacher_application_email_templates.sql`. No existing policy, grant or function was changed. The legacy anon self-registration policy remains.
+- Tests: `supabase/tests/teacher-applications/run.sh`. 83 of 83 checks pass on PostgreSQL 16.15 against Supabase-shaped stubs. Mutation checks confirmed the reviewer gate and the verification gate fail when weakened.
+- Not verified: the CI migration gate (needs Docker and the Supabase CLI); live Supabase Auth behaviour; production definitions listed in section 9 of the foundation document.
+- Gate: security boundary (RLS, grants, role gate). Draft PR permitted; merge held. See `docs/BRANCH_HOLDS.md`.
+- Decisions outstanding: D1 to D11 in `docs/TEACHER_APPLICATION_FOUNDATION.md`.
+
+## 2026-10-26 — Request Access Phase 3 (branch `claude/funny-hamilton-cx3ak3`, PR #45 draft, not merged)
+
+Scope: general access-request intake and review (pastor, subgroup admin, other), the public `/auth/request-access` page, and the staff inbox `/staff/access-requests`. Teacher requests reuse the Phase 2 teacher application functions. Approval records `APPROVAL_PENDING_PROVISIONING` and changes no account, role, scope, teacher record or email.
+
+- Migration: `supabase/migrations/202610250400_access_request_intake_and_review.sql`. Additive. No existing object is dropped. Replaces no Phase 1 or Phase 2 function.
+- Tests: `supabase/tests/access-requests/run.sh`, 101 of 101 checks passing on PostgreSQL 16 against the Supabase-shaped stub baseline. The Phase 1 (`request-access-scope`, 75 of 75) and Phase 2 (`teacher-applications`, 132 of 132) suites still pass on the same run.
+- SPA: Vitest 421 of 421 across 63 files, including 69 new Request Access checks. `npm run build` exits 0. Signed-out page captured at 1280, 820 and 375 px with no horizontal overflow and no page errors. The signed-in form and the inbox were not captured, since they need a live session.
+- Not verified: the CI migration gate on this head (needs the Supabase CLI and the full schema), live Supabase Auth sign-up and confirmation behaviour, and production drift. Nothing was applied to any database.
+- Gate: security boundary (RLS, grants, views, authority function). Draft PR permitted; merge held. See `docs/BRANCH_HOLDS.md` (Phase 3 update).
+- Phase 4 (provisioning queue, worker, auth-first activation) is not started.

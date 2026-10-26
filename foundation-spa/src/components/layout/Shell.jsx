@@ -7,13 +7,15 @@ import {
   BarChart2, CheckSquare, CalendarCheck, TrendingUp, HelpCircle,
   MessageSquare, Bell, Mail, FileText, Lock, GraduationCap,
   RefreshCw, Activity, Layers, ExternalLink, Search, Star,
-  LogOut, ChevronLeft, ChevronRight, ChevronDown, Menu, X, Moon, Sun,
+  LogOut, ChevronLeft, ChevronRight, ChevronDown, Menu, X, Moon, Sun, ClipboardCheck,
 } from 'lucide-react';
 
 // ── Nav structure (mirrors admin-shell.js NAV_SECTIONS) ──────────────────────
 
 const OPERATIONAL_ROLES = ['regional_secretary', 'principal', 'subgroup_admin', 'pastor', 'admin', 'superadmin'];
 const SYSTEM_ADMIN_ROLES = ['admin', 'superadmin'];
+// Access request review: the same four roles as the route guard. Admin and principal have no approval authority.
+const ACCESS_REVIEW_ROLES = ['superadmin', 'regional_secretary', 'pastor', 'subgroup_admin'];
 const TEACHER_MODE_ELIGIBLE = new Set(['regional_secretary', 'admin', 'superadmin']);
 const TEACHER_KEYS = new Set(['attendance', 'schedule', 'progress', 'help']);
 // Teacher-facing targets for shared nav items. Teachers cannot open the staff routes
@@ -35,6 +37,7 @@ const NAV_SECTIONS = [
       { key: 'applicants',  label: 'Applicants',       path: '/staff/applicant-directory', Icon: Users,     roles: OPERATIONAL_ROLES },
       { key: 'waitlist',    label: 'Waiting Students', path: '/staff/waitlist',            Icon: Clock,     roles: OPERATIONAL_ROLES },
       { key: 'classeditor', label: 'Class Editor',     path: '/staff/class-editor',        Icon: BookOpen,  roles: OPERATIONAL_ROLES },
+      { key: 'accessreq',   label: 'Access Requests',  path: '/staff/access-requests',     Icon: ClipboardCheck, roles: ACCESS_REVIEW_ROLES },
     ],
   },
   {

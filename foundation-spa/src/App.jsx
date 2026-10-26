@@ -6,6 +6,7 @@ import { ToastProvider } from './context/ToastContext.jsx';
 import ProtectedRoute from './components/layout/ProtectedRoute.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import { landingPathForRole } from './routing/routeRoles.js';
+import { INBOX_ROLES } from './features/access-requests-inbox/lib/accessRequestsInbox.js';
 import Shell from './components/layout/Shell.jsx';
 import { PWAInstallPrompt } from './components/pwa/PWAInstallPrompt.jsx';
 import { OfflineIndicator } from './components/pwa/OfflineIndicator.jsx';
@@ -56,6 +57,8 @@ const GraduationStatusPage = lazy(() => import('./features/graduation-status/Gra
 const NexusManagementPage = lazy(() => import('./features/nexus-management/NexusManagementPage.jsx'));
 const TeacherPortalPage  = lazy(() => import('./features/teacher-portal/TeacherPortalPage.jsx'));
 const PlaceholderPage    = lazy(() => import('./features/placeholder/PlaceholderPage.jsx'));
+const RequestAccessPage  = lazy(() => import('./features/access-request/RequestAccessPage.jsx'));
+const AccessRequestsPage = lazy(() => import('./features/access-requests-inbox/AccessRequestsPage.jsx'));
 // Showcase exists only in development builds; production never imports it.
 const SHOWCASE_ENABLED = import.meta.env.DEV;
 const ShowcasePage       = SHOWCASE_ENABLED
@@ -101,6 +104,8 @@ export default function App() {
               {/* Public */}
               <Route path="/auth/login" element={<LoginPage />} />
               <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+              {/* Public: anyone may open it. Filing requires a verified account and grants nothing. */}
+              <Route path="/auth/request-access" element={<RequestAccessPage />} />
               <Route path="/auth/*" element={<Navigate to="/auth/login" replace />} />
 
               {/* Design system showcase: registered in development builds only */}
@@ -114,6 +119,18 @@ export default function App() {
                   }
                 />
               )}
+
+              {/* Staff — access request review. Server functions decide what each role may see or decide. */}
+              <Route
+                path="/staff/access-requests"
+                element={
+                  <ProtectedRoute roles={INBOX_ROLES}>
+                    <StaffShell title="Access Requests">
+                      <AccessRequestsPage />
+                    </StaffShell>
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Staff — audit log (Phase 2 pilot) */}
               <Route
