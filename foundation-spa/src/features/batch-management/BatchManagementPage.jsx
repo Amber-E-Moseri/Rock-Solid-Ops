@@ -1,11 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  fetchBatches, fetchFellowshipMap, fetchSubgroups, upsertBatch,
+  fetchBatches, fetchFellowshipMap, fetchSubgroups, fetchAllCampusSettings, upsertBatch,
   archiveBatch, deleteBatch, closeBatch, reopenBatch, rolloverBatch, announceBatch,
   filterBatches, fmtDate,
 } from './lib/batchManagement.js';
-import { campusesForBatch, countCampuses } from './lib/batchCampus.js';
+import { campusesForBatch, countEligibleCampuses } from './lib/batchCampus.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { PageHeader, SearchInput, Skeleton, EmptyState, Badge, Button, Modal } from '../../components/ui/index.js';
@@ -22,6 +22,11 @@ const TABS = [
 // Roles that may insert and update batches. Mirrors is_admin() (latest definition: migration
 // 202605220030), which the batches insert and update policies use. Delete stays superadmin-only.
 const BATCH_WRITE_ROLES = ['superadmin', 'admin', 'subgroup_admin', 'pastor', 'principal', 'regional_secretary'];
+
+// Roles that can read every batch_campus_registration_settings row (superadmin, admin, regional_secretary).
+// Other roles see only part of the table under RLS, so campus coverage would be wrong for them. The page
+// shows coverage as unavailable instead. Keep in step with the table's SELECT policies.
+const FULL_CAMPUS_VIEW_ROLES = ['superadmin', 'admin', 'regional_secretary'];
 
 const isArchivedStatus = (status) => ['archived', 'completed'].includes(String(status || '').toLowerCase());
 
@@ -53,6 +58,7 @@ export default function BatchManagementPage() {
   const { data, isLoading, refetch } = useQuery({ queryKey: ['batch-mgmt'], queryFn: fetchBatches, staleTime: 60_000 });
   const fellowships = useQuery({ queryKey: ['batch-fellowships'], queryFn: fetchFellowshipMap, staleTime: 5 * 60_000 });
   const subgroups = useQuery({ queryKey: ['batch-subgroups'], queryFn: fetchSubgroups, staleTime: 5 * 60_000 });
+  const campusSettings = useQuery({ queryKey: ['batch-campus-settings'], queryFn: fetchAllCampusSettings, staleTime: 60_000, retry: false });
 
   const batches = data?.batches ?? [];
   const counts = data?.counts ?? {};
@@ -78,6 +84,20 @@ export default function BatchManagementPage() {
 
   const fellowshipRows = useMemo(() => fellowships.data ?? [], [fellowships.data]);
 
+  const settingsByBatch = useMemo(() => {
+    const map = new Map();
+    for (const row of campusSettings.data ?? []) {
+      if (!map.has(row.batch_id)) map.set(row.batch_id, []);
+      map.get(row.batch_id).push(row);
+    }
+    return map;
+  }, [campusSettings.data]);
+
+  // Campus coverage is available only when the settings read succeeded and this role can read all of it.
+  const campusCoverageState = campusSettings.isError || !FULL_CAMPUS_VIEW_ROLES.includes(profile?.role)
+    ? 'unavailable'
+    : campusSettings.isLoading ? 'loading' : 'ready';
+
   const canEditBatches = BATCH_WRITE_ROLES.includes(profile?.role);
   const canEditBatch = (b) => canEditBatches && !isArchivedStatus(b.status);
 
@@ -98,9 +118,9 @@ export default function BatchManagementPage() {
       upcoming: batches.filter((b) => b.status === 'Upcoming').length,
       nextStart: upcomingStarts[0] ? fmtMonthDay(upcomingStarts[0]) : null,
       openReg: openBatches.length,
-      campuses: countCampuses(openBatches, fellowshipRows),
+      campuses: campusCoverageState === 'ready' ? countEligibleCampuses(openBatches, fellowshipRows, settingsByBatch) : null,
     };
-  }, [batches, fellowshipRows]);
+  }, [batches, fellowshipRows, settingsByBatch, campusCoverageState]);
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
@@ -163,7 +183,7 @@ export default function BatchManagementPage() {
         subtitle="Programme batches, campus registration and open classes."
         actions={
           <>
-            <Button variant="secondary" size="sm" onClick={refetch}>↺ Refresh</Button>
+            <Button variant="secondary" size="sm" onClick={() => { refetch(); campusSettings.refetch(); }}>↺ Refresh</Button>
             <Button variant="primary" size="sm" className="bm-btn-gold" onClick={() => setEditModal({ isNew: true })}>+ Create Batch</Button>
           </>
         }
@@ -188,7 +208,11 @@ export default function BatchManagementPage() {
         <div className="bm-kpi bm-kpi-rose">
           <span className="bm-kpi-label">Open Registration</span>
           <span className="bm-kpi-value">{kpis.openReg}</span>
-          <span className="bm-kpi-sub">Across {kpis.campuses} campus{kpis.campuses === 1 ? '' : 'es'}</span>
+          <span className="bm-kpi-sub">
+            {kpis.campuses !== null
+              ? `Across ${kpis.campuses} campus${kpis.campuses === 1 ? '' : 'es'}`
+              : campusCoverageState === 'loading' ? 'Loading campuses…' : 'Campus coverage unavailable'}
+          </span>
         </div>
       </div>
 
@@ -240,7 +264,7 @@ export default function BatchManagementPage() {
                     <tr key={b.batch_id}>
                       <td>
                         <div className="bm-batch-name">{b.batch_name || b.batch_id}</div>
-                        <div className="bm-batch-meta">{batchMeta(b, fellowshipRows)}</div>
+                        <div className="bm-batch-meta">{batchMeta(b, fellowshipRows, settingsByBatch.get(b.batch_id) ?? [], campusCoverageState === 'ready')}</div>
                       </td>
                       <td className="bm-mono">{fmtShortDate(b.start_date)} → {fmtShortDate(b.end_date)}</td>
                       <td className="bm-mono">{counts[b.batch_id] ?? 0} / {b.capacity ?? '—'}</td>
@@ -342,7 +366,7 @@ export default function BatchManagementPage() {
       {viewBatch && (
         <BatchDetailsModal
           batch={viewBatch}
-          campuses={campusesForBatch(viewBatch, fellowshipRows)}
+          campuses={campusCoverageState === 'ready' ? campusesForBatch(viewBatch, fellowshipRows, settingsByBatch.get(viewBatch.batch_id) ?? []) : null}
           registered={counts[viewBatch.batch_id] ?? 0}
           moodleCourses={moodleCourses}
           onClose={() => setViewBatch(null)}
@@ -417,8 +441,8 @@ function fmtMonthDay(isoDate) {
 
 // Second line under the batch name: the campus (or a count when it spans several), then the subgroup
 // or fellowship. Falls back to the batch id.
-function batchMeta(b, fellowshipRows) {
-  const campuses = campusesForBatch(b, fellowshipRows);
+function batchMeta(b, fellowshipRows, settingsRows, showCampus) {
+  const campuses = showCampus ? campusesForBatch(b, fellowshipRows, settingsRows) : [];
   const campusLabel = campuses.length === 1 ? campuses[0] : campuses.length > 1 ? `${campuses.length} campuses` : null;
   const parts = [campusLabel, b.subgroup_id || b.subgroup || b.fellowship_group].filter(Boolean);
   return parts.length ? parts.join(' · ') : b.batch_id;
@@ -429,7 +453,7 @@ function BatchDetailsModal({ batch, campuses, registered, moodleCourses, onClose
   const course = moodleCourses.find((c) => (c.id || c.course_id) === batch.moodle_course_mapping);
   const rows = [
     ['Batch ID', batch.batch_id],
-    ['Campus', campuses.length ? campuses.join(', ') : '—'],
+    ['Campus', campuses === null ? 'Not available for your role' : campuses.length ? campuses.join(', ') : '—'],
     ['Fellowship', batch.fellowship_group || '—'],
     ['Subgroup', batch.subgroup_id || batch.subgroup || '—'],
     ['Start', fmtDate(batch.start_date)],

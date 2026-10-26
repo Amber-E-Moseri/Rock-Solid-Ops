@@ -3,6 +3,8 @@ import { render, screen, within, fireEvent, waitFor } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const auth = vi.hoisted(() => ({ role: 'superadmin' }));
+// Batch-campus overrides served to the page. fail makes the settings read error.
+const coverage = vi.hoisted(() => ({ rows: [], fail: false }));
 
 vi.mock('../hooks/useAuth.js', () => ({
   useAuth: () => ({ profile: { role: auth.role, email: 'admin@x.com' } }),
@@ -43,6 +45,10 @@ vi.mock('../features/batch-management/lib/batchManagement.js', () => {
       { fellowship_code: 'UBC', campus_name: 'UBC', group_id: 'WS', subgroup_id: 'WSGA' },
       { fellowship_code: 'YORK', campus_name: 'York', group_id: 'CS', subgroup_id: 'CSGA' },
     ]),
+    fetchAllCampusSettings: vi.fn(async () => {
+      if (coverage.fail) throw new Error('denied');
+      return coverage.rows;
+    }),
     fetchSubgroups: vi.fn(async () => []),
     upsertBatch: vi.fn(),
     archiveBatch: vi.fn(),
@@ -267,5 +273,53 @@ describe('BatchManagementPage overflow menu permissions', () => {
     expect(within(menu).queryByRole('menuitem', { name: 'Archive' })).toBeNull();
     expect(within(menu).queryByRole('menuitem', { name: 'Delete' })).toBeNull();
     expect(within(menu).getByRole('menuitem', { name: 'Rollover' })).toBeInTheDocument();
+  });
+});
+
+describe('BatchManagementPage campus coverage', () => {
+  const openKpi = () => document.querySelector('.bm-kpi-rose');
+
+  beforeEach(() => {
+    auth.role = 'superadmin';
+    coverage.rows = [];
+    coverage.fail = false;
+  });
+
+  it('explicit overrides close a campus for every open batch that names it', async () => {
+    // B1 and B2 are CESGA batches (Manitoba). B3 is a CESGB batch (Waterloo). Closing Manitoba for B1 and
+    // B2 leaves Waterloo as the only campus reached by the three open batches.
+    coverage.rows = [
+      { batch_id: 'B1', fellowship_code: 'CMU', registration_open: false },
+      { batch_id: 'B2', fellowship_code: 'CMU', registration_open: false },
+    ];
+    renderPage();
+    await waitFor(() => expect(openKpi()).toHaveTextContent('Across 1 campus'));
+    expect(openKpi()).toHaveTextContent('3');
+  });
+
+  it('a batch closed at every campus it reaches contributes no campus', async () => {
+    coverage.rows = [
+      { batch_id: 'B1', fellowship_code: 'CMU', registration_open: false },
+      { batch_id: 'B2', fellowship_code: 'CMU', registration_open: false },
+      { batch_id: 'B3', fellowship_code: 'UWA', registration_open: false },
+    ];
+    renderPage();
+    await waitFor(() => expect(openKpi()).toHaveTextContent('Across 0 campuses'));
+  });
+
+  it('shows coverage as unavailable when the settings read fails, not as a count', async () => {
+    coverage.fail = true;
+    renderPage();
+    await waitFor(() => expect(openKpi()).toHaveTextContent('Campus coverage unavailable'));
+    expect(openKpi()).not.toHaveTextContent('Across');
+  });
+
+  it('a role that cannot read every override sees coverage as unavailable and no campus label', async () => {
+    auth.role = 'subgroup_admin';
+    renderPage();
+    await waitFor(() => expect(rows().length).toBeGreaterThan(0));
+    expect(openKpi()).toHaveTextContent('Campus coverage unavailable');
+    expect(within(rows()[0]).getByText('CESGA')).toBeInTheDocument();
+    expect(within(rows()[0]).queryByText(/Manitoba/)).toBeNull();
   });
 });

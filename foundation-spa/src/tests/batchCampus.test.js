@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { campusesForBatch, countCampuses } from '../features/batch-management/lib/batchCampus.js';
+import {
+  scopeCodes, eligibleCampusCodes, campusesForBatch, countEligibleCampuses,
+} from '../features/batch-management/lib/batchCampus.js';
 
 const FELLOWSHIPS = [
   { fellowship_code: 'CMU', campus_name: 'Manitoba', group_id: 'CE', subgroup_id: 'CESGA' },
@@ -8,51 +10,105 @@ const FELLOWSHIPS = [
   { fellowship_code: 'YORK', campus_name: 'York', group_id: 'CS', subgroup_id: 'CSGA' },
 ];
 
-describe('campusesForBatch', () => {
-  it('resolves a batch with a subgroup to that subgroup\'s campuses', () => {
-    expect(campusesForBatch({ subgroup_id: 'CESGA', fellowship_group: 'CE' }, FELLOWSHIPS)).toEqual(['Manitoba']);
+const closed = (fellowship_code) => ({ fellowship_code, registration_open: false });
+const open = (fellowship_code) => ({ fellowship_code, registration_open: true });
+
+describe('organizational scope', () => {
+  it('a subgroup-scoped batch covers only that subgroup, not its group', () => {
+    // CESGA and CESGB are both in group CE. The CESGA batch must not pick up Waterloo.
+    expect(scopeCodes({ subgroup_id: 'CESGA', fellowship_group: 'CE' }, FELLOWSHIPS)).toEqual(['CMU']);
   });
 
   it('accepts the legacy subgroup column when subgroup_id is absent', () => {
-    expect(campusesForBatch({ subgroup: 'WSGA' }, FELLOWSHIPS)).toEqual(['UBC']);
+    expect(scopeCodes({ subgroup: 'WSGA' }, FELLOWSHIPS)).toEqual(['UBC']);
   });
 
-  it('falls back to the group code when there is no subgroup', () => {
-    expect(campusesForBatch({ fellowship_group: 'CE' }, FELLOWSHIPS)).toEqual(['Manitoba', 'Waterloo']);
+  it('a group-scoped batch (no subgroup) covers every campus in that group', () => {
+    expect(scopeCodes({ fellowship_group: 'CE' }, FELLOWSHIPS)).toEqual(['CMU', 'UWA']);
   });
 
-  it('falls back to a fellowship code when the value is not a group', () => {
-    expect(campusesForBatch({ fellowship_group: 'YORK' }, FELLOWSHIPS)).toEqual(['York']);
+  it('a fellowship-code scope covers that one campus', () => {
+    expect(scopeCodes({ fellowship_group: 'YORK' }, FELLOWSHIPS)).toEqual(['YORK']);
   });
 
-  it('returns no campuses when nothing matches or the batch has no fellowship', () => {
-    expect(campusesForBatch({ subgroup_id: 'NOPE' }, FELLOWSHIPS)).toEqual([]);
+  it('an unresolved subgroup does not fall back to the group', () => {
+    expect(scopeCodes({ subgroup_id: 'NOPE', fellowship_group: 'CE' }, FELLOWSHIPS)).toEqual([]);
+  });
+});
+
+describe('unmapped batches', () => {
+  it('a batch with no subgroup and no fellowship covers no campus', () => {
+    expect(eligibleCampusCodes({}, FELLOWSHIPS)).toEqual([]);
     expect(campusesForBatch({}, FELLOWSHIPS)).toEqual([]);
   });
 
-  it('lists each campus once', () => {
+  it('an unmapped batch invents no campus, even with an explicit open row for an unknown code', () => {
+    expect(eligibleCampusCodes({ subgroup_id: 'NOPE' }, FELLOWSHIPS, [open('GHOST')])).toEqual([]);
+  });
+});
+
+describe('explicit batch-campus settings', () => {
+  it('an explicit closed row removes a campus from subgroup scope', () => {
+    expect(eligibleCampusCodes({ subgroup_id: 'CESGA' }, FELLOWSHIPS, [closed('CMU')])).toEqual([]);
+  });
+
+  it('an explicit closed row removes one campus from group scope and keeps the rest', () => {
+    expect(eligibleCampusCodes({ fellowship_group: 'CE' }, FELLOWSHIPS, [closed('CMU')])).toEqual(['UWA']);
+  });
+
+  it('an explicit open row adds a campus outside the batch scope', () => {
+    expect(eligibleCampusCodes({ subgroup_id: 'CESGA' }, FELLOWSHIPS, [open('UBC')])).toEqual(['CMU', 'UBC']);
+  });
+
+  it('a closed row for a campus outside scope changes nothing', () => {
+    expect(eligibleCampusCodes({ subgroup_id: 'CESGA' }, FELLOWSHIPS, [closed('UBC')])).toEqual(['CMU']);
+  });
+
+  it('a campus with no row keeps its organizational eligibility', () => {
+    expect(eligibleCampusCodes({ fellowship_group: 'CE' }, FELLOWSHIPS, [])).toEqual(['CMU', 'UWA']);
+  });
+
+  it('an explicit row naming a code that is not an active fellowship is ignored', () => {
+    expect(eligibleCampusCodes({ subgroup_id: 'CESGA' }, FELLOWSHIPS, [open('GHOST')])).toEqual(['CMU']);
+  });
+
+  it('display names come from the eligible codes and never repeat', () => {
     const rows = [...FELLOWSHIPS, { fellowship_code: 'CMU2', campus_name: 'Manitoba', group_id: 'CE', subgroup_id: 'CESGA' }];
     expect(campusesForBatch({ subgroup_id: 'CESGA' }, rows)).toEqual(['Manitoba']);
   });
 });
 
-describe('countCampuses (Open Registration KPI)', () => {
-  it('counts distinct campuses reached by the given batches only', () => {
-    // Two open batches in CESGA and CESGB reach two campuses. UBC and York are in the map but unused here.
-    const open = [{ subgroup_id: 'CESGA' }, { subgroup_id: 'CESGA' }, { subgroup_id: 'CESGB' }];
-    expect(countCampuses(open, FELLOWSHIPS)).toBe(2);
+describe('countEligibleCampuses (Open Registration KPI)', () => {
+  it('counts distinct campuses across open batches, not every campus in the map', () => {
+    // Open batches reach CMU (CESGA) and UWA (CESGB). UBC and YORK are in the map but unused.
+    const openBatches = [{ batch_id: 'A', subgroup_id: 'CESGA' }, { batch_id: 'B', subgroup_id: 'CESGA' }, { batch_id: 'C', subgroup_id: 'CESGB' }];
+    expect(countEligibleCampuses(openBatches, FELLOWSHIPS)).toBe(2);
   });
 
-  it('does not count every campus in fellowship_map', () => {
-    expect(countCampuses([{ subgroup_id: 'CESGA' }], FELLOWSHIPS)).toBe(1);
-    expect(FELLOWSHIPS.length).toBe(4);
+  it('counts duplicate coverage once', () => {
+    // Two CESGA batches and a group-scoped CE batch all reach CMU. CE also reaches UWA.
+    const openBatches = [
+      { batch_id: 'A', subgroup_id: 'CESGA' },
+      { batch_id: 'B', subgroup_id: 'CESGA' },
+      { batch_id: 'C', fellowship_group: 'CE' },
+    ];
+    expect(countEligibleCampuses(openBatches, FELLOWSHIPS)).toBe(2);
   });
 
-  it('counts a group-level batch once per distinct campus across batches', () => {
-    expect(countCampuses([{ fellowship_group: 'CE' }, { subgroup_id: 'CESGA' }], FELLOWSHIPS)).toBe(2);
+  it('applies each batch\'s own explicit overrides', () => {
+    const openBatches = [{ batch_id: 'A', subgroup_id: 'CESGA' }, { batch_id: 'B', subgroup_id: 'CESGB' }];
+    const settings = new Map([['A', [closed('CMU')]]]);
+    // A is closed at CMU, so only B's UWA remains.
+    expect(countEligibleCampuses(openBatches, FELLOWSHIPS, settings)).toBe(1);
+  });
+
+  it('a campus closed for one batch still counts through another open batch', () => {
+    const openBatches = [{ batch_id: 'A', subgroup_id: 'CESGA' }, { batch_id: 'B', subgroup_id: 'CESGA' }];
+    const settings = new Map([['A', [closed('CMU')]]]);
+    expect(countEligibleCampuses(openBatches, FELLOWSHIPS, settings)).toBe(1);
   });
 
   it('is zero when no batch is open', () => {
-    expect(countCampuses([], FELLOWSHIPS)).toBe(0);
+    expect(countEligibleCampuses([], FELLOWSHIPS)).toBe(0);
   });
 });
