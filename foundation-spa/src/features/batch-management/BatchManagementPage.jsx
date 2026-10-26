@@ -5,6 +5,7 @@ import {
   archiveBatch, deleteBatch, closeBatch, reopenBatch, rolloverBatch, announceBatch,
   filterBatches, fmtDate,
 } from './lib/batchManagement.js';
+import { campusesForBatch, countCampuses } from './lib/batchCampus.js';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { PageHeader, SearchInput, Skeleton, EmptyState, Badge, Button, Modal } from '../../components/ui/index.js';
@@ -17,6 +18,10 @@ const TABS = [
   { key: 'Upcoming', label: 'Upcoming' },
   { key: 'Archived', label: 'Archived' },
 ];
+
+// Roles that may insert and update batches. Mirrors is_admin() (latest definition: migration
+// 202605220030), which the batches insert and update policies use. Delete stays superadmin-only.
+const BATCH_WRITE_ROLES = ['superadmin', 'admin', 'subgroup_admin', 'pastor', 'principal', 'regional_secretary'];
 
 const isArchivedStatus = (status) => ['archived', 'completed'].includes(String(status || '').toLowerCase());
 
@@ -43,6 +48,7 @@ export default function BatchManagementPage() {
   const [tab, setTab] = useState('');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [openMenuId, setOpenMenuId] = useState(null);
+  const [viewBatch, setViewBatch] = useState(null);
 
   const { data, isLoading, refetch } = useQuery({ queryKey: ['batch-mgmt'], queryFn: fetchBatches, staleTime: 60_000 });
   const fellowships = useQuery({ queryKey: ['batch-fellowships'], queryFn: fetchFellowshipMap, staleTime: 5 * 60_000 });
@@ -70,10 +76,10 @@ export default function BatchManagementPage() {
     [batches],
   );
 
-  const campusByCode = useMemo(
-    () => new Map((fellowships.data ?? []).map((f) => [f.fellowship_code, f.campus_name])),
-    [fellowships.data],
-  );
+  const fellowshipRows = useMemo(() => fellowships.data ?? [], [fellowships.data]);
+
+  const canEditBatches = BATCH_WRITE_ROLES.includes(profile?.role);
+  const canEditBatch = (b) => canEditBatches && !isArchivedStatus(b.status);
 
   const kpis = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -83,16 +89,18 @@ export default function BatchManagementPage() {
       .filter((d) => d >= today)
       .sort();
     const years = batches.map((b) => new Date(b.created_at).getFullYear()).filter(Number.isFinite);
+    // Open Registration counts batches with registration open. Campuses are the ones those batches reach.
+    const openBatches = batches.filter((b) => b.registration_open);
     return {
       total: batches.length,
       since: years.length ? Math.min(...years) : null,
       active: batches.filter((b) => b.status === 'Active').length,
       upcoming: batches.filter((b) => b.status === 'Upcoming').length,
       nextStart: upcomingStarts[0] ? fmtMonthDay(upcomingStarts[0]) : null,
-      openReg: batches.filter((b) => b.registration_open).length,
-      campuses: new Set((fellowships.data ?? []).map((f) => f.campus_name).filter(Boolean)).size,
+      openReg: openBatches.length,
+      campuses: countCampuses(openBatches, fellowshipRows),
     };
-  }, [batches, fellowships.data]);
+  }, [batches, fellowshipRows]);
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
@@ -228,26 +236,22 @@ export default function BatchManagementPage() {
               <thead><tr><th>Batch</th><th>Dates</th><th>Registered</th><th>Status</th><th>Action</th></tr></thead>
               <tbody>
                 {visible.map((b) => {
-                  const archived = isArchivedStatus(b.status);
                   return (
                     <tr key={b.batch_id}>
                       <td>
                         <div className="bm-batch-name">{b.batch_name || b.batch_id}</div>
-                        <div className="bm-batch-meta">{batchMeta(b, campusByCode)}</div>
+                        <div className="bm-batch-meta">{batchMeta(b, fellowshipRows)}</div>
                       </td>
                       <td className="bm-mono">{fmtShortDate(b.start_date)} → {fmtShortDate(b.end_date)}</td>
                       <td className="bm-mono">{counts[b.batch_id] ?? 0} / {b.capacity ?? '—'}</td>
                       <td><Badge status={b.status?.toLowerCase()}>{b.status}</Badge></td>
                       <td>
                         <div className="bm-actions">
-                          <Button
-                            variant={archived ? 'secondary' : 'primary'}
-                            size="sm"
-                            className={archived ? 'bm-btn-outline' : undefined}
-                            onClick={() => setEditModal({ isNew: false, batch: b })}
-                          >
-                            {archived ? 'View' : 'Edit'}
-                          </Button>
+                          {canEditBatch(b) ? (
+                            <Button variant="primary" size="sm" onClick={() => setEditModal({ isNew: false, batch: b })}>Edit</Button>
+                          ) : (
+                            <Button variant="secondary" size="sm" className="bm-btn-outline" onClick={() => setViewBatch(b)}>View</Button>
+                          )}
                           <div className="bm-menu-wrap" data-menu>
                             <button
                               type="button"
@@ -303,7 +307,11 @@ export default function BatchManagementPage() {
               <div className="rso-table-card-row"><span className="rso-table-card-label">Capacity</span><span>{b.capacity ?? '—'}</span></div>
               <div className="rso-table-card-row"><span className="rso-table-card-label">Registered</span><span>{counts[b.batch_id] ?? 0}</span></div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-                <Button variant="ghost" size="sm" onClick={() => setEditModal({ isNew: false, batch: b })}>Edit</Button>
+                {canEditBatch(b) ? (
+                  <Button variant="primary" size="sm" onClick={() => setEditModal({ isNew: false, batch: b })}>Edit</Button>
+                ) : (
+                  <Button variant="secondary" size="sm" className="bm-btn-outline" onClick={() => setViewBatch(b)}>View</Button>
+                )}
                 <Button variant="ghost" size="sm" onClick={() => setRolloverModal(b)}>Rollover</Button>
                 <Button variant="ghost" size="sm" onClick={() => setAnnounceModal(b)}>Announce</Button>
                 {isSuperadmin && (b.status === 'Active' || b.status === 'Upcoming') && (
@@ -329,6 +337,17 @@ export default function BatchManagementPage() {
           </div>
         )}
       </section>
+
+      {/* Read-only details (View) */}
+      {viewBatch && (
+        <BatchDetailsModal
+          batch={viewBatch}
+          campuses={campusesForBatch(viewBatch, fellowshipRows)}
+          registered={counts[viewBatch.batch_id] ?? 0}
+          moodleCourses={moodleCourses}
+          onClose={() => setViewBatch(null)}
+        />
+      )}
 
       {/* Edit/Create Modal */}
       {editModal && (
@@ -396,11 +415,45 @@ function fmtMonthDay(isoDate) {
   return new Date(`${isoDate}T00:00:00`).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
 }
 
-// Second line under the batch name: campus, fellowship and subgroup. Falls back to the batch id.
-function batchMeta(b, campusByCode) {
-  const campus = campusByCode.get(b.fellowship_group);
-  const parts = [campus, b.fellowship_group, b.subgroup_id || b.subgroup].filter(Boolean);
+// Second line under the batch name: the campus (or a count when it spans several), then the subgroup
+// or fellowship. Falls back to the batch id.
+function batchMeta(b, fellowshipRows) {
+  const campuses = campusesForBatch(b, fellowshipRows);
+  const campusLabel = campuses.length === 1 ? campuses[0] : campuses.length > 1 ? `${campuses.length} campuses` : null;
+  const parts = [campusLabel, b.subgroup_id || b.subgroup || b.fellowship_group].filter(Boolean);
   return parts.length ? parts.join(' · ') : b.batch_id;
+}
+
+// Read-only batch details. Text only: no form fields, so nothing in this dialog can change the batch.
+function BatchDetailsModal({ batch, campuses, registered, moodleCourses, onClose }) {
+  const course = moodleCourses.find((c) => (c.id || c.course_id) === batch.moodle_course_mapping);
+  const rows = [
+    ['Batch ID', batch.batch_id],
+    ['Campus', campuses.length ? campuses.join(', ') : '—'],
+    ['Fellowship', batch.fellowship_group || '—'],
+    ['Subgroup', batch.subgroup_id || batch.subgroup || '—'],
+    ['Start', fmtDate(batch.start_date)],
+    ['End', fmtDate(batch.end_date)],
+    ['Capacity', batch.capacity ?? '—'],
+    ['Registered', registered],
+    ['Moodle course', course?.name || course?.course_name || batch.moodle_course_mapping || '—'],
+    ['Status', batch.status || '—'],
+    ['Notes', batch.notes || '—'],
+  ];
+  return (
+    <Modal open title={batch.batch_name || batch.batch_id} onClose={onClose} footer={
+      <Button variant="ghost" onClick={onClose}>Close</Button>
+    }>
+      <dl className="bm-details">
+        {rows.map(([label, value]) => (
+          <div key={label} className="bm-details-row">
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </Modal>
+  );
 }
 
 function BatchModal({ batch, subgroups, moodleCourses, onClose, onSave, saving }) {
