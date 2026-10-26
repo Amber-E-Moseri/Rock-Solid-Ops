@@ -426,15 +426,21 @@
         const cfg = adminApi?.getConfig?.() || {};
         const supabaseUrl = String(window.FS_CONFIG?.SUPABASE_URL || cfg.url || "").trim();
         const anonKey = String(window.FS_CONFIG?.SUPABASE_ANON_KEY || cfg.anonKey || "").trim();
+        // moodle-sync accepts an admin session JWT for action "test" only. The session token is the bearer;
+        // the anon key is only the apikey header.
+        const { data: sess } = await supabase.auth.getSession();
+        const token = sess?.session?.access_token;
         if (!supabaseUrl || !anonKey) {
           pushCheck("moodle-api", "Moodle API Connectivity", "warn", "Missing runtime config — cannot test Moodle connection.");
+        } else if (!token) {
+          pushCheck("moodle-api", "Moodle API Connectivity", "warn", "Admin sign-in required to test Moodle connectivity.");
         } else {
           const moodleRes = await withTimeout(
             "moodle-api-test",
             () => fetch(`${supabaseUrl}/functions/v1/moodle-sync`, {
               method: "POST",
               headers: {
-                Authorization: `Bearer ${anonKey}`,
+                Authorization: `Bearer ${token}`,
                 apikey: anonKey,
                 "Content-Type": "application/json"
               },
