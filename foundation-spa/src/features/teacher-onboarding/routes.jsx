@@ -1,7 +1,8 @@
 // Route definitions for the teacher onboarding screens. App.jsx registers the public onboarding routes
-// only while TEACHER_ONBOARDING_CERTIFIED is true (src/releaseHolds.js). The reset-password route is an
-// existing public path, so it always uses the hardened page. Pages load lazily, so an unreleased
-// feature costs nothing on the first load.
+// only while TEACHER_ONBOARDING_CERTIFIED is true (src/releaseHolds.js). The reset-password and
+// forgot-password routes are recovery entry points, not onboarding: they are always registered, and the
+// forgot-password form refuses to send in production until Turnstile is configured. Pages load lazily,
+// so an unreleased feature costs nothing on the first load.
 import { lazy, Suspense } from 'react';
 import { Route } from 'react-router-dom';
 import './teacherOnboarding.css';
@@ -32,8 +33,12 @@ export const teacherOnboardingRoutes = [
   <Route key="teacher-check-email" path={TEACHER_ONBOARDING_PATHS.checkEmail} element={<Lazy><CheckEmailPage /></Lazy>} />,
   <Route key="teacher-confirm" path={TEACHER_ONBOARDING_PATHS.confirm} element={<Lazy><ConfirmEmailPage /></Lazy>} />,
   <Route key="teacher-application" path={TEACHER_ONBOARDING_PATHS.application} element={<Lazy><ApplicationPage /></Lazy>} />,
-  <Route key="forgot-password" path={TEACHER_ONBOARDING_PATHS.forgotPassword} element={<Lazy><ForgotPasswordPage /></Lazy>} />,
 ];
+
+// Always registered: the account recovery entry point, outside the onboarding gate.
+export const forgotPasswordRoute = (
+  <Route key="forgot-password" path={TEACHER_ONBOARDING_PATHS.forgotPassword} element={<Lazy><ForgotPasswordPage /></Lazy>} />
+);
 
 // Element for the existing "/auth/reset-password" route.
 export function ResetPasswordRoute() {

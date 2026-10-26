@@ -393,11 +393,8 @@
   }
 
   // ── Side-effect helpers ────────────────────────────────────────────────────
-  async function updateProfile(teacherUserId, patch) {
-    if (!teacherUserId) return;
-    await global.supabase.from("profiles").update(patch).eq("user_id", teacherUserId);
-    // non-fatal: profile row may not exist yet
-  }
+  // Role and status transitions live in teacher-activation.js (window.FSTeacherActivation).
+  const FSTeacherActivation = global.FSTeacherActivation;
 
   async function queueEmail(templateKey, subject, row, extraPayload) {
     if (!row.email) return;
@@ -473,15 +470,29 @@
     }
 
     // 1. Update teachers
-    const { error: teacherErr } = await global.supabase
-      .from("teachers")
-      .update(teachersPatch)
-      .eq("teacher_id", teacherId);
-    if (teacherErr) throw teacherErr;
+    const writeTeacher = async () => {
+      const { error: teacherErr } = await global.supabase
+        .from("teachers")
+        .update(teachersPatch)
+        .eq("teacher_id", teacherId);
+      if (teacherErr) throw teacherErr;
+    };
 
-    // 2. Update profiles
-    if (profilePatch && row.teacher_user_id) {
-      await updateProfile(row.teacher_user_id, profilePatch);
+    // 1 and 2. An activation assigns the sign-in role first, so a refused role change leaves the teacher
+    // record unchanged. Other actions write the teacher record, then the profile. Neither path drops an error.
+    if (action === "activate") {
+      if (!FSTeacherActivation) throw new Error("Teacher activation helper is not loaded. Reload the page.");
+      await FSTeacherActivation.runActivation({
+        db: global.supabase,
+        teacherUserId: row.teacher_user_id,
+        profilePatch,
+        writeTeacher,
+      });
+    } else {
+      await writeTeacher();
+      if (profilePatch) {
+        await FSTeacherActivation.updateProfileStrict(global.supabase, row.teacher_user_id, profilePatch);
+      }
     }
 
     // 3. Suspend Tentative availability slots

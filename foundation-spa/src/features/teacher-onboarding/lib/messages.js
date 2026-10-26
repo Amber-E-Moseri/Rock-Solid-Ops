@@ -13,6 +13,13 @@ export const RESEND_SENT =
 export const SIGNUP_SENT =
   'Check your email for a confirmation link. Open it on this device to continue your application.';
 
+export const VERIFICATION_REQUIRED = 'Complete the verification check, then try again.';
+
+export const VERIFICATION_FAILED = 'The verification check did not complete. Complete it again and retry.';
+
+export const VERIFICATION_UNAVAILABLE =
+  'Sign-up and email requests are unavailable until human verification is configured. Contact an administrator.';
+
 export const LINK_INVALID =
   'This link is not valid. Request a new one and use the newest email.';
 
@@ -37,6 +44,14 @@ const APPLICATION_ERRORS = {
   INVALID_TRANSITION: 'That action is not available for this application.',
 };
 
+// Reports what the server did. Only a first submission or a resubmission sends an email.
+export function submitOutcomeMessage(outcome) {
+  if (outcome === 'UNCHANGED') return 'Your application is already up to date.';
+  if (outcome === 'UPDATED') return 'Your application has been updated. No email was sent for this change.';
+  if (outcome === 'RESUBMITTED') return 'Your updated application has been sent to the administration team.';
+  return 'Your application has been sent. A receipt is on its way by email.';
+}
+
 export function applicationErrorMessage(error) {
   const code = String(error?.message || '').split(':')[0].trim();
   return APPLICATION_ERRORS[code] || GENERIC_ERROR;
@@ -54,6 +69,7 @@ export function isRateLimit(error) {
 export function authErrorMessage(error, fallback = GENERIC_ERROR) {
   if (!error) return fallback;
   if (isRateLimit(error)) return RATE_LIMIT;
+  if (String(error.code ?? '') === 'captcha_failed') return VERIFICATION_FAILED;
   if (String(error.code ?? '') === 'weak_password') return 'Choose a stronger password (at least 8 characters).';
   return fallback;
 }

@@ -19,10 +19,17 @@ DENO_UNIT_TESTS=(
   "supabase/functions/_shared/lib/assign-applicant.test.ts"
   "supabase/functions/_shared/push-notify.test.ts"
   "supabase/functions/_shared/webpush.test.ts"
+  "supabase/functions/_shared/moodle-retry-hold.test.ts"
+  "supabase/functions/_shared/retry-authorization.test.ts"
+  "supabase/functions/_shared/retry-schema-compat.test.ts"
+  "supabase/functions/_shared/retry-email-queue.test.ts"
+  "supabase/functions/_shared/retry-release-config.test.ts"
+  "supabase/functions/_shared/email-resolve-hold.test.ts"
   "supabase/functions/admin-api/create-staff-direct.test.ts"
   "supabase/functions/admin-api/role-boundary-matrix.test.ts"
   "supabase/functions/teacher-portal-api/class-ownership.test.ts"
   "supabase/functions/teacher-portal-api/teacher-auth.test.ts"
+  "supabase/functions/teacher-portal-api/attendance-submit-hold.test.ts"
   "supabase/functions/waitlist-processor/waitlist-dedup.test.ts"
   "supabase/functions/registration-processor/registration-processor.test.ts"
   "supabase/functions/nexus-users-search/nexus-cors.test.ts"
@@ -31,7 +38,7 @@ DENO_UNIT_TESTS=(
 )
 
 cd "$ROOT"
-deno test --allow-env --no-prompt --no-check --node-modules-dir=auto "${DENO_UNIT_TESTS[@]}"
+deno test --allow-env --allow-read --no-prompt --no-check --node-modules-dir=auto "${DENO_UNIT_TESTS[@]}"
 DENO_EXIT=$?
 
 echo ""

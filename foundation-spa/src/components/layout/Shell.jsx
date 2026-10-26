@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { PushToggle } from '../pwa/PushToggle.jsx';
+import { TEACHER_ONBOARDING_CERTIFIED } from '../../releaseHolds.js';
 import {
   LayoutDashboard, Shield, Calendar, Users, Clock, BookOpen,
   BarChart2, CheckSquare, CalendarCheck, TrendingUp, HelpCircle,
   MessageSquare, Bell, Mail, FileText, Lock, GraduationCap,
   RefreshCw, Activity, Layers, ExternalLink, Search, Star,
-  LogOut, ChevronLeft, ChevronRight, ChevronDown, Menu, X, Moon, Sun,
+  LogOut, ChevronLeft, ChevronRight, ChevronDown, Menu, X, Moon, Sun, UserCheck,
 } from 'lucide-react';
 
 // ── Nav structure (mirrors admin-shell.js NAV_SECTIONS) ──────────────────────
@@ -72,6 +73,9 @@ const NAV_SECTIONS = [
     label: 'System',
     items: [
       { key: 'teachers',      label: 'Teachers',         path: '/staff/teacher-management',       Icon: GraduationCap, roles: OPERATIONAL_ROLES },
+      ...(TEACHER_ONBOARDING_CERTIFIED
+        ? [{ key: 'teacherapps', label: 'Teacher Applications', path: '/staff/teacher-applications', Icon: UserCheck, roles: SYSTEM_ADMIN_ROLES }]
+        : []),
       { key: 'trace',         label: 'Operational Trace', path: '/staff/operational-trace',        Icon: Activity,      roles: ['admin', 'superadmin', 'regional_secretary'] },
       { key: 'fellowships',   label: 'Fellowships',      path: '/staff/fellowship-management',    Icon: Layers,        roles: SYSTEM_ADMIN_ROLES },
       { key: 'nexusmapping',  label: 'Nexus Mapping',    path: '/staff/nexus-management',         Icon: ExternalLink,  roles: SYSTEM_ADMIN_ROLES },

@@ -5,8 +5,9 @@ import { AuthProvider } from './context/AuthContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import ProtectedRoute from './components/layout/ProtectedRoute.jsx';
 import { useAuth } from './context/AuthContext.jsx';
-import { landingPathForRole } from './routing/routeRoles.js';
-import { teacherOnboardingRoutes, ResetPasswordRoute } from './features/teacher-onboarding/routes.jsx';
+import { landingPathForRole, SYSTEM_ADMIN_ROLES } from './routing/routeRoles.js';
+import { teacherOnboardingRoutes, ResetPasswordRoute, forgotPasswordRoute } from './features/teacher-onboarding/routes.jsx';
+import { teacherApplicationsRoute } from './features/teacher-applications/routes.jsx';
 import { TEACHER_ONBOARDING_CERTIFIED } from './releaseHolds.js';
 import Shell from './components/layout/Shell.jsx';
 import { PWAInstallPrompt } from './components/pwa/PWAInstallPrompt.jsx';
@@ -102,7 +103,9 @@ export default function App() {
               {/* Public */}
               <Route path="/auth/login" element={<LoginPage />} />
               <Route path="/auth/reset-password" element={<ResetPasswordRoute />} />
+              {forgotPasswordRoute}
               {TEACHER_ONBOARDING_CERTIFIED && teacherOnboardingRoutes}
+              {TEACHER_ONBOARDING_CERTIFIED && teacherApplicationsRoute}
               <Route path="/auth/*" element={<Navigate to="/auth/login" replace />} />
 
               {/* Design system showcase: registered in development builds only */}
@@ -332,7 +335,7 @@ export default function App() {
               <Route
                 path="/staff/failed-sync-retry-center"
                 element={
-                  <ProtectedRoute roles={ADMIN_ROLES}>
+                  <ProtectedRoute roles={SYSTEM_ADMIN_ROLES}>
                     <StaffShell title="Failed Sync Retry Center">
                       <FailedSyncRetryCenterPage />
                     </StaffShell>

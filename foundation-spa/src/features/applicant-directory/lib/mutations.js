@@ -1,4 +1,6 @@
 import { supabase } from '../../../supabase.js';
+import { isMoodleRetryHeld, MOODLE_RETRY_CERTIFIED, MOODLE_RETRY_HOLD_MESSAGE } from '../../../releaseHolds.js';
+import { canManualRetry } from '../../../routing/routeRoles.js';
 
 // All writes mirror foundation/js/applicant-directory.js exactly:
 // same tables, same patches, same audit_logs action names and details.
@@ -194,7 +196,10 @@ export async function bulkClassChange({ apps, classId, cls, actorEmail, onProgre
   return done;
 }
 
-export async function retryFailedNotification({ target, source }) {
+export async function retryFailedNotification({ target, source, actorRole }) {
+  if (isMoodleRetryHeld('retry', source, MOODLE_RETRY_CERTIFIED)) throw new Error(MOODLE_RETRY_HOLD_MESSAGE);
+  // The backend allows manual retry for admin and superadmin only. Refuse other roles before any request.
+  if (!canManualRetry(actorRole)) throw new Error('Manual retry is limited to administrators.');
   return supabase.functions.invoke('retry-worker', {
     body: { action: 'retry', source, id: String(target.id) },
   });

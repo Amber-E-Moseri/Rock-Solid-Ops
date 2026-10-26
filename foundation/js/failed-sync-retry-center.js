@@ -75,7 +75,8 @@ async function ensureAccess() {
     actions: {
       retry: async (row) => { await adminApi.invokeRetryWorker(supabase, { action: "retry", source: row.source, id: String(row.id) }); },
       resolve: async (row) => { await adminApi.invokeRetryWorker(supabase, { action: "resolve", source: row.source, id: String(row.id) }); },
-      bulk: async (action, rows) => { for (const row of rows) await adminApi.invokeRetryWorker(supabase, { action, source: row.source, id: String(row.id) }); },
+      // Email rows are skipped for Resolve while that action is on hold.
+      bulk: async (action, rows) => { const runnable = action === "resolve" ? rows.filter((r) => r.source !== "email_queue") : rows; for (const row of runnable) await adminApi.invokeRetryWorker(supabase, { action, source: row.source, id: String(row.id) }); },
     },
     filters: { status: true, type: true, date: true, search: true },
     statusClass,

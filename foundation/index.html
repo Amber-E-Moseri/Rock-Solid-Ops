@@ -94,14 +94,6 @@
       ]);
     }
 
-    function resolveRoleFromSession(session) {
-      const raw =
-        session?.user?.user_metadata?.role ||
-        session?.user?.app_metadata?.role ||
-        "";
-      return String(raw || "").toLowerCase();
-    }
-
     (async () => {
       try {
         document.documentElement.setAttribute("data-theme", "light");
@@ -114,23 +106,13 @@
           return;
         }
 
-        // Fast path: use role from current session metadata while profile loads.
-        const sessionRole = resolveRoleFromSession(session);
-        if (sessionRole === "teacher") {
-          go(teacherUrl);
-          return;
-        }
-        if (isAdmin(sessionRole)) {
-          go(adminUrl);
-          return;
-        }
-
-        // Slow path: profile lookup with timeout to avoid long spinner hangs.
+        // Routing uses only the trusted profile. There is no metadata fast path. A missing,
+        // failed, slow or inactive lookup sends the user to sign-in.
         const profile = await withTimeout(getCurrentProfile(), 2500).catch(() => null);
         const role = String(profile?.role || "").toLowerCase();
-        const isActive = profile?.is_active !== false && profile?.active !== false;
+        const isActive = profile?.is_active === true;
 
-        if (!isActive || isPending(role) || !role) {
+        if (!profile || !isActive || isPending(role) || !role) {
           go(loginUrl);
         } else if (role === "teacher") {
           go(teacherUrl);

@@ -9,6 +9,20 @@ import {
   isValidString,
   safeLogAudit,
 } from "../_shared/http.ts";
+import {
+  MOODLE_RETRY_HELD_CODE,
+  invokeMoodleRetrySync,
+  planDirectRetry,
+  planSweep,
+} from "../_shared/moodle-retry-hold.ts";
+import { authorizeRetryRequest } from "../_shared/retry-authorization.ts";
+import { resolveRetryAdmin } from "../_shared/retry-admin-lookup.ts";
+import { EMAIL_RESOLVE_HELD_CODE, planResolve } from "../_shared/email-resolve-hold.ts";
+
+// The scheduled sweep is unavailable. retry-worker has no verified scheduler-authentication contract,
+// so no request can be recognised as the scheduler. Enable only with a verified contract (see
+// docs/BRANCH_HOLDS.md), and never on a missing Authorization header.
+const SCHEDULED_SWEEP_ENABLED = false;
 
 type RetryAction = "retry" | "resolve";
 type RetrySource = "email_queue" | "scheduled_notifications" | "moodle_sync" | "moodle_enrollment_sync" | "failed_syncs";
@@ -54,7 +68,7 @@ async function triggerMoodleSync(
   serviceKey: string,
   id: string,
 ) {
-  const res = await fetch(`${supabaseUrl}/functions/v1/moodle-sync`, {
+  const res = await invokeMoodleRetrySync(fetch, `${supabaseUrl}/functions/v1/moodle-sync`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${serviceKey}`,
@@ -89,53 +103,6 @@ async function triggerClickupEscalation(
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(String(data?.error || `clickup-sync failed (${res.status})`));
   return data as Record<string, unknown>;
-}
-
-async function isAdmin(serviceDb: ReturnType<typeof createClient>, userId: string, email?: string) {
-  try {
-    const profile = await serviceDb
-      .from("profiles")
-      .select("role,is_active")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (profile.error) return false;
-
-    if (profile.data) {
-      const role = String(profile.data?.role || "").toLowerCase();
-      const active = profile.data?.is_active !== false;
-
-      if (
-        active &&
-        ["admin", "superadmin", "subgroup_admin", "pastor", "principal"].includes(role)
-      ) {
-        return true;
-      }
-      return false;
-    }
-
-    const legacy = await serviceDb
-      .from("admin_users")
-      .select("role,status,active")
-      .or(`auth_user_id.eq.${userId}${email ? `,email.eq.${email}` : ""}`)
-      .maybeSingle();
-    if (legacy.error) return false;
-
-    const legacyRole = String(legacy.data?.role || "").toLowerCase();
-    const active =
-      legacy.data?.active !== false &&
-      legacy.data?.status !== "suspended";
-
-    if (
-      active &&
-      ["admin", "superadmin", "subgroup_admin", "pastor", "principal"].includes(legacyRole)
-    ) {
-      return true;
-    }
-
-    return false;
-  } catch (_) {
-    return false;
-  }
 }
 
 async function logAudit(
@@ -279,8 +246,8 @@ async function applyRetry(
       .from("email_queue")
       .update({
         status: "Pending",
+        // email_queue has no last_error column. error_message is its only error field.
         error_message: null,
-        last_error: null,
         retry_count: Number(row.retry_count || 0) + 1,
         last_retry_at: now,
         updated_at: now,
@@ -404,17 +371,21 @@ Deno.serve(async (req) => {
     if (!SUPABASE_URL || !SERVICE_KEY) return json({ ok: false, error: "Missing Supabase env" }, 500);
 
     const serviceDb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
-    const authHeader = req.headers.get("Authorization") || "";
-    const isCronCall = !authHeader.startsWith("Bearer ");
-    let actorEmail = "retry-worker@system";
-    if (!isCronCall) {
-      const jwt = authHeader.slice("Bearer ".length).trim();
-      const { data: userData, error: userErr } = await serviceDb.auth.getUser(jwt);
-      if (userErr || !userData?.user) return json({ ok: false, error: "Invalid session" }, 401);
-      const allowed = await isAdmin(serviceDb, userData.user.id, userData.user.email);
-      if (!allowed) return json({ ok: false, error: "Admin access required" }, 403);
-      actorEmail = userData.user.email || actorEmail;
+    // Every request must present a Bearer token that verifies as an active admin, before any body is
+    // read, retry, resolve, sweep, Moodle call or escalation. A missing header is not a trusted scheduler.
+    const authDecision = await authorizeRetryRequest({
+      authHeader: req.headers.get("Authorization"),
+      verifyUser: async (jwt) => {
+        const { data: userData, error: userErr } = await serviceDb.auth.getUser(jwt);
+        if (userErr || !userData?.user) return null;
+        return { id: userData.user.id, email: userData.user.email };
+      },
+      isAdmin: (user) => resolveRetryAdmin(serviceDb, user.id, user.email),
+    });
+    if (!authDecision.ok) {
+      return json({ ok: false, error: authDecision.error, code: authDecision.code }, authDecision.status);
     }
+    const actorEmail = authDecision.actorEmail;
 
     const body = (await req.json().catch(() => ({}))) as RetryRequest;
     
@@ -442,7 +413,19 @@ Deno.serve(async (req) => {
       return json({ ok: false, error: idErr.message, code: "INVALID_ID" }, 400);
     }
 
-    if (isCronCall && !id) {
+    if (SCHEDULED_SWEEP_ENABLED && !id) {
+      if (planSweep() === "skip_held") {
+        await logAudit(
+          serviceDb,
+          actorEmail,
+          "MOODLE_RETRY_SWEEP_HELD",
+          "moodle_enrollment_sync",
+          "batch",
+          "SKIPPED",
+          { source: "moodle_enrollment_sync", limit, code: MOODLE_RETRY_HELD_CODE },
+        );
+        return json({ ok: true, mode: "auto_sweep", source: "moodle_enrollment_sync", skipped: MOODLE_RETRY_HELD_CODE, selected: 0, attempted: 0, escalated: 0, limit });
+      }
       const sweep = await sweepMoodleEnrollmentRetries(serviceDb, limit);
       let escalated = 0;
       for (const row of sweep.candidates || []) {
@@ -465,7 +448,7 @@ Deno.serve(async (req) => {
       // Trigger Moodle sync once after sweep to process newly marked RETRYING rows.
       if (sweep.attempted > 0) {
         try {
-          await fetch(`${SUPABASE_URL}/functions/v1/moodle-sync`, {
+          await invokeMoodleRetrySync(fetch, `${SUPABASE_URL}/functions/v1/moodle-sync`, {
             method: "POST",
             headers: {
               Authorization: `Bearer ${SERVICE_KEY}`,
@@ -482,6 +465,33 @@ Deno.serve(async (req) => {
     }
 
     if (!id) return json({ ok: false, error: "id is required", code: "MISSING_ID" }, 400);
+
+    if (planDirectRetry(action, source) === "refuse_held") {
+      await logAudit(
+        serviceDb,
+        actorEmail,
+        "MOODLE_RETRY_HELD",
+        source,
+        id,
+        "SKIPPED",
+        { action, source, id, code: MOODLE_RETRY_HELD_CODE },
+      );
+      return json({ ok: false, error: "Moodle retry is on hold.", code: MOODLE_RETRY_HELD_CODE }, 409);
+    }
+
+    // email_queue has no Resolved status. Refuse before any write, and do not map to another status.
+    if (planResolve(action, source) === "refuse_held") {
+      await logAudit(
+        serviceDb,
+        actorEmail,
+        "EMAIL_RESOLVE_HELD",
+        source,
+        id,
+        "SKIPPED",
+        { action, source, id, code: EMAIL_RESOLVE_HELD_CODE },
+      );
+      return json({ ok: false, error: "Email Resolve is on hold.", code: EMAIL_RESOLVE_HELD_CODE }, 409);
+    }
 
     if (action === "retry") {
       if (source === "moodle_enrollment_sync") {
