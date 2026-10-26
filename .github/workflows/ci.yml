@@ -7,8 +7,9 @@ on:
     # brief/spa-cutover-integration is the stacked base for the SPA integration candidate (PR #23).
     # integration/teacher-onboarding-candidate is the stacked base for the legacy auth fix (PR #24) and the teacher experience candidate (PR #25).
     # integration/consolidated-spa-release-candidate is the base for the security remediation PR (PR #26 stack).
+    # integration/pr48-main-reconciled-candidate is the base for the stacked D4 authorized-landing fix (PR #53).
     # Only pull requests into these branches are added. Pushes to them do not run CI, and nothing here deploys.
-    branches: [main, brief/spa-cutover-integration, integration/teacher-onboarding-candidate, integration/consolidated-spa-release-candidate]
+    branches: [main, brief/spa-cutover-integration, integration/teacher-onboarding-candidate, integration/consolidated-spa-release-candidate, integration/pr48-main-reconciled-candidate]
 
 # Only one CI run per branch at a time; newer pushes cancel in-flight runs.
 concurrency:
