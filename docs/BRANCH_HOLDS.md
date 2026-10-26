@@ -105,7 +105,15 @@ Hold conditions before merge:
 4. Owner approves the security boundary: RLS and grants on `org_subgroups` and `staff_scope_assignments`, and the service-role-only scope functions (`grant_staff_scope`, `revoke_staff_scope`, `staff_scope_covers`, `staff_scope_org_wide`).
 5. Read-only production checks for the Phase 1 objects are recorded in `docs/migration-log.md`.
 
-Provisioning, activation, role elevation and teacher linking are not part of this branch. No application code calls the scope functions yet. Any staging apply additionally requires the owner decision on `rocksolid-staging`.
+Provisioning, activation, role elevation and teacher linking are not part of this branch. No application code calls the scope grant or revoke functions. Any staging apply additionally requires the owner decision on `rocksolid-staging`.
+
+**Phase 3 update (2026-10-26).** Adds the general Request Access intake and review (`202610250400_access_request_intake_and_review.sql`), the public `/auth/request-access` page and the staff inbox at `/staff/access-requests`. Approval records `APPROVAL_PENDING_PROVISIONING` and changes nothing else. Phase 3 is held under the same conditions 1 to 5 above, plus:
+
+6. Owner approves the Phase 3 security boundary: `access_requests` and `access_request_events` RLS, the three views, the decision function's authority check (`access_request_can_decide`), and the public `access_request_org_options()` (anon and authenticated, active rows only).
+7. Supabase Auth sign-up and email-confirmation settings for the project are confirmed. The page depends on them and they were not verified here.
+8. The provisioning queue and worker are not built. Approved requests stay held. Phase 4 has its own gate.
+
+Phase 3 status of the hold: draft PR permitted, merge not permitted. No staging or production apply.
 
 ## Resolved (moot — already merged)
 

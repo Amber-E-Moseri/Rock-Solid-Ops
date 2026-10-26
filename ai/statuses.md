@@ -163,3 +163,18 @@ WITHDRAWN                      terminal; applicant withdrew; a new application m
 ```
 
 Email template keys added for this flow: `teacher_application_received`, `teacher_application_info_requested`, `teacher_application_rejected`. `APPROVAL_PENDING_PROVISIONING` sends no email.
+
+# ACCESS REQUEST STATUSES (general requests: pastor, subgroup admin, other)
+
+Source: `supabase/migrations/202610250400_access_request_intake_and_review.sql`. Transitions are enforced by `access_request_transition_allowed`. Teacher requests keep the teacher statuses above.
+
+```
+SUBMITTED                      applicant submitted (or resubmitted after information was requested)
+INFO_REQUESTED                 reviewer asked a question; applicant may update and resubmit
+APPROVAL_PENDING_PROVISIONING  approval recorded. No account, role, scope, teacher or email change.
+                               Held until provisioning is certified. Not reviewable or withdrawable.
+REJECTED                       terminal; reviewer's reason is internal, applicant sees a generic outcome
+WITHDRAWN                      terminal; applicant withdrew from SUBMITTED or INFO_REQUESTED
+```
+
+Only `SUBMITTED` and `INFO_REQUESTED` are open. The partial unique index on `access_requests` allows one open request per applicant. `APPROVED` is not used by this flow.
