@@ -698,3 +698,74 @@ select test_harness.expect_raise(
   'update public.profiles set role = ''group_admin'' where user_id = ''00000000-0000-0000-0000-0000000000a5''',
   'new row for relation'
 );
+
+-- ---------------------------------------------------------------------------
+-- J. Function and table privileges (certification: only service_role reaches the contracts)
+-- ---------------------------------------------------------------------------
+
+-- PUBLIC holds EXECUTE by default unless revoked; a NULL proacl means the default ACL applies.
+create or replace function test_harness.public_can_execute(p_signature text)
+returns boolean
+language sql
+stable
+as $$
+  select exists (
+    select 1
+    from pg_proc p,
+         aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+    where p.oid = p_signature::regprocedure
+      and a.grantee = 0
+      and a.privilege_type = 'EXECUTE'
+  );
+$$;
+
+select test_harness.record(
+  'grant_staff_scope: anon, authenticated and PUBLIC cannot execute; service_role can',
+  not has_function_privilege('anon', 'public.grant_staff_scope(uuid,uuid,text,text)', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.grant_staff_scope(uuid,uuid,text,text)', 'EXECUTE')
+  and not test_harness.public_can_execute('public.grant_staff_scope(uuid,uuid,text,text)')
+  and has_function_privilege('service_role', 'public.grant_staff_scope(uuid,uuid,text,text)', 'EXECUTE'),
+  ''
+);
+
+select test_harness.record(
+  'revoke_staff_scope: anon, authenticated and PUBLIC cannot execute; service_role can',
+  not has_function_privilege('anon', 'public.revoke_staff_scope(uuid,uuid)', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.revoke_staff_scope(uuid,uuid)', 'EXECUTE')
+  and not test_harness.public_can_execute('public.revoke_staff_scope(uuid,uuid)')
+  and has_function_privilege('service_role', 'public.revoke_staff_scope(uuid,uuid)', 'EXECUTE'),
+  ''
+);
+
+select test_harness.record(
+  'staff_scope_covers: anon, authenticated and PUBLIC cannot execute; service_role can',
+  not has_function_privilege('anon', 'public.staff_scope_covers(uuid,text,text)', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.staff_scope_covers(uuid,text,text)', 'EXECUTE')
+  and not test_harness.public_can_execute('public.staff_scope_covers(uuid,text,text)')
+  and has_function_privilege('service_role', 'public.staff_scope_covers(uuid,text,text)', 'EXECUTE'),
+  ''
+);
+
+select test_harness.record(
+  'staff_scope_org_wide and seed function: anon, authenticated and PUBLIC cannot execute',
+  not has_function_privilege('anon', 'public.staff_scope_org_wide(uuid)', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.staff_scope_org_wide(uuid)', 'EXECUTE')
+  and not test_harness.public_can_execute('public.staff_scope_org_wide(uuid)')
+  and not has_function_privilege('anon', 'public.org_subgroups_seed_from_fellowship()', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.org_subgroups_seed_from_fellowship()', 'EXECUTE')
+  and not test_harness.public_can_execute('public.org_subgroups_seed_from_fellowship()'),
+  ''
+);
+
+select test_harness.record(
+  'authenticated has no write privilege on either new table; anon has no read privilege',
+  not has_table_privilege('authenticated', 'public.staff_scope_assignments', 'INSERT')
+  and not has_table_privilege('authenticated', 'public.staff_scope_assignments', 'UPDATE')
+  and not has_table_privilege('authenticated', 'public.staff_scope_assignments', 'DELETE')
+  and not has_table_privilege('authenticated', 'public.org_subgroups', 'INSERT')
+  and not has_table_privilege('authenticated', 'public.org_subgroups', 'UPDATE')
+  and not has_table_privilege('authenticated', 'public.org_subgroups', 'DELETE')
+  and not has_table_privilege('anon', 'public.staff_scope_assignments', 'SELECT')
+  and not has_table_privilege('anon', 'public.org_subgroups', 'SELECT'),
+  ''
+);
