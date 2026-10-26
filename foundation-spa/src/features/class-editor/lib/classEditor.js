@@ -135,6 +135,7 @@ export async function countEnrolled(coId) {
 export async function createClass({ form, teacher, actorEmail }) {
   const now = new Date().toISOString();
   const { teacherId, day, time, capacity, batchId, suffix, expiry, isOnline, active, enrollOpen, fc, mode, customId } = form;
+  if (!teacherId || !day || !time) throw new Error('Teacher, day and time are required.');
 
   const baseRow = {
     teacher_id: teacherId,
@@ -153,7 +154,10 @@ export async function createClass({ form, teacher, actorEmail }) {
   });
 
   if (isOnline && fc.length > 1 && mode === 'separate') {
-    const rows = fc.map((code) => ({ ...baseRow, class_option_id: generateSeparateClassId(code, teacherId, day, time), fellowship_codes: [code] }));
+    const rows = fc.map((code) => {
+      const id = generateSeparateClassId(code, teacherId, day, time);
+      return { ...baseRow, class_option_id: id, class_id: id, fellowship_codes: [code] };
+    });
     const { error } = await supabase.from('class_options').insert(rows);
     if (error) throw error;
     if (batchId) {
@@ -168,7 +172,7 @@ export async function createClass({ form, teacher, actorEmail }) {
   }
 
   const classId = customId || generateSharedClassId(teacher?.subgroup_id || 'SG', teacherId, day, time);
-  const { error } = await supabase.from('class_options').insert({ ...baseRow, class_option_id: classId, fellowship_codes: fc });
+  const { error } = await supabase.from('class_options').insert({ ...baseRow, class_option_id: classId, class_id: classId, fellowship_codes: fc });
   if (error) throw error;
   if (batchId) {
     const { error: slotErr } = await supabase.from('class_slots').insert(makeSlot(classId));
@@ -187,6 +191,7 @@ export async function splitSharedClass({ source, actorEmail }) {
   const now = new Date().toISOString();
   const rows = codes.map((code) => ({
     class_option_id: generateSeparateClassId(code, source.teacher_id || '', source.day || '', source.class_time || ''),
+    class_id: source.class_id || generateSeparateClassId(code, source.teacher_id || '', source.day || '', source.class_time || ''),
     teacher_id: source.teacher_id, teacher_name: source.teacher_name, day: source.day, class_time: source.class_time,
     max_capacity: source.max_capacity, label_suffix: source.label_suffix, active: true,
     enrollment_open: source.enrollment_open !== false, fellowship_codes: [code],
