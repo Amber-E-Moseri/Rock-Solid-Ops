@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth, isRoleAllowed } from '../../context/AuthContext.jsx';
+import { landingPathForRole } from '../../routing/routeRoles.js';
 
 /**
  * Wraps a route with role-based access control.
@@ -13,7 +14,8 @@ import { useAuth, isRoleAllowed } from '../../context/AuthContext.jsx';
  *   - Profile load failed → redirect to /auth/login?error=session (explicit message)
  *   - No user  → redirect to /auth/login with ?next= return URL
  *   - Inactive / pending profile → redirect to /auth/login?error=inactive|pending
- *   - Role not in `roles` → redirect to /auth/login?error=unauthorized
+ *   - Role not in `roles`, active session with a role landing → redirect to that landing with a notice
+ *   - Role not in `roles`, no landing (or already redirected here) → redirect to /auth/login?error=unauthorized
  */
 export default function ProtectedRoute({ roles, children }) {
   const { user, profile, loading, error } = useAuth();
@@ -40,6 +42,11 @@ export default function ProtectedRoute({ roles, children }) {
   }
 
   if (roles && roles.length > 0 && !isRoleAllowed(profile.role, roles)) {
+    const landing = landingPathForRole(profile.role);
+    const redirectedHere = location.state?.notice === 'unauthorized';
+    if (landing && landing !== location.pathname && !redirectedHere) {
+      return <Navigate to={landing} replace state={{ notice: 'unauthorized' }} />;
+    }
     return <Navigate to={`/auth/login?next=${next}&error=unauthorized`} replace />;
   }
 

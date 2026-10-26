@@ -28,6 +28,8 @@ function renderAt(path = TEACHER_APPLICATIONS_PATH) {
       <Routes>
         {teacherApplicationsRoute}
         <Route path="/auth/login" element={<LoginProbe />} />
+        <Route path="/staff/dashboards" element={<p>DASHBOARD LANDING</p>} />
+        <Route path="/teacher/index" element={<p>TEACHER LANDING</p>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -59,15 +61,22 @@ describe('teacher application review route', () => {
     expect(screen.getByTestId('shell')).toBeInTheDocument();
   });
 
-  it.each(['pastor', 'principal', 'subgroup_admin', 'regional_secretary', 'teacher'])(
-    'refuses %s with an unauthorized notice, and never renders the screen',
+  it.each(['pastor', 'principal', 'subgroup_admin', 'regional_secretary'])(
+    'sends %s to the staff landing, and never renders the screen',
     async (role) => {
       signedInAs(role);
       renderAt();
-      expect(await screen.findByText(/LOGIN \?next=.*error=unauthorized/)).toBeInTheDocument();
+      expect(await screen.findByText('DASHBOARD LANDING')).toBeInTheDocument();
       expect(screen.queryByText('REVIEW SCREEN')).not.toBeInTheDocument();
     },
   );
+
+  it('sends a teacher to the teacher landing, and never renders the screen', async () => {
+    signedInAs('teacher');
+    renderAt();
+    expect(await screen.findByText('TEACHER LANDING')).toBeInTheDocument();
+    expect(screen.queryByText('REVIEW SCREEN')).not.toBeInTheDocument();
+  });
 
   it('sends a pending account to the pending notice, not the review screen', async () => {
     signedInAs('pending');

@@ -196,14 +196,16 @@ describe('first-login race', () => {
     expect(harness.profileCalls).toBe(1);
   });
 
-  it('a teacher denied an admin route is sent to login with an unauthorized message (restored session)', async () => {
+  it('a teacher denied an admin route lands on the teacher portal, keeping the session (restored session)', async () => {
     harness.session = { user: TEACHER.user, access_token: 'token' };
     renderApp('/staff/dashboards');
 
     await waitFor(() => {
-      expect(screen.getByText('You do not have permission to access that page.')).toBeInTheDocument();
+      expect(screen.getByText('Teacher portal')).toBeInTheDocument();
     }, { timeout: 2000 });
     expect(screen.queryByText('Admin dashboard')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
+    expect(harness.session).not.toBeNull();
   });
 
   it('a failed profile fetch shows an explicit message instead of a silent login form', async () => {
@@ -218,7 +220,7 @@ describe('first-login race', () => {
     expect(screen.queryByText('Admin dashboard')).not.toBeInTheDocument();
   });
 
-  it('a teacher who signs in and targets an admin route gets the unauthorized message on the first attempt', async () => {
+  it('a teacher who signs in and targets an admin route lands on the teacher portal on the first attempt', async () => {
     renderApp('/auth/login?next=%2Fstaff%2Fdashboards');
     const release = holdProfile();
 
@@ -227,10 +229,10 @@ describe('first-login race', () => {
     release();
 
     await waitFor(() => {
-      expect(screen.getByText('You do not have permission to access that page.')).toBeInTheDocument();
+      expect(screen.getByText('Teacher portal')).toBeInTheDocument();
     }, { timeout: 2000 });
     expect(screen.queryByText('Admin dashboard')).not.toBeInTheDocument();
-    expect(visited).toEqual(['/auth/login', '/staff/dashboards', '/auth/login']);
+    expect(visited).toEqual(['/auth/login', '/staff/dashboards', '/teacher/index']);
   });
 
   it('a profile failure on a restored session sends the user to login once with the session message', async () => {

@@ -178,7 +178,7 @@ describe('ProtectedRoute', () => {
     });
   });
 
-  it('redirects unauthorized role to /auth/login?error=unauthorized', async () => {
+  it('sends a signed-in teacher denied a superadmin route to their landing, not the sign-in form', async () => {
     const { supabase } = await import('../supabase.js');
     supabase.auth.getSession.mockResolvedValue({
       data: {
@@ -207,13 +207,15 @@ describe('ProtectedRoute', () => {
           }
         />
         <Route path="/auth/login" element={<div data-testid="login">Login page</div>} />
+        <Route path="/teacher/index" element={<div data-testid="teacher-landing">Teacher landing</div>} />
       </Routes>,
       { initialPath: '/' }
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('login')).toBeInTheDocument();
-      expect(screen.queryByText('Superadmin only')).not.toBeInTheDocument();
+      expect(screen.getByTestId('teacher-landing')).toBeInTheDocument();
     });
+    expect(screen.queryByTestId('login')).not.toBeInTheDocument();
+    expect(screen.queryByText('Superadmin only')).not.toBeInTheDocument();
   });
 });

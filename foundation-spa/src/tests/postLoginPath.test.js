@@ -71,6 +71,38 @@ describe('postLoginPath', () => {
   });
 });
 
+describe('next targets with an incompatible base or auth path', () => {
+  it('rejects /app, /foundation and /auth prefixes, in any letter case or encoding', () => {
+    for (const bad of [
+      '/app/staff/dashboards',
+      '/app',
+      '/APP/staff/dashboards',
+      '/%61pp/staff/dashboards',
+      '/foundation/staff/dashboards.html',
+      '/auth/login?next=%2Fstaff%2Fdashboards',
+      '/auth/teacher/register',
+      '/auth',
+      '/app?x=1',
+    ]) {
+      expect(safeNextPath(bad), bad).toBeNull();
+      expect(postLoginPath({ role: 'admin', next: bad }), bad).toBe(STAFF_LANDING);
+      expect(postLoginPath({ role: 'teacher', next: bad }), bad).toBe(TEACHER_LANDING);
+    }
+  });
+
+  it('still accepts paths that only start with the same letters', () => {
+    expect(safeNextPath('/authentic-report')).toBe('/authentic-report');
+    expect(safeNextPath('/application/list')).toBe('/application/list');
+    expect(safeNextPath('/apps')).toBe('/apps');
+  });
+
+  it('rejects malformed encodings and control characters', () => {
+    for (const bad of ['/%E0%A4%A', '/staff/%0Ad', '/staff/ dashboards']) {
+      expect(safeNextPath(bad), bad).toBeNull();
+    }
+  });
+});
+
 describe('shared access matrix', () => {
   it('gives teachers the teacher portal and no staff dashboard', () => {
     expect(landingPathForRole('teacher')).toBe('/teacher/index');

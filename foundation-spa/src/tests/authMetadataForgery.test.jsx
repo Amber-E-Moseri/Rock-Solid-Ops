@@ -105,7 +105,7 @@ describe('forged metadata cannot grant access', () => {
     await settled();
     expect(JSON.parse(screen.getByTestId('state').textContent).role).toBe('teacher');
     expect(screen.queryByText('SECRET PAGE')).not.toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId('location').textContent).toMatch(/error=unauthorized/));
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/teacher/index'));
   });
 
   it('fails closed when no profile row exists, even with forged superadmin metadata', async () => {

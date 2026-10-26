@@ -18,6 +18,7 @@ vi.mock('../components/pwa/PushToggle.jsx', () => ({
 }));
 
 import Shell from '../components/layout/Shell.jsx';
+import { ToastProvider } from '../context/ToastContext.jsx';
 
 function LocationProbe() {
   const location = useLocation();
@@ -26,16 +27,18 @@ function LocationProbe() {
 
 function renderTeacherShell() {
   return render(
-    <MemoryRouter initialEntries={['/teacher/index']}>
-      <Routes>
-        <Route
-          path="/teacher/index"
-          element={<Shell pageTitle="Teacher Portal"><p>content</p></Shell>}
-        />
-        <Route path="/auth/login" element={<div>login page</div>} />
-      </Routes>
-      <LocationProbe />
-    </MemoryRouter>
+    <ToastProvider>
+      <MemoryRouter initialEntries={['/teacher/index']}>
+        <Routes>
+          <Route
+            path="/teacher/index"
+            element={<Shell pageTitle="Teacher Portal"><p>content</p></Shell>}
+          />
+          <Route path="/auth/login" element={<div>login page</div>} />
+        </Routes>
+        <LocationProbe />
+      </MemoryRouter>
+    </ToastProvider>
   );
 }
 
