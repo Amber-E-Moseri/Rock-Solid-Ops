@@ -40,6 +40,9 @@ vi.mock('../features/teacher-attendance/TeacherAttendancePage.jsx', () => ({
 vi.mock('../features/attendance/AttendancePage.jsx', () => ({
   default: () => <p>STAFF ATTENDANCE PAGE</p>,
 }));
+vi.mock('../features/dashboards/DashboardsPage.jsx', () => ({
+  default: () => <p>DASHBOARDS PAGE</p>,
+}));
 
 import App from '../App.jsx';
 
@@ -60,10 +63,10 @@ describe('teacher attendance route guard (App.jsx)', () => {
     state.profile = null;
   });
 
-  it('denies an admin and sends them to login as unauthorized', async () => {
+  it('denies an admin and sends them to their staff landing', async () => {
     renderAt('/teacher/attendance', 'admin');
-    expect(await screen.findByText(/LOGIN PAGE/)).toBeTruthy();
-    expect(screen.getByText(/LOGIN PAGE/).textContent).toContain('error=unauthorized');
+    expect(await screen.findByText('DASHBOARDS PAGE')).toBeTruthy();
+    expect(screen.queryByText(/LOGIN PAGE/)).toBeNull();
     expect(screen.queryByText('TEACHER ATTENDANCE PAGE')).toBeNull();
   });
 
@@ -78,8 +81,8 @@ describe('teacher attendance route guard (App.jsx)', () => {
     if (allowed) {
       expect(await screen.findByText('TEACHER ATTENDANCE PAGE')).toBeTruthy();
     } else {
-      expect(await screen.findByText(/LOGIN PAGE/)).toBeTruthy();
-      expect(screen.getByText(/LOGIN PAGE/).textContent).toContain('error=unauthorized');
+      expect(await screen.findByText('DASHBOARDS PAGE')).toBeTruthy();
+      expect(screen.queryByText(/LOGIN PAGE/)).toBeNull();
     }
   });
 

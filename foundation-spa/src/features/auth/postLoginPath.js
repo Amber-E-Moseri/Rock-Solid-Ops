@@ -6,6 +6,9 @@ import { landingPathForRole, TEACHER_LANDING, STAFF_LANDING } from '../../routin
 // protocol-relative redirects.
 const UNSAFE = /[\s\u0000-\u001f\u007f-\u009f\\]/;
 const APP_ORIGIN = 'https://app.invalid';
+// The SPA router already applies its /app basename, so a target carrying another base
+// would be doubled, and /auth targets would send a signed-in user back to the sign-in screen.
+const INCOMPATIBLE_PREFIX = /^\/(app|foundation|auth)(?=[/?#]|$)/i;
 
 // Returns `raw` when it is a same-origin, app-local path, otherwise null. Both
 // the raw value and one percent-decoded copy are checked, so encoded bypasses
@@ -28,6 +31,7 @@ export function safeNextPath(raw) {
     return null;
   }
   if (url.origin !== APP_ORIGIN) return null;
+  if (INCOMPATIBLE_PREFIX.test(raw) || INCOMPATIBLE_PREFIX.test(decoded)) return null;
   return raw;
 }
 

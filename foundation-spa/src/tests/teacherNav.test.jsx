@@ -14,6 +14,7 @@ vi.mock('../components/pwa/PushToggle.jsx', () => ({
 }));
 
 import Shell from '../components/layout/Shell.jsx';
+import { ToastProvider } from '../context/ToastContext.jsx';
 
 const TEACHER = { role: 'teacher', full_name: 'RSO Test Teacher', email: 'teacher@example.test' };
 const ADMIN = { role: 'admin', full_name: 'RSO Test Staff', email: 'admin@example.test' };
@@ -21,9 +22,11 @@ const ADMIN = { role: 'admin', full_name: 'RSO Test Staff', email: 'admin@exampl
 function renderShell(profile) {
   state.profile = profile;
   return render(
-    <MemoryRouter initialEntries={['/teacher/index']}>
-      <Shell pageTitle="Teacher Portal"><p>content</p></Shell>
-    </MemoryRouter>
+    <ToastProvider>
+      <MemoryRouter initialEntries={['/teacher/index']}>
+        <Shell pageTitle="Teacher Portal"><p>content</p></Shell>
+      </MemoryRouter>
+    </ToastProvider>
   );
 }
 

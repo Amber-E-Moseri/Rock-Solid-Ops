@@ -3,6 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { PushToggle } from '../pwa/PushToggle.jsx';
 import { TEACHER_ONBOARDING_CERTIFIED } from '../../releaseHolds.js';
+import { useAccessNotice } from './useAccessNotice.js';
 import {
   LayoutDashboard, Shield, Calendar, Users, Clock, BookOpen,
   BarChart2, CheckSquare, CalendarCheck, TrendingUp, HelpCircle,
@@ -99,6 +100,7 @@ export default function Shell({ children, pageTitle }) {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  useAccessNotice();
 
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; }
