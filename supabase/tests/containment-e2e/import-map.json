@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "https://esm.sh/@supabase/supabase-js@2": "./fake-supabase.ts",
+    "jsr:@supabase/functions-js/edge-runtime.d.ts": "./empty.ts"
+  }
+}

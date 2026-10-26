@@ -68,7 +68,8 @@ describe('Applicant Directory exposes no unauthorized retry control', () => {
       return text.includes('retry-worker') || text.includes('retryFailedNotification');
     });
     // Only the helper's own module may name them. No component may wire a retry control.
-    expect(offenders.filter((f) => !f.endsWith('lib/mutations.js'))).toEqual([]);
+    // readdirSync returns OS-native separators, so normalise to '/' before matching (Windows uses '\').
+    expect(offenders.filter((f) => !f.replace(/\\/g, '/').endsWith('lib/mutations.js'))).toEqual([]);
   });
 
   it('retryFailedNotification refuses non-admin roles before any request', async () => {

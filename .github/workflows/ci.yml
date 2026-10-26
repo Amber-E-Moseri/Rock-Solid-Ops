@@ -63,6 +63,18 @@ jobs:
         # The legacy /foundation login must not send Auth reset requests while the hold is in force.
         run: node --test tests/legacy-login-recovery-hold.test.mjs
 
+      - name: Run legacy teacher-activation regression test
+        # Legacy Teacher Management never marks a teacher ACTIVE without the sign-in role, and surfaces role-write errors.
+        run: node --test tests/legacy-teacher-activation.test.mjs
+
+      - name: Run PR #41 / PR #47 reconciliation hold regression test
+        # Pins the reconciled holds, the admin/superadmin retry roles, verify_jwt, and the email_queue select.
+        run: node --test tests/reconciliation-holds.test.mjs
+
+      - name: Run Moodle compatibility static checks (PR #41)
+        # Staff dashboard retry is disabled, system-health uses the admin session, and no browser code holds service-role material.
+        run: node --test tests/moodle-compat.test.mjs
+
   # ──────────────────────────────────────────────────────────────
   # Job 2: Migration gate — db reset + schema invariant check.
   # Verifies the full migration chain replays cleanly from zero

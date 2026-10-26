@@ -29,9 +29,15 @@ DENO_UNIT_TESTS=(
   "supabase/functions/admin-api/role-boundary-matrix.test.ts"
   "supabase/functions/teacher-portal-api/class-ownership.test.ts"
   "supabase/functions/teacher-portal-api/teacher-auth.test.ts"
+  "supabase/functions/teacher-portal-api/attendance-submit-hold.test.ts"
   "supabase/functions/waitlist-processor/waitlist-dedup.test.ts"
   "supabase/functions/registration-processor/registration-processor.test.ts"
   "supabase/functions/nexus-users-search/nexus-cors.test.ts"
+  "supabase/functions/_shared/moodle-sync-auth.test.ts"
+  "supabase/functions/_shared/function-jwt-config.test.ts"
+  "supabase/functions/_shared/request-origin.test.ts"
+  "supabase/functions/moodle-sync/moodle-sync-contract.test.ts"
+  "supabase/functions/retry-worker/retry-worker-contract.test.ts"
   # moodle-sync/moodle-sync.test.ts excluded: pre-existing type errors +
   # top-level Deno.serve() in index.ts prevents import (tracked separately)
 )
@@ -39,6 +45,11 @@ DENO_UNIT_TESTS=(
 cd "$ROOT"
 deno test --allow-env --allow-read --no-prompt --no-check --node-modules-dir=auto "${DENO_UNIT_TESTS[@]}"
 DENO_EXIT=$?
+
+# Containment E2E: runs the real moodle-sync and retry-worker handlers against the in-memory fake client.
+deno test --import-map=supabase/tests/containment-e2e/import-map.json --allow-env --allow-read --no-prompt --no-check --node-modules-dir=auto supabase/tests/containment-e2e/containment-e2e.test.ts
+E2E_EXIT=$?
+if [ $E2E_EXIT -ne 0 ]; then DENO_EXIT=$E2E_EXIT; fi
 
 echo ""
 echo "========================================"

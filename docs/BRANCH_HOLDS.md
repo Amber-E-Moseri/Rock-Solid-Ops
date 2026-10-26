@@ -189,6 +189,14 @@ for unauthenticated callers, but the check must still be recorded.
 Release flags, all `false`: `APPROVAL_CERTIFIED`, `MOODLE_RETRY_CERTIFIED` (SPA and server constant),
 `ATTENDANCE_SUBMIT_CERTIFIED`, `TEACHER_ONBOARDING_CERTIFIED`, `APPROVAL_CONTRACT_AVAILABLE`.
 
+### `reconcile/pr41-into-pr47` — retry-worker scheduler HOLD: scheduled Moodle retry sweeps stay disabled (2026-10-26)
+
+Owner decision: keep scheduled Moodle retry sweeps disabled. Local reconciliation candidate `94e691f`, not deployed.
+
+- `SCHEDULED_SWEEP_ENABLED = false` in `retry-worker/index.ts` stays. No scheduler authentication mechanism is added in this release.
+- The production `retry-worker` cron is treated as uncertified, even though its schedule remains present. Its request headers are not in the repository. Under the current function authorization it cannot authenticate as a user session, so it is refused.
+- `retry-worker` keeps `verify_jwt = true` in the candidate. Production gateway setting is unverified and is not changed by this hold.
+- Lifting this hold needs a new owner decision on a scheduler identity the function can verify, a certified contract, and a recorded change here.
 
 ## Resolved (moot — already merged)
 

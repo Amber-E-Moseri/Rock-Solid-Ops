@@ -421,20 +421,33 @@
         pushCheck("moodle-mapping", "Moodle Course Mapping", "warn", adminApi.normalizeError(e));
       }
 
-      // Moodle API live connectivity check (core_webservice_get_site_info)
+      // The Moodle connectivity test is not part of automatic checks. It runs only from runMoodleConnectivityTest,
+      // on an explicit administrator action, so opening System Health sends no Moodle request.
+    }
+
+    // Explicit administrator action only. Opening the page never calls this. One read-only moodle-sync "test"
+    // request (core_webservice_get_site_info), authorized by the admin session JWT. The anon key is only apikey.
+    async function runMoodleConnectivityTest() {
+      const btn = $("moodleTestBtn");
+      if (btn) btn.disabled = true;
+      let result;
       try {
         const cfg = adminApi?.getConfig?.() || {};
         const supabaseUrl = String(window.FS_CONFIG?.SUPABASE_URL || cfg.url || "").trim();
         const anonKey = String(window.FS_CONFIG?.SUPABASE_ANON_KEY || cfg.anonKey || "").trim();
+        const { data: sess } = await supabase.auth.getSession();
+        const token = sess?.session?.access_token;
         if (!supabaseUrl || !anonKey) {
-          pushCheck("moodle-api", "Moodle API Connectivity", "warn", "Missing runtime config — cannot test Moodle connection.");
+          result = ["warn", "Missing runtime config — cannot test Moodle connection."];
+        } else if (!token) {
+          result = ["warn", "Admin sign-in required to test Moodle connectivity."];
         } else {
           const moodleRes = await withTimeout(
             "moodle-api-test",
             () => fetch(`${supabaseUrl}/functions/v1/moodle-sync`, {
               method: "POST",
               headers: {
-                Authorization: `Bearer ${anonKey}`,
+                Authorization: `Bearer ${token}`,
                 apikey: anonKey,
                 "Content-Type": "application/json"
               },
@@ -445,18 +458,23 @@
           const moodleData = await moodleRes.json().catch(() => ({}));
           if (moodleData.ok) {
             const label = moodleData.sitename || moodleData.siteurl || moodleData.moodleUrl || "Moodle";
-            pushCheck("moodle-api", "Moodle API Connectivity", "pass", `Connected — ${label}`);
+            result = ["pass", `Connected — ${label}`];
           } else if (moodleData.code === "MOODLE_NOT_CONFIGURED") {
-            pushCheck("moodle-api", "Moodle API Connectivity", "warn", "MOODLE_URL / MOODLE_TOKEN not configured in environment.");
+            result = ["warn", "MOODLE_URL / MOODLE_TOKEN not configured in environment."];
           } else {
             const cause = moodleData.failure_reason ? ` (${moodleData.failure_reason})` : "";
             const url = moodleData.moodleUrl ? ` — ${moodleData.moodleUrl}` : "";
-            pushCheck("moodle-api", "Moodle API Connectivity", "fail", `${moodleData.error || moodleData.code || "Unknown error"}${cause}${url}`);
+            result = ["fail", `${moodleData.error || moodleData.code || "Unknown error"}${cause}${url}`];
           }
         }
       } catch (e) {
-        pushCheck("moodle-api", "Moodle API Connectivity", "fail", adminApi.normalizeError(e));
+        result = ["fail", adminApi.normalizeError(e)];
+      } finally {
+        if (btn) btn.disabled = false;
       }
+      state.checks = state.checks.filter((c) => c.key !== "moodle-api");
+      pushCheck("moodle-api", "Moodle API Connectivity", result[0], result[1]);
+      renderChecks();
     }
 
     async function loadMetricsAndFailures() {
@@ -571,6 +589,8 @@
         getCurrentProfile,
         getSessionOrNull
       });
+
+      $("moodleTestBtn")?.addEventListener("click", runMoodleConnectivityTest);
 
       $("refreshBtn").addEventListener("click", async () => {
         try {

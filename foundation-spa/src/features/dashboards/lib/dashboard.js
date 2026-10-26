@@ -1,5 +1,5 @@
 import { supabase } from '../../../supabase.js';
-import { MOODLE_RETRY_CERTIFIED, MOODLE_RETRY_HOLD_MESSAGE } from '../../../releaseHolds.js';
+import { isMoodleRetryHeld, MOODLE_RETRY_CERTIFIED, MOODLE_RETRY_HOLD_MESSAGE } from '../../../releaseHolds.js';
 
 // ── Scope resolution ────────────────────────────────────────────────────────
 
@@ -273,10 +273,9 @@ async function fetchActivityFeed() {
 // ── Retry action ────────────────────────────────────────────────────────────
 
 export async function retryAllFailedMoodleSyncs() {
-  // Held: the endpoint and authorization contract are unverified, so no request is sent.
-  if (!MOODLE_RETRY_CERTIFIED) throw new Error(MOODLE_RETRY_HOLD_MESSAGE);
-  const { data: sess } = await supabase.auth.getSession();
-  const token = sess?.session?.access_token;
+  // Held: the retry-worker route refuses Moodle retries until certification. Refuse before any request.
+  const source = 'moodle_enrollment_sync';
+  if (isMoodleRetryHeld('retry', source, MOODLE_RETRY_CERTIFIED)) throw new Error(MOODLE_RETRY_HOLD_MESSAGE);
   const { data: failedRows, error } = await supabase
     .from('moodle_enrollment_sync')
     .select('id')
@@ -284,13 +283,13 @@ export async function retryAllFailedMoodleSyncs() {
     .limit(100);
   if (error) throw error;
   let failed = 0;
+  // The authorized route is retry-worker. supabase.functions.invoke sends the admin session JWT, and
+  // retry-worker enforces the admin check and the server-side Moodle hold. The browser holds no service key.
   for (const row of (failedRows || [])) {
-    const res = await fetch(`${window.location.origin}/functions/v1/moodle-sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ id: row.id, limit: 1 }),
+    const { data, error: invokeError } = await supabase.functions.invoke('retry-worker', {
+      body: { action: 'retry', source, id: String(row.id) },
     });
-    if (!res.ok) failed += 1;
+    if (invokeError || !data?.ok) failed += 1;
   }
   if (failed > 0) throw new Error(`${failed} Moodle sync retr${failed === 1 ? 'y' : 'ies'} failed`);
 }
