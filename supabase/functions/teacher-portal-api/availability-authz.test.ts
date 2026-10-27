@@ -5,7 +5,7 @@ import { ApiError } from "./_lib/errors.ts";
 
 // Fake service-role client. Reads are answered from `teachers`; every write (and rpc) is recorded so a refusal
 // can be checked for zero side effects. Audit inserts are recorded too, but they are excluded from stateWrites.
-function fakeDb(teachers: any[] = []) {
+function fakeDb(teachers: any[] = [], availability: any[] = []) {
   const writes: { table: string; op: string; payload?: any }[] = [];
   const db: any = {
     from(table: string) {
@@ -21,7 +21,12 @@ function fakeDb(teachers: any[] = []) {
           const row = table === "teachers" ? teachers.find((t) => t.teacher_id === filters.teacher_id) ?? null : null;
           return Promise.resolve({ data: row, error: null });
         },
-        then(resolve: any) { return Promise.resolve({ data: [], error: null }).then(resolve); },
+        then(resolve: any) {
+          const data = table === "teacher_availability"
+            ? availability.filter((r) => r.teacher_id === filters.teacher_id)
+            : [];
+          return Promise.resolve({ data, error: null }).then(resolve);
+        },
         upsert(payload: unknown) { writes.push({ table, op: "upsert", payload }); return Promise.resolve({ error: null }); },
         insert(payload: unknown) { writes.push({ table, op: "insert", payload }); return Promise.resolve({ error: null }); },
       };
@@ -228,4 +233,98 @@ Deno.test("Availability approval hold: request parameters cannot lift the hold",
     423,
   );
   if (touches.length !== 0) throw new Error(`no database access allowed, saw: ${touches.join(", ")}`);
+});
+
+// ---- Attribution: created_by / updated_by ---------------------------------------------------------------------
+
+function upsertedRows(writes: { table: string; op: string; payload?: any }[]) {
+  return writes
+    .filter((w) => w.table === "teacher_availability" && w.op === "upsert")
+    .flatMap((w) => w.payload as any[]);
+}
+
+const creatorSlots = [
+  { teacherDay: "Monday", timeSlot: "19:00", campusCode: "YORK" },
+  { teacherDay: "Tuesday", timeSlot: "20:00", campusCode: "YORK" },
+];
+
+Deno.test("Attribution: teacher self-write records the teacher as created_by and updated_by", async () => {
+  const { db, writes } = fakeDb(TEACHERS);
+  await submitTeacherAvailabilityAction({ db, auth: authFor("teacher", "t1"), params: { slots } });
+  const rows = upsertedRows(writes);
+  if (rows.length !== 1) throw new Error(`expected 1 row, saw ${rows.length}`);
+  if (rows[0].created_by !== "teacher@example.com" || rows[0].updated_by !== "teacher@example.com") {
+    throw new Error(`expected teacher attribution, saw ${rows[0].created_by} / ${rows[0].updated_by}`);
+  }
+});
+
+Deno.test("Attribution: admin writing on behalf of a teacher is attributed to the admin, not the target", async () => {
+  const { db, writes } = fakeDb(TEACHERS);
+  await submitTeacherAvailabilityAction({ db, auth: authFor("admin", ""), params: { slots, teacherId: "t2" } });
+  const rows = upsertedRows(writes);
+  if (rows[0].teacher_id !== "t2") throw new Error(`row must belong to t2, saw ${rows[0].teacher_id}`);
+  if (rows[0].created_by !== "admin@example.com" || rows[0].updated_by !== "admin@example.com") {
+    throw new Error(`expected admin attribution, saw ${rows[0].created_by} / ${rows[0].updated_by}`);
+  }
+});
+
+Deno.test("Attribution: updating an existing row preserves its original created_by", async () => {
+  const existing = [
+    { teacher_id: "t1", day: "Monday", time_slot: "19:00:00", batch_id: null, created_by: "original@example.com" },
+  ];
+  const { db, writes } = fakeDb(TEACHERS, existing);
+  await submitTeacherAvailabilityAction({ db, auth: authFor("teacher", "t1"), params: { slots } });
+  const rows = upsertedRows(writes);
+  if (rows[0].created_by !== "original@example.com") throw new Error(`created_by was overwritten: ${rows[0].created_by}`);
+  if (rows[0].updated_by !== "teacher@example.com") throw new Error(`updated_by must be the actor, saw ${rows[0].updated_by}`);
+});
+
+Deno.test("Attribution: a new row gets the actor while an existing row in the same submission keeps its creator", async () => {
+  const existing = [
+    { teacher_id: "t1", day: "Monday", time_slot: "19:00:00", batch_id: null, created_by: "original@example.com" },
+  ];
+  const { db, writes } = fakeDb(TEACHERS, existing);
+  await submitTeacherAvailabilityAction({ db, auth: authFor("teacher", "t1"), params: { slots: creatorSlots } });
+  const rows = upsertedRows(writes);
+  const monday = rows.find((r) => r.day === "Monday");
+  const tuesday = rows.find((r) => r.day === "Tuesday");
+  if (!monday || !tuesday) throw new Error("expected both Monday and Tuesday rows");
+  if (monday.created_by !== "original@example.com") throw new Error(`existing row lost its creator: ${monday.created_by}`);
+  if (tuesday.created_by !== "teacher@example.com") throw new Error(`new row must be attributed to the actor: ${tuesday.created_by}`);
+  if (monday.updated_by !== "teacher@example.com" || tuesday.updated_by !== "teacher@example.com") {
+    throw new Error("updated_by must be the actor on every row");
+  }
+});
+
+Deno.test("Attribution: teacher-supplied created_by / updated_by / teacherEmail are ignored", async () => {
+  const existing = [
+    { teacher_id: "t1", day: "Monday", time_slot: "19:00:00", batch_id: null, created_by: "original@example.com" },
+  ];
+  const { db, writes } = fakeDb(TEACHERS, existing);
+  await submitTeacherAvailabilityAction({
+    db,
+    auth: authFor("teacher", "t1"),
+    params: {
+      slots,
+      created_by: "spoof@example.com",
+      updated_by: "admin@example.com",
+      teacherEmail: "t2@example.com",
+    },
+  });
+  const rows = upsertedRows(writes);
+  if (rows[0].created_by !== "original@example.com") throw new Error(`spoofed request replaced the creator: ${rows[0].created_by}`);
+  if (rows[0].updated_by !== "teacher@example.com") throw new Error(`spoofed request set updated_by: ${rows[0].updated_by}`);
+});
+
+Deno.test("Attribution: admin-supplied created_by in the body is ignored", async () => {
+  const { db, writes } = fakeDb(TEACHERS);
+  await submitTeacherAvailabilityAction({
+    db,
+    auth: authFor("admin", ""),
+    params: { slots, teacherId: "t2", created_by: "spoof@example.com", updated_by: "spoof@example.com" },
+  });
+  const rows = upsertedRows(writes);
+  if (rows[0].created_by !== "admin@example.com" || rows[0].updated_by !== "admin@example.com") {
+    throw new Error(`body attribution must be ignored, saw ${rows[0].created_by} / ${rows[0].updated_by}`);
+  }
 });

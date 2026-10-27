@@ -1,5 +1,5 @@
 import { ApiError } from "../_lib/errors.ts";
-import { json, normalizeTimeSlot, withTimeout } from "../_lib/http.ts";
+import { json, normalizeTimeSlot, safeLower, withTimeout } from "../_lib/http.ts";
 import type { ActionContext } from "../_lib/types.ts";
 import { writeAudit } from "../_lib/teacher-auth.ts";
 import { resolveAvailabilityWriteTarget } from "../_lib/availability-write-authz.ts";
@@ -15,6 +15,11 @@ function normalizeCampusCodes(raw: unknown): string[] {
   return [...uniq];
 }
 
+// Identity of one availability row for the upsert conflict target (teacher_id, batch_id, day, time_slot).
+function availabilityKey(day: unknown, timeSlot: unknown, batchId: unknown): string {
+  return `${String(day ?? "")}__${String(timeSlot ?? "")}__${String(batchId ?? "")}`;
+}
+
 export async function submitTeacherAvailabilityAction(ctx: ActionContext): Promise<Response> {
   const { db, auth, params } = ctx;
 
@@ -22,6 +27,10 @@ export async function submitTeacherAvailabilityAction(ctx: ActionContext): Promi
   // resolveAvailabilityWriteTarget). A client-supplied teacherId or teacherEmail never overrides it, and refused
   // roles get the authorization refusal before any payload validation or database write.
   const { teacherId, teacherEmail } = await resolveAvailabilityWriteTarget(db, auth, params);
+
+  // created_by / updated_by record the authenticated actor. They are never the target teacher's email and never a
+  // client-supplied value, so an admin write is attributed to the admin.
+  const actorEmail = safeLower(auth?.user?.email || auth?.teacher?.email || "") || null;
 
   const slots = Array.isArray(params.slots) ? params.slots : [];
   if (!slots.length) throw new ApiError("INVALID_PAYLOAD", "No slots provided", 400);
@@ -72,12 +81,31 @@ export async function submitTeacherAvailabilityAction(ctx: ActionContext): Promi
       selected_fellowship_codes: selectedCodes,
       status: "Tentative",
       notes: String(`Teacher portal submission${month || year ? ` - ${month} ${year}` : ""}`).slice(0, 300),
-      created_by: teacherEmail || auth?.teacher?.email || null,
-      updated_by: teacherEmail || auth?.teacher?.email || null,
+      created_by: actorEmail,
+      updated_by: actorEmail,
     };
   });
 
   if (!inserts.length) throw new ApiError("INVALID_PAYLOAD", "No valid availability slots", 400);
+
+  // The upsert overwrites every column it sends, so created_by must be carried over from an existing row. A new row
+  // is attributed to the authenticated actor. A request-supplied created_by is never read.
+  const existingRes = await withTimeout(
+    db
+      .from("teacher_availability")
+      .select("day,time_slot,batch_id,created_by")
+      .eq("teacher_id", teacherId),
+    "load existing availability creators",
+  );
+  if (existingRes.error) throw new ApiError("INTERNAL_ERROR", "Failed to load existing availability", 500);
+  const creatorByKey = new Map<string, string | null>();
+  for (const row of existingRes.data || []) {
+    creatorByKey.set(availabilityKey(row.day, row.time_slot, row.batch_id), row.created_by ?? null);
+  }
+  for (const row of inserts) {
+    const key = availabilityKey(row.day, row.time_slot, row.batch_id);
+    row.created_by = creatorByKey.has(key) ? creatorByKey.get(key) ?? null : actorEmail;
+  }
 
   const insertRes = await withTimeout(
     db
