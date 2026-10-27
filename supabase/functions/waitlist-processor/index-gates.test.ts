@@ -22,6 +22,10 @@ Deno.test("an unauthorized caller gets a status response and no further work", (
   assert(source.slice(refusal, body).includes("return jsonResponse("));
 });
 
+Deno.test("the refusal body carries the same statusCode as the HTTP status", () => {
+  assert(source.includes("return jsonResponse({ ok: false, error: decision.code, statusCode: decision.status }, decision.status);"));
+});
+
 Deno.test("the class-state gate runs before any notification for a slot", () => {
   const gate = source.indexOf("if (!isClassOpenForSelection(classInfo))");
   const notify = source.indexOf("await notifyClassNowAvailable(slot, classInfo, results);");

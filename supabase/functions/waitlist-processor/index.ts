@@ -246,7 +246,7 @@ Deno.serve(async (req) => {
     verifyStaff: verifyStaffBearer,
   });
   if (!decision.ok) {
-    return jsonResponse({ ok: false, error: decision.code }, decision.status);
+    return jsonResponse({ ok: false, error: decision.code, statusCode: decision.status }, decision.status);
   }
 
   try {
