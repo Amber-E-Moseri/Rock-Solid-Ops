@@ -16,6 +16,7 @@ interface Slot {
   class_slot_id: string;
   class_option_id: string;
   batch_id: string;
+  status: string;
   max_capacity: number | null;
   current_enrolment: number;
 }
@@ -267,7 +268,7 @@ Deno.serve(async (req) => {
       const { data } = await withTimeout(
         sb
           .from("class_slots")
-          .select("class_slot_id,class_option_id,batch_id,max_capacity,current_enrolment")
+          .select("class_slot_id,class_option_id,batch_id,status,max_capacity,current_enrolment")
           .eq("class_option_id", body.class_option_id)
           .eq("batch_id", body.batch_id)
           .eq("status", "Active")
@@ -285,7 +286,7 @@ Deno.serve(async (req) => {
         const { data } = await withTimeout(
           sb
             .from("class_slots")
-            .select("class_slot_id,class_option_id,batch_id,max_capacity,current_enrolment")
+            .select("class_slot_id,class_option_id,batch_id,status,max_capacity,current_enrolment")
             .in("batch_id", batchIds)
             .eq("status", "Active")
             .limit(200),

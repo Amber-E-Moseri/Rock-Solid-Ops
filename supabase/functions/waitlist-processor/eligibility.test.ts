@@ -28,6 +28,25 @@ Deno.test("a missing class row is not open for selection", () => {
   assertEquals(isClassOpenForSelection(undefined), false);
 });
 
+// Rows shaped exactly as the processor's slot select returns them (see index.ts).
+const slotRow = {
+  class_slot_id: "slot-1",
+  class_option_id: "CO-CEA-FRI-0900-RSOTEST",
+  batch_id: "2025A",
+  status: "Active",
+  max_capacity: 1,
+  current_enrolment: 0,
+};
+
+Deno.test("an Active slot row passes the slot gate and a Cancelled one does not", () => {
+  assertEquals(isSlotActive(slotRow), true);
+  assertEquals(isSlotActive({ ...slotRow, status: "Cancelled" }), false);
+});
+
+Deno.test("a slot row without status fails closed", () => {
+  assertEquals(isSlotActive({ ...slotRow, status: undefined }), false);
+});
+
 Deno.test("only an Active slot is processed", () => {
   assertEquals(isSlotActive({ status: "Active" }), true);
   assertEquals(isSlotActive({ status: "Cancelled" }), false);

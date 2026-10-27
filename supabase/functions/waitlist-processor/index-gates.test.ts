@@ -40,6 +40,18 @@ Deno.test("skipped closed classes are reported in the run result", () => {
   assert(source.includes("results.skipped_class_closed += 1;"));
 });
 
+Deno.test("both slot queries select status, so the slot gate can read it", () => {
+  const selects = source.match(/\.select\("class_slot_id,[^"]*"\)/g) ?? [];
+  assert(selects.length === 2, `expected 2 slot queries, found ${selects.length}`);
+  for (const select of selects) {
+    assert(select.split(",").includes("status"), `slot query omits status: ${select}`);
+  }
+});
+
+Deno.test("the slot row type declares status", () => {
+  assert(/interface Slot \{[^}]*\bstatus: string;/.test(source));
+});
+
 Deno.test("class lookup selects the state fields the gate needs", () => {
   assert(source.includes('.select("teacher_name,day,class_time,fellowship_codes,active,enrollment_open,deleted_at")'));
 });
