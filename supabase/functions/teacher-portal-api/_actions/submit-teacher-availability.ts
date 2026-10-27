@@ -1,7 +1,8 @@
 import { ApiError } from "../_lib/errors.ts";
-import { json, normalizeTimeSlot, safeLower, withTimeout } from "../_lib/http.ts";
+import { json, normalizeTimeSlot, withTimeout } from "../_lib/http.ts";
 import type { ActionContext } from "../_lib/types.ts";
 import { writeAudit } from "../_lib/teacher-auth.ts";
+import { resolveAvailabilityWriteTarget } from "../_lib/availability-write-authz.ts";
 import { notifyProfilesPush, resolveStaffRecipients } from "../../_shared/push-notify.ts";
 
 function normalizeCampusCodes(raw: unknown): string[] {
@@ -17,33 +18,13 @@ function normalizeCampusCodes(raw: unknown): string[] {
 export async function submitTeacherAvailabilityAction(ctx: ActionContext): Promise<Response> {
   const { db, auth, params } = ctx;
 
+  // Authorization comes first: target ownership is decided server-side from the authenticated session (see
+  // resolveAvailabilityWriteTarget). A client-supplied teacherId or teacherEmail never overrides it, and refused
+  // roles get the authorization refusal before any payload validation or database write.
+  const { teacherId, teacherEmail } = await resolveAvailabilityWriteTarget(db, auth, params);
+
   const slots = Array.isArray(params.slots) ? params.slots : [];
   if (!slots.length) throw new ApiError("INVALID_PAYLOAD", "No slots provided", 400);
-
-  const teacherEmail = safeLower(params.teacherEmail || auth?.teacher?.email || auth?.user?.email || "");
-  const teacherIdFromAuth = String(auth?.teacher?.teacherId || "").trim();
-  let teacherId = String(params.teacherId || teacherIdFromAuth || "").trim();
-
-  if (!teacherId) {
-    if (!teacherEmail) {
-      throw new ApiError("INVALID_PAYLOAD", "teacherId or teacherEmail is required", 400);
-    }
-    const teacherRes = await withTimeout(
-      db
-        .from("teachers")
-        .select("teacher_id")
-        .eq("email", teacherEmail)
-        .eq("active", true)
-        .is("deleted_at", null)
-        .limit(1)
-        .maybeSingle(),
-      "resolve teacher_id by email",
-    );
-    if (teacherRes.error || !teacherRes.data?.teacher_id) {
-      throw new ApiError("INVALID_PAYLOAD", "Teacher not found for teacherEmail", 400);
-    }
-    teacherId = String(teacherRes.data.teacher_id);
-  }
 
   const batchId = String(params.batchId || "").trim() || null;
   const month = String(params.month || "").trim();

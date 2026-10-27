@@ -6,6 +6,8 @@ export type ApiErrorCode =
   | "INVALID_PAYLOAD"
   | "REQUEST_TIMEOUT"
   | "ATTENDANCE_SUBMIT_HELD"
+  | "AVAILABILITY_WRITE_FORBIDDEN"
+  | "APPROVAL_HELD"
   | "INTERNAL_ERROR";
 
 export interface TeacherContext {
