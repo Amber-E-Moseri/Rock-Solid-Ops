@@ -1,5 +1,6 @@
 import { submitLegacyAttendanceAction } from "./_actions/submit-legacy-attendance.ts";
 import { submitTeacherAttendanceAction } from "./_actions/submit-teacher-attendance.ts";
+import { submitSessionOutcomesAction } from "./_actions/submit-session-outcomes.ts";
 import { ATTENDANCE_SUBMIT_CERTIFIED, assertAttendanceSubmitCertified } from "./_lib/attendance-submit-hold.ts";
 import { ApiError } from "./_lib/errors.ts";
 
@@ -95,5 +96,37 @@ Deno.test("Attendance hold: refusal also holds for an empty payload, before vali
   const { db, touches } = spyDb();
   await expectHeld(() => submitLegacyAttendanceAction({ db, auth, params: {} }));
   await expectHeld(() => submitTeacherAttendanceAction({ db, auth, params: {} }));
+  if (touches.length !== 0) throw new Error(`no database access allowed, saw: ${touches.join(", ")}`);
+});
+
+Deno.test("Attendance hold: submitSessionOutcomes refuses direct requests with no side effects", async () => {
+  const { db, touches } = spyDb();
+  const outcomesParams = {
+    classOptionId: "c1",
+    classSession: "Class1",
+    classDate: "2026-10-26",
+    submitted: true,
+    entries: [{ studentId: "s1", personType: "student", milestoneId: "m1", outcomeResult: "Pass" }],
+  };
+  await withFetchSpy(async (calls) => {
+    await expectHeld(() => submitSessionOutcomesAction({ db, auth, params: outcomesParams }));
+    if (touches.length !== 0) throw new Error(`no database access allowed, saw: ${touches.join(", ")}`);
+    if (calls.length !== 0) throw new Error(`no external call allowed, saw: ${calls.join(", ")}`);
+  });
+});
+
+Deno.test("Attendance hold: submitSessionOutcomes refusal holds for an empty or unauthenticated call", async () => {
+  const { db, touches } = spyDb();
+  await expectHeld(() => submitSessionOutcomesAction({ db, auth, params: {} }));
+  await expectHeld(() => submitSessionOutcomesAction({ db, auth: null as any, params: {} }));
+  if (touches.length !== 0) throw new Error(`no database access allowed, saw: ${touches.join(", ")}`);
+});
+
+Deno.test("Attendance hold: every attendance submit action is refused before any side effect", async () => {
+  const { db, touches } = spyDb();
+  const actions = [submitTeacherAttendanceAction, submitLegacyAttendanceAction, submitSessionOutcomesAction];
+  for (const action of actions) {
+    await expectHeld(() => action({ db, auth, params }));
+  }
   if (touches.length !== 0) throw new Error(`no database access allowed, saw: ${touches.join(", ")}`);
 });
