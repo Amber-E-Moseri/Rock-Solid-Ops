@@ -3,9 +3,12 @@ import { json, normalizeTimeSlot, parseDate, safeLower, withTimeout } from "../_
 import type { ActionContext } from "../_lib/types.ts";
 import { assertClassOwnership } from "../_lib/class-ownership.ts";
 import { safeLogAudit, writeAudit } from "../_lib/teacher-auth.ts";
+import { assertAvailabilityApprovalCertified } from "../_lib/approval-hold.ts";
 
 
 export async function approveAvailabilityAction(ctx: ActionContext): Promise<Response> {
+  // Refuse before any database read, write, audit or external call while availability approval is uncertified.
+  assertAvailabilityApprovalCertified();
   const { db, auth, params } = ctx;
       // INVARIANT: After this step, at least one class_options row must exist
       // for batch_id + class_option_id. If missing, audit and throw — do not proceed.
